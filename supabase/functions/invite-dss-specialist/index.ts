@@ -1,0 +1,135 @@
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Origin': '*',
+};
+
+const response = (status: number, body: Record<string, unknown>) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+});
+
+Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (request.method !== 'POST') return response(405, { error: 'Method not allowed' });
+
+  const authorization = request.headers.get('Authorization');
+  const origin = request.headers.get('Origin');
+  if (!authorization || !origin) return response(401, { error: 'Authenticated request required' });
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SECRET_KEY');
+  if (!supabaseUrl || !anonKey || !serviceKey) return response(500, { error: 'Supabase function environment is incomplete' });
+
+  const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
+  const adminClient = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: { user: manager }, error: authError } = await userClient.auth.getUser();
+  if (authError || !manager) return response(401, { error: 'Session is invalid or expired' });
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return response(400, { error: 'Invalid request body' });
+  }
+
+  const organizationId = String(body.organizationId ?? '');
+  const email = String(body.email ?? '').trim().toLowerCase();
+  const redirectTo = String(body.redirectTo ?? '');
+  let redirectUrl: URL;
+  try {
+    redirectUrl = new URL(redirectTo);
+  } catch {
+    return response(400, { error: 'Invalid invitation redirect URL' });
+  }
+  if (!organizationId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || redirectUrl.origin !== origin) {
+    return response(400, { error: 'DSS invitation data is invalid' });
+  }
+
+  const { data: managerMembership, error: managerMembershipError } = await userClient
+    .from('organization_memberships')
+    .select('role')
+    .eq('organization_id', organizationId)
+    .eq('user_id', manager.id)
+    .maybeSingle();
+  if (managerMembershipError || managerMembership?.role !== 'manager') {
+    return response(403, { error: 'Only an organization manager can invite DSS specialists' });
+  }
+
+  const { data: workspace, error: workspaceError } = await adminClient
+    .from('organization_data')
+    .select('data')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (workspaceError || !workspace?.data) return response(409, { error: 'Organization workspace is not saved yet' });
+
+  let specialistUser: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
+  let invited = false;
+  const { data: listedUsers, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listError) return response(500, { error: `Could not look up the DSS account: ${listError.message}` });
+  specialistUser = listedUsers.users.find((candidate) => candidate.email?.toLowerCase() === email) ?? null;
+
+  if (specialistUser) {
+    const { data: profile, error: profileError } = await adminClient
+      .from('profiles')
+      .select('full_name, account_type')
+      .eq('id', specialistUser.id)
+      .maybeSingle();
+    if (profileError) return response(500, { error: profileError.message });
+    if (profile?.account_type !== 'dss_specialist') {
+      return response(409, { error: 'This email already belongs to a different account type' });
+    }
+  } else {
+    const { data: invitation, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: {
+        full_name: email,
+        account_type: 'dss_specialist',
+        employee_needs_password: true,
+      },
+      redirectTo: redirectUrl.toString(),
+    });
+    if (inviteError || !invitation.user) return response(400, { error: inviteError?.message ?? 'Could not send DSS invitation' });
+    specialistUser = invitation.user;
+    invited = true;
+  }
+
+  const fullName = String(specialistUser.user_metadata?.full_name ?? email);
+  const organization = workspace.data.organizations?.find((item: Record<string, unknown>) => item.id === organizationId);
+  if (!organization) {
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(404, { error: 'Organization workspace was not found' });
+  }
+
+  const nextOrganizations = workspace.data.organizations.map((item: Record<string, unknown>) => item.id === organizationId
+    ? { ...item, dss: [...new Set([...(Array.isArray(item.dss) ? item.dss : []), specialistUser.id])], dssInvitations: (item.dssInvitations ?? []).filter((invite: Record<string, unknown>) => invite.specialistId !== specialistUser?.id) }
+    : item);
+  const nextSpecialists = [...(workspace.data.specialists ?? []).filter((item: Record<string, unknown>) => item.id !== specialistUser?.id), {
+    id: specialistUser.id,
+    name: fullName,
+    email,
+    status: 'Paskyra patvirtinta',
+  }];
+  const { error: updateError } = await adminClient.from('organization_data').update({
+    data: { ...workspace.data, organizations: nextOrganizations, specialists: nextSpecialists },
+  }).eq('organization_id', organizationId);
+  if (updateError) {
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(500, { error: `Could not save DSS assignment: ${updateError.message}` });
+  }
+
+  const { error: membershipError } = await adminClient.from('organization_memberships').upsert({
+    organization_id: organizationId,
+    user_id: specialistUser.id,
+    role: 'dss_specialist',
+  }, { onConflict: 'organization_id,user_id' });
+  if (membershipError) {
+    await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(500, { error: `Could not link DSS account: ${membershipError.message}` });
+  }
+
+  return response(200, { userId: specialistUser.id, fullName, email, invited });
+});

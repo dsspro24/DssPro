@@ -46,6 +46,7 @@ import {
   Shirt,
   Trash2,
   Upload,
+  UserPlus,
   X,
 } from 'lucide-react';
 
@@ -561,6 +562,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [commissionSigningTarget, setCommissionSigningTarget] = useState(null);
   const [commissionSignPin, setCommissionSignPin] = useState('');
   const [commissionSignError, setCommissionSignError] = useState('');
+  const [commissionPinStatus, setCommissionPinStatus] = useState({ organizationId: null, members: {} });
   const [dssSigningTasks, setDssSigningTasks] = useState([]);
   const [signPinDraft, setSignPinDraft] = useState('');
   const [dssSigningError, setDssSigningError] = useState('');
@@ -606,6 +608,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
       return () => window.clearTimeout(timeout);
     }
+
+    if (userRole === 'dss') return undefined;
 
     const organization = data.organizations.find((item) => item.id === selectedOrgId);
     if (!organization) return undefined;
@@ -657,6 +661,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.removeEventListener('afterprint', clearPrintMode);
     };
   }, [archivePrintMode]);
+
+  useEffect(() => {
+    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    let active = true;
+    supabase.rpc('get_commission_signer_status', { input_organization_id: selectedOrgId })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setNotice(`Komisijos PIN būsenos įkelti nepavyko: ${error.message}`);
+        else setCommissionPinStatus({ organizationId: selectedOrgId, members: data ?? {} });
+      });
+    return () => { active = false; };
+  }, [cloudMode, selectedOrgId, userRole]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
@@ -1373,7 +1389,32 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     closeEmployeeEditor();
   };
 
-  const inviteSpecialist = (specialist) => {
+  const inviteSpecialist = async (specialist) => {
+    if (cloudMode) {
+      const { data: invitation, error } = await supabase.functions.invoke('invite-dss-specialist', {
+        body: { organizationId: currentOrg.id, email: specialist.email, redirectTo: window.location.origin },
+      });
+      if (error) {
+        let message = error.message;
+        if (error.context instanceof Response) {
+          const details = await error.context.clone().json().catch(() => null);
+          message = details?.error ?? message;
+        }
+        setNotice(`DSS specialisto pakviesti nepavyko: ${message}`);
+        return;
+      }
+      const invitedSpecialist = { id: invitation.userId, name: invitation.fullName, email: invitation.email, status: 'Paskyra patvirtinta' };
+      setData((current) => ({
+        ...current,
+        specialists: [...current.specialists.filter((item) => item.id !== invitedSpecialist.id), invitedSpecialist],
+        organizations: current.organizations.map((org) => org.id === currentOrg.id
+          ? { ...org, dss: [...new Set([...org.dss, invitedSpecialist.id])] }
+          : org),
+      }));
+      setSpecialistQuery('');
+      setNotice(invitation.invited ? `Kvietimo nuoroda išsiųsta ${invitation.email}.` : `DSS specialistas ${invitation.email} pridėtas prie įmonės.`);
+      return;
+    }
     if (currentOrg.dss.includes(specialist.id) || currentOrg.dssInvitations?.some((invite) => invite.specialistId === specialist.id)) {
       setNotice(`${specialist.name} jau priskirtas arba pakviestas į šią įmonę.`);
       return;
@@ -1393,7 +1434,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const requestDssSign = (tasks) => {
-    if (!currentSpecialist?.pin) {
+    if (!cloudMode && !currentSpecialist?.pin) {
       setActiveTab('paskyra');
       setNotice('Prieš pasirašydami dokumentus, nustatykite 4 skaitmenų PIN.');
       return;
@@ -1404,10 +1445,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setDssSigningError('');
   };
 
-  const signDssTask = (event) => {
+  const signDssTask = async (event) => {
     event.preventDefault();
     const specialist = data.specialists.find((person) => person.id === selectedSpecialistId);
-    if (!specialist?.pin || signPinDraft !== specialist.pin) {
+    if (!cloudMode && (!specialist?.pin || signPinDraft !== specialist.pin)) {
       setDssSigningError('PIN neteisingas arba dar nenustatytas.');
       return;
     }
@@ -1420,24 +1461,43 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setDssSigningError('Pasirašytinų dokumentų nebėra.');
       return;
     }
-    const signedAt = new Date().toISOString();
-    setData((current) => ({ ...current, signatures: [...current.signatures, ...tasksToSign.map((task, index) => {
-      const employee = current.employees.find((person) => person.id === task.employeeId);
-      const resource = current.resources.find((item) => item.id === task.resourceId);
-      return {
-        id: `sig-${Date.now()}-${index}`,
-        orgId: task.orgId,
-        employeeId: task.employeeId,
-        contractNumber: employee?.contractNumber ?? task.contractNumber ?? '',
-        resourceId: task.resourceId,
-        signer: specialist.name,
-        role: 'DSS specialistas',
-        signatureMethod: 'PIN',
-        signedAt,
-        validUntil: getValidityUntil(resource?.validityMonths),
-        ip: '127.0.0.1 (demo)',
-      };
-    })] }));
+    if (cloudMode) {
+      const signatures = [];
+      for (const task of tasksToSign) {
+        const { data: signature, error } = await supabase.rpc('record_dss_signature', {
+          input_organization_id: task.orgId,
+          input_employee_id: task.employeeId,
+          input_resource_id: task.resourceId,
+          input_pin: signPinDraft,
+        });
+        if (error || !signature) {
+          if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+          setDssSigningError(error?.message || 'PIN neteisingas arba per daug kartų bandyta.');
+          return;
+        }
+        signatures.push(signature);
+      }
+      setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+    } else {
+      const signedAt = new Date().toISOString();
+      setData((current) => ({ ...current, signatures: [...current.signatures, ...tasksToSign.map((task, index) => {
+        const employee = current.employees.find((person) => person.id === task.employeeId);
+        const resource = current.resources.find((item) => item.id === task.resourceId);
+        return {
+          id: `sig-${Date.now()}-${index}`,
+          orgId: task.orgId,
+          employeeId: task.employeeId,
+          contractNumber: employee?.contractNumber ?? task.contractNumber ?? '',
+          resourceId: task.resourceId,
+          signer: specialist.name,
+          role: 'DSS specialistas',
+          signatureMethod: 'PIN',
+          signedAt,
+          validUntil: getValidityUntil(resource?.validityMonths),
+          ip: '127.0.0.1 (demo)',
+        };
+      })] }));
+    }
     setDssSigningTasks([]);
     setSignPinDraft('');
     setDssReviewConfirmed(false);
@@ -1513,32 +1573,40 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployerSignError('Nepavyko rasti pasirašomo dokumento.');
       return;
     }
-    let pinMatches = employerSignPin === org.managerPin;
     if (cloudMode) {
-      const { data: verified, error } = await supabase.rpc('verify_signing_pin', { input_pin: employerSignPin });
+      const { data: signature, error } = await supabase.rpc('record_manager_signature', {
+        input_employee_id: employee.id,
+        input_resource_id: resource.id,
+        input_pin: employerSignPin,
+      });
       if (error) {
-        setEmployerSignError('PIN patikrinti nepavyko. Bandykite dar kartą.');
+        setEmployerSignError(error.message || 'Vadovo parašo įrašyti nepavyko.');
         return;
       }
-      pinMatches = verified === true;
+      if (!signature) {
+        setEmployerSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
+        return;
+      }
+      setData((current) => ({ ...current, signatures: [...current.signatures, signature] }));
+    } else {
+      if (employerSignPin !== org.managerPin) {
+        setEmployerSignError('Vadovo PIN kodas neteisingas.');
+        return;
+      }
+      setData((current) => ({ ...current, signatures: [...current.signatures, {
+        id: `sig-${Date.now()}`,
+        orgId: org.id,
+        employeeId: employee.id,
+        contractNumber: employee.contractNumber ?? '',
+        resourceId: resource.id,
+        signer: org.manager,
+        role: 'Vadovas',
+        signatureMethod: 'PIN',
+        signedAt: new Date().toISOString(),
+        validUntil: getValidityUntil(resource.validityMonths),
+        ip: '127.0.0.1 (demo)',
+      }] }));
     }
-    if (!pinMatches) {
-      setEmployerSignError('Vadovo PIN kodas neteisingas.');
-      return;
-    }
-    setData((current) => ({ ...current, signatures: [...current.signatures, {
-      id: `sig-${Date.now()}`,
-      orgId: org.id,
-      employeeId: employee.id,
-      contractNumber: employee.contractNumber ?? '',
-      resourceId: resource.id,
-      signer: org.manager,
-      role: 'Vadovas',
-      signatureMethod: 'PIN',
-      signedAt: new Date().toISOString(),
-      validUntil: getValidityUntil(resource.validityMonths),
-      ip: '127.0.0.1 (demo)',
-    }] }));
     setEmployerSigningTarget(null);
     setEmployerSignPin('');
     setNotice('Darbdavio parašas patvirtintas PIN kodu.');
@@ -1546,7 +1614,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const requestCommissionSign = (employee, resource, member) => {
     const org = data.organizations.find((item) => item.id === employee.orgId);
-    if (!org?.commissionPins?.[member]) {
+    const pinConfigured = cloudMode
+      ? commissionPinStatus.organizationId === org?.id && commissionPinStatus.members[member]
+      : org?.commissionPins?.[member];
+    if (!pinConfigured) {
       setActiveTab('imone');
       setNotice(`Komisijos nariui „${member}“ įmonės nustatymuose pirmiausia reikia nustatyti asmeninį PIN.`);
       return;
@@ -1557,29 +1628,70 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setCommissionSignError('');
   };
 
-  const confirmCommissionSign = (event) => {
+  const saveCommissionPin = async (orgId, member, pin) => {
+    const { error } = await supabase.rpc('set_commission_signer_pin', {
+      input_organization_id: orgId,
+      input_signer_name: member,
+      input_pin: pin,
+    });
+    if (error) {
+      setNotice(`Komisijos PIN išsaugoti nepavyko: ${error.message}`);
+      return false;
+    }
+    setCommissionPinStatus((current) => ({
+      organizationId: orgId,
+      members: { ...(current.organizationId === orgId ? current.members : {}), [member]: true },
+    }));
+    setNotice(`Komisijos nario „${member}“ PIN nustatytas.`);
+    return true;
+  };
+
+  const confirmCommissionSign = async (event) => {
     event.preventDefault();
     const target = commissionSigningTarget;
     const org = data.organizations.find((item) => item.id === target?.orgId);
     const employee = data.employees.find((item) => item.id === target?.employeeId);
     const resource = data.resources.find((item) => item.id === target?.resourceId);
-    if (!target || !org || !employee || !resource || commissionSignPin !== org.commissionPins?.[target.member]) {
+    if (!target || !org || !employee || !resource) {
       setCommissionSignError('Komisijos nario PIN kodas neteisingas.');
       return;
     }
-    setData((current) => ({ ...current, signatures: [...current.signatures, {
-      id: `sig-${Date.now()}`,
-      orgId: org.id,
-      employeeId: employee.id,
-      contractNumber: employee.contractNumber ?? '',
-      resourceId: resource.id,
-      signer: target.member,
-      role: 'Komisijos narys',
-      signatureMethod: 'PIN',
-      signedAt: new Date().toISOString(),
-      validUntil: getValidityUntil(resource.validityMonths),
-      ip: '127.0.0.1 (demo)',
-    }] }));
+    if (cloudMode) {
+      const { data: signature, error } = await supabase.rpc('record_commission_signature', {
+        input_organization_id: org.id,
+        input_employee_id: employee.id,
+        input_resource_id: resource.id,
+        input_signer_name: target.member,
+        input_pin: commissionSignPin,
+      });
+      if (error) {
+        setCommissionSignError(error.message || 'Komisijos parašo įrašyti nepavyko.');
+        return;
+      }
+      if (!signature) {
+        setCommissionSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
+        return;
+      }
+      setData((current) => ({ ...current, signatures: [...current.signatures, signature] }));
+    } else {
+      if (commissionSignPin !== org.commissionPins?.[target.member]) {
+        setCommissionSignError('Komisijos nario PIN kodas neteisingas.');
+        return;
+      }
+      setData((current) => ({ ...current, signatures: [...current.signatures, {
+        id: `sig-${Date.now()}`,
+        orgId: org.id,
+        employeeId: employee.id,
+        contractNumber: employee.contractNumber ?? '',
+        resourceId: resource.id,
+        signer: target.member,
+        role: 'Komisijos narys',
+        signatureMethod: 'PIN',
+        signedAt: new Date().toISOString(),
+        validUntil: getValidityUntil(resource.validityMonths),
+        ip: '127.0.0.1 (demo)',
+      }] }));
+    }
     setCommissionSigningTarget(null);
     setCommissionSignPin('');
     setNotice(`Komisijos nario „${target.member}“ parašas patvirtintas PIN kodu.`);
@@ -1601,7 +1713,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
       return;
     }
-    if (cloudMode && userRole === 'darbuotojas') {
+    if (cloudMode && ['darbuotojas', 'dss'].includes(userRole)) {
       if (!/^\d{4}$/.test(workerCurrentPin)) {
         setNotice('Įveskite dabartinį 4 skaitmenų PIN.');
         return;
@@ -1940,9 +2052,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
                 </label>
                 <p className="mt-2 text-xs text-slate-500">Tapatybę patikrinkite pagal el. paštą. Vien vardas ir pavardė nėra pakankamas sutapimas; kvietimas priskiria specialistą tik po jo patvirtinimo.</p>
+                {cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
                 {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
-              <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p><CommissionEditor org={currentOrg} updateOrg={updateOrg} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => setCommissionSigningTarget(null)} /></Panel>
+              <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p><CommissionEditor org={currentOrg} updateOrg={updateOrg} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => setCommissionSigningTarget(null)} /></Panel>
               <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>
               <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>
             </div>
@@ -2058,7 +2171,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
 
-          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && userRole === 'darbuotojas' && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
+          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5"><PageTitle title="Įmonės prenumerata" subtitle="Demo leidžia peržiūrėti būsenas ir išbandyti pratęsimo bei atšaukimo veiksmus; mokėjimai neprijungti." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel></section>}
 
@@ -2646,19 +2759,24 @@ function SubscriptionCard({ subscription, onAction }) {
   if (!subscription) return <p className="text-sm text-slate-500">Prenumerata nerasta.</p>;
   return <div><p className="text-lg font-bold">{subscription.plan} · {subscription.price} €/mėn.</p><p className="mt-1 text-sm text-slate-600">Būsena: {subscription.status} · iki {subscription.endsAt}</p><div className="mt-4 flex flex-wrap gap-2">{subscription.status === 'Aktyvi' ? <button className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800" onClick={() => onAction(subscription.id, 'cancel')}><X size={15} className="inline" />Atšaukti</button> : <button className={buttonClass} onClick={() => onAction(subscription.id, 'renew')}><RotateCcw size={15} />Pratęsti prenumeratą</button>}</div></div>;
 }
-function CommissionEditor({ org, updateOrg, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
+function CommissionEditor({ org, updateOrg, cloudMode = false, commissionPinStatus = {}, onSetPin, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
   const [name, setName] = useState('');
   const [pins, setPins] = useState({});
   const [confirmPins, setConfirmPins] = useState({});
   const [error, setError] = useState('');
   if (!org) return null;
-  const savePin = (event, member) => {
+  const savePin = async (event, member) => {
     event.preventDefault();
     if (!/^\d{4}$/.test(pins[member] ?? '') || pins[member] !== confirmPins[member]) {
       setError(`„${member}“ PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.`);
       return;
     }
-    updateOrg(org.id, (current) => ({ ...current, commissionPins: { ...current.commissionPins, [member]: pins[member] } }));
+    if (cloudMode) {
+      const saved = await onSetPin(org.id, member, pins[member]);
+      if (!saved) return;
+    } else {
+      updateOrg(org.id, (current) => ({ ...current, commissionPins: { ...current.commissionPins, [member]: pins[member] } }));
+    }
     setPins((current) => ({ ...current, [member]: '' }));
     setConfirmPins((current) => ({ ...current, [member]: '' }));
     setError('');
@@ -2670,7 +2788,7 @@ function CommissionEditor({ org, updateOrg, signingTarget, signPin, setSignPin, 
     updateOrg(org.id, (current) => ({ ...current, commission: [...current.commission, nextName] }));
     setName('');
   };
-  return <div className="space-y-4">{org.commission.map((member) => <form className="space-y-2 border-b border-slate-100 pb-4" key={member} onSubmit={(event) => savePin(event, member)}><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{member}</span><span className="text-xs text-slate-500">{org.commissionPins?.[member] ? 'PIN nustatytas' : 'PIN nenustatytas'}</span></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><label className="text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label></div><button className={buttonClass}><LockKeyhole size={15} />Nustatyti PIN</button></form>)}{error && <p className="text-sm text-rose-700">{error}</p>}<form className="flex gap-2" onSubmit={addMember}><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Komisijos nario vardas" /><button className={buttonClass} aria-label="Pridėti komisijos narį"><Plus size={16} /></button></form>{signingTarget?.orgId === org.id && <form onSubmit={onSign} className="rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Komisijos nario parašas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}</div>;
+  return <div className="space-y-4">{org.commission.map((member) => <form className="space-y-2 border-b border-slate-100 pb-4" key={member} onSubmit={(event) => savePin(event, member)}><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{member}</span><span className="text-xs text-slate-500">{(cloudMode ? commissionPinStatus[member] : org.commissionPins?.[member]) ? 'PIN nustatytas' : 'PIN nenustatytas'}</span></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><label className="text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label></div><button className={buttonClass}><LockKeyhole size={15} />Nustatyti PIN</button></form>)}{error && <p className="text-sm text-rose-700">{error}</p>}<form className="flex gap-2" onSubmit={addMember}><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Komisijos nario vardas" /><button className={buttonClass} aria-label="Pridėti komisijos narį"><Plus size={16} /></button></form>{signingTarget?.orgId === org.id && <form onSubmit={onSign} className="rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Komisijos nario parašas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}</div>;
 }
 
 function getValidityUntil(months) {

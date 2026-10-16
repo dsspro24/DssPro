@@ -167,5 +167,16 @@ Deno.serve(async (request) => {
     return response(500, { error: `Could not link employee account: ${membershipError.message}` });
   }
 
+  const { error: employeeLinkError } = await adminClient
+    .from('organization_employees')
+    .update({ auth_user_id: invitation.user.id })
+    .eq('employee_id', employeeId);
+  if (employeeLinkError) {
+    await adminClient.from('organization_memberships').delete().eq('organization_id', organizationId).eq('user_id', invitation.user.id);
+    await adminClient.auth.admin.deleteUser(invitation.user.id);
+    await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+    return response(500, { error: `Could not link employee record: ${employeeLinkError.message}` });
+  }
+
   return response(200, { employeeId, email });
 });

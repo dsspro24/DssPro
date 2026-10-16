@@ -25,7 +25,7 @@ async function loadManagerWorkspace(user) {
     companyCode: user.user_metadata?.company_code ?? '',
   };
 
-  if (profile?.account_type === 'employee' && user.user_metadata?.employee_needs_password) {
+  if (['employee', 'dss_specialist'].includes(profile?.account_type) && user.user_metadata?.employee_needs_password) {
     return { requiresEmployeePassword: true, managerName };
   }
 
@@ -83,14 +83,53 @@ async function loadManagerWorkspace(user) {
   const { data: signingPinConfigured, error: pinError } = await supabase.rpc('has_signing_pin');
   if (pinError) throw pinError;
   if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
-  if (profile?.account_type === 'dss_specialist') return { requiresDssSpecialist: true, managerName };
-  if (profile?.account_type === 'employee') return { requiresEmployee: true, managerName };
-
   const { data: memberships, error: membershipError } = await supabase
     .from('organization_memberships')
     .select('organization_id, role, employee_id')
     .eq('user_id', user.id);
   if (membershipError) throw membershipError;
+
+  if (profile?.account_type === 'dss_specialist') {
+    const dssMemberships = memberships.filter((membership) => membership.role === 'dss_specialist');
+    if (!dssMemberships.length) return { requiresDssSpecialist: true, managerName };
+    const organizationIds = dssMemberships.map((membership) => membership.organization_id);
+    const [organizationsResult, workspacesResult, catalogResult] = await Promise.all([
+      supabase.from('organizations').select('id, name, company_code').in('id', organizationIds),
+      supabase.from('organization_data').select('organization_id, data').in('organization_id', organizationIds),
+      supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+    ]);
+    if (organizationsResult.error) throw organizationsResult.error;
+    if (workspacesResult.error) throw workspacesResult.error;
+    if (catalogResult.error) throw catalogResult.error;
+
+    const workspaceByOrganization = new Map(workspacesResult.data.map((item) => [item.organization_id, item.data]));
+    const resourcesById = new Map();
+    const organizations = organizationsResult.data.map((organization) => {
+      const workspaceData = workspaceByOrganization.get(organization.id);
+      const savedOrganization = workspaceData?.organizations?.find((item) => item.id === organization.id) ?? {};
+      for (const resource of workspaceData?.resources ?? []) resourcesById.set(resource.id, resource);
+      return { ...savedOrganization, id: organization.id, name: organization.name, companyCode: organization.company_code ?? '', dss: [...new Set([...(savedOrganization.dss ?? []), user.id])] };
+    });
+    for (const resource of catalogResult.data?.data?.resources ?? []) {
+      if (!resource.organizationId) resourcesById.set(resource.id, resource);
+    }
+
+    return {
+      dss: true,
+      managerName,
+      data: {
+        organizations,
+        employees: [...workspaceByOrganization.values()].flatMap((item) => item?.employees ?? []),
+        archivedEmployees: [],
+        protocolBatches: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolBatches ?? []),
+        specialists: [{ id: user.id, name: managerName, email: user.email ?? '', status: 'Paskyra patvirtinta' }],
+        signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
+        resources: [...resourcesById.values()],
+        resourceTypes: catalogResult.data?.data?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
+        subscriptions: [],
+      },
+    };
+  }
 
   if (profile?.account_type === 'employee') {
     const employeeMembership = memberships.find((membership) => membership.role === 'employee');
@@ -338,7 +377,7 @@ export default function CloudEntry() {
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
-    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
+    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
