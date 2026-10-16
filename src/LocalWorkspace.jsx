@@ -1075,7 +1075,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     document.getElementById('resource-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const addResource = (event) => {
+  const addResource = async (event) => {
     event.preventDefault();
     if (!resourceForm.title.trim()) return;
     const questions = draftQuestions.map((question) => ({ ...question, prompt: question.prompt.trim(), options: question.options.map((option) => option.trim()) }));
@@ -1084,6 +1084,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     const resource = { ...data.resources.find((item) => item.id === editingResourceId), ...resourceForm, id: editingResourceId ?? `res-${Date.now()}`, title: resourceForm.title.trim(), category: resourceForm.category.trim() || resourceTypeDisplayNames[resourceForm.type], validityMonths: Number(resourceForm.validityMonths) || 12, questions: resourceForm.type === 'Testas' ? questions : [], signatures: true };
+    if (cloudMode && userRole === 'kurejas') {
+      const { error } = await supabase.rpc('save_creator_resource', {
+        input_resource: resource,
+        input_resource_types: data.resourceTypes,
+      });
+      if (error) {
+        setNotice(`Šablono išsaugoti nepavyko: ${error.message}`);
+        return;
+      }
+    }
     setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
     setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');
     resetResourceForm();
@@ -1091,23 +1101,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const deleteCreatorResource = async (resource) => {
     if (!window.confirm(`Ar tikrai norite ištrinti „${resource.title}“? Šablonas bus pašalintas iš kūrėjo bibliotekos ir gali būti pašalintas iš įmonių priskyrimų.`)) return;
-    const nextData = {
-      ...data,
-      resources: data.resources.filter((item) => item.id !== resource.id),
-      organizations: data.organizations.map((org) => ({ ...org, resources: org.resources.filter((id) => id !== resource.id) })),
-      employees: data.employees.map((employee) => ({ ...employee, resourceIds: employee.resourceIds.filter((id) => id !== resource.id) })),
-    };
-
     if (cloudMode) {
-      try {
-        await saveCreatorWorkspaceSnapshot(nextData);
-      } catch (error) {
-        setNotice(`Šablono ištrinti nepavyko: ${error.message}`);
+      const { data: deleted, error } = await supabase.rpc('delete_creator_resource', { input_resource_id: resource.id });
+      if (error || !deleted) {
+        setNotice(`Šablono ištrinti nepavyko: ${error?.message ?? 'šablonas nerastas arba jau ištrintas.'}`);
         return;
       }
     }
 
-    setData(nextData);
+    setData((current) => ({
+      ...current,
+      resources: current.resources.filter((item) => item.id !== resource.id),
+      organizations: current.organizations.map((org) => ({ ...org, resources: org.resources.filter((id) => id !== resource.id) })),
+      employees: current.employees.map((employee) => ({ ...employee, resourceIds: employee.resourceIds.filter((id) => id !== resource.id) })),
+    }));
     setNotice(`Šablonas „${resource.title}“ ištrintas.`);
   };
 
