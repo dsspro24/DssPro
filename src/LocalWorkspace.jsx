@@ -37,6 +37,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   LockKeyhole,
+  LogOut,
   Menu,
   Pencil,
   Plus,
@@ -509,6 +510,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const [notice, setNotice] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -571,6 +574,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerSignPin, setWorkerSignPin] = useState('');
   const [workerSignError, setWorkerSignError] = useState('');
+
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!profileMenuRef.current?.contains(event.target)) setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileMenuOpen]);
 
   useEffect(() => {
     if (!cloudMode) {
@@ -1807,7 +1826,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
       <aside className="sticky top-0 z-40 flex w-full shrink-0 flex-col bg-emerald-950 px-3 py-2 text-white shadow-lg sm:px-4 sm:py-3 lg:static lg:z-auto lg:w-64 lg:px-4 lg:py-5 lg:shadow-none print:hidden">
         <div className="flex items-center justify-between lg:contents">
-          <button onClick={onExit} className="mb-0 flex items-center gap-2 px-2 text-left text-lg font-black lg:mb-6">Dss <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-xs text-emerald-300">Pro</span></button>
+          <button onClick={() => { setActiveTab(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis'); setMobileMenuOpen(false); }} className="mb-0 flex items-center gap-2 px-2 text-left text-lg font-black lg:mb-6">Dss <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-xs text-emerald-300">Pro</span></button>
           <button type="button" aria-label={mobileMenuOpen ? 'Uždaryti meniu' : 'Atidaryti meniu'} aria-expanded={mobileMenuOpen} aria-controls="workspace-mobile-menu" className="grid size-10 place-items-center rounded-md border border-white/20 text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)}><Menu size={20} /></button>
         </div>
         <div id="workspace-mobile-menu" className={`${mobileMenuOpen ? 'block' : 'hidden'} mt-3 lg:contents`}>
@@ -1837,7 +1856,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </button>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/15 pt-4 text-xs text-emerald-100/70">{roleLabels[userRole]}<button onClick={onExit} className="ml-3 underline">Išeiti</button></div>
+        <div className="mt-auto border-t border-white/15 pt-4 text-xs text-emerald-100/70">{roleLabels[userRole]}</div>
         </div>
       </aside>
 
@@ -1850,7 +1869,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
             <a href="#pagalba" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" className="hidden size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700 sm:grid"><LifeBuoy size={18} /></a>
             <div className="relative">
-              <button type="button" aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
+              <button type="button" aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => { setProfileMenuOpen(false); setNotificationsOpen((open) => !open); }} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
                 <Bell size={18} />
                 {notifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white">{notifications.length}</span>}
               </button>
@@ -1884,10 +1903,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </li>)}</ul> : <p className="px-4 py-5 text-sm text-slate-500">Naujų veiksmų nėra.</p>}
               </div>}
             </div>
-            <div className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 hover:bg-slate-50">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{(displayName ?? 'JP').split(' ').map((part) => part[0]).join('')}</span>
-              <span className="hidden max-w-[40vw] truncate sm:inline">{displayName}</span>
-              <ChevronDown size={15} className="text-slate-400" />
+            <div ref={profileMenuRef} className="relative">
+              <button type="button" aria-label={`Profilis: ${displayName ?? 'Naudotojas'}`} aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => { setNotificationsOpen(false); setProfileMenuOpen((open) => !open); }} className="flex max-w-[55vw] items-center gap-2 rounded-full py-1 pl-1 pr-2 text-left hover:bg-slate-50 sm:pr-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{(displayName ?? 'JP').split(' ').map((part) => part[0]).join('')}</span>
+                <span className="hidden max-w-[40vw] truncate sm:inline">{displayName}</span>
+                <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {profileMenuOpen && <div role="menu" className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-slate-900 shadow-xl">
+                <div className="border-b border-slate-100 px-4 py-3"><p className="truncate text-sm font-semibold">{displayName}</p><p className="mt-0.5 text-xs font-normal text-slate-500">{roleLabels[userRole]}</p></div>
+                <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); onExit?.(); }} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"><LogOut size={16} />Atsijungti</button>
+              </div>}
             </div>
           </div>
         </header>
