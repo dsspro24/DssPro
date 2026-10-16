@@ -548,6 +548,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [resourceSettingsDraft, setResourceSettingsDraft] = useState({});
   const [draftQuestions, setDraftQuestions] = useState([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   const [previewResource, setPreviewResource] = useState(null);
+  const creatorSaveQueue = useRef(Promise.resolve());
   const previewFrameRef = useRef(null);
   const autoPrintPreviewRef = useRef(false);
   const [quizAnswers, setQuizAnswers] = useState({});
@@ -600,16 +601,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!cloudUserId) return undefined;
 
     if (userRole === 'kurejas') {
-      const timeout = window.setTimeout(async () => {
+      creatorSaveQueue.current = creatorSaveQueue.current.catch(() => {}).then(async () => {
         const { error } = await supabase.rpc('save_creator_workspace', {
           input_resources: data.resources.filter((resource) => !resource.organizationId),
           input_resource_types: data.resourceTypes,
           input_subscriptions: data.subscriptions,
         });
         if (error) setNotice(`Kūrėjo duomenų išsaugoti nepavyko: ${error.message}`);
-      }, 500);
-
-      return () => window.clearTimeout(timeout);
+      });
+      return undefined;
     }
 
     if (userRole === 'darbuotojas') {
