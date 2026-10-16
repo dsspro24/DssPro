@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import aapTemplate from './assets/aap-template.html?raw';
+import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
 import workplaceInstructionsTemplate from './assets/workplace-dss-instructions-journal.html?raw';
 import introInstructionsTemplate from './assets/intro-dss-instructions-journal.html?raw';
@@ -351,6 +352,37 @@ const initialData = {
   ],
 };
 
+function createInitialCloudWorkspace(organization, managerName = '') {
+  const organizationTemplate = initialData.organizations[0];
+  const cloudOrganization = {
+    ...organizationTemplate,
+    id: organization.id,
+    name: organization.name,
+    companyCode: organization.company_code ?? '',
+    manager: managerName,
+    managerPin: '',
+    commission: [],
+    commissionPins: {},
+    dss: [],
+    dssInvitations: [],
+    employeeAssignmentPresets: [],
+    resourceSettings: {},
+    resources: initialData.resources.map((resource) => resource.id),
+  };
+
+  return {
+    ...initialData,
+    organizations: [cloudOrganization],
+    employees: [],
+    archivedEmployees: [],
+    protocolBatches: [],
+    specialists: [],
+    signatures: [],
+    subscriptions: [],
+    resources: initialData.resources.map((resource) => ({ ...resource, type: normalizeResourceType(resource) })),
+  };
+}
+
 const preservedUserResourceIds = new Set([
   workplaceConductTestId,
   chemicalSafetyTestId,
@@ -449,13 +481,13 @@ const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, aw
 const validityCheckTime = Date.now();
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit }) {
-  const [data, setData] = useState(loadData);
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+  const [data, setData] = useState(() => initialCloudData ?? (cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData()));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
-  const [selectedOrgId, setSelectedOrgId] = useState('org-statybu');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('emp-jonas');
-  const [selectedSpecialistId, setSelectedSpecialistId] = useState('spec-rasa');
+  const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? 'org-statybu');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const [notice, setNotice] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
@@ -484,7 +516,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit }) {
   const [inviteResourceIds, setInviteResourceIds] = useState(['res-fire', 'res-height', 'res-aap']);
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
   const [assignmentPresetDraft, setAssignmentPresetDraft] = useState({ id: '', name: '', resourceIds: [] });
-  const [aapDraft, setAapDraft] = useState(() => loadData().organizations.find((org) => org.id === 'org-statybu')?.aapItems ?? defaultAapItems);
+  const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
   const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'] });
   const [editingResourceId, setEditingResourceId] = useState(null);
   const [protocolSource, setProtocolSource] = useState(null);
@@ -518,8 +550,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit }) {
   const [workerSignError, setWorkerSignError] = useState('');
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
+    if (!cloudMode) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return undefined;
+    }
+
+    const organization = data.organizations.find((item) => item.id === selectedOrgId);
+    if (!organization || !cloudUserId) return undefined;
+
+    const timeout = window.setTimeout(async () => {
+      const { error } = await supabase.from('organization_data').upsert({
+        organization_id: organization.id,
+        data,
+        updated_by: cloudUserId,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'organization_id' });
+      if (error) setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [data, cloudMode, cloudUserId, selectedOrgId]);
 
   useEffect(() => {
     const frame = previewFrameRef.current;
@@ -1472,12 +1522,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit }) {
           <button type="button" aria-label={mobileMenuOpen ? 'Uždaryti meniu' : 'Atidaryti meniu'} aria-expanded={mobileMenuOpen} aria-controls="workspace-mobile-menu" className="grid size-10 place-items-center rounded-md border border-white/20 text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)}><Menu size={20} /></button>
         </div>
         <div id="workspace-mobile-menu" className={`${mobileMenuOpen ? 'block' : 'hidden'} mt-3 lg:contents`}>
-        <label className="mb-5 rounded-lg border border-white/15 bg-white/10 p-3 text-xs text-emerald-100">
+        {!cloudMode && <label className="mb-5 rounded-lg border border-white/15 bg-white/10 p-3 text-xs text-emerald-100">
           Demonstracijos rolė
           <select value={userRole} onChange={(event) => changeDemoRole(event.target.value)} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">
             <option value="darbuotojas">Darbuotojas</option><option value="dss">DSS specialistas</option><option value="vadovas">Įmonės vadovas</option><option value="kurejas">Turinio kūrėjas</option>
           </select>
-        </label>
+        </label>}
         {userRole === 'dss' && <label className="mb-4 text-xs text-emerald-100">Demo DSS paskyra
           <select value={selectedSpecialistId} onChange={(event) => { setSelectedSpecialistId(event.target.value); const org = data.organizations.find((item) => item.dss.includes(event.target.value) || item.dssInvitations?.some((invite) => invite.specialistId === event.target.value)); if (org) setSelectedOrgId(org.id); setMobileMenuOpen(false); }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">{data.specialists.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
         </label>}
@@ -2159,60 +2209,6 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
         const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : resource.relatedTestId ? 'Testo rezultato nėra' : '';
         writeRow(row, [escapeHtml(item.contractNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
-      } else if (resource.templateKind === 'internal-documents-register') {
-        const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
-          ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
-        const [dssResource, fireResource, rulesResource, positionResource, riskResource, sdsResource] = [
-          findRelatedResource('res-intro-dss-journal', /dss.*įvadin|įvadin.*(dss|instruktav)/i),
-          findRelatedResource('res-fire-safety-journal', /gaisrin/i),
-          findRelatedResource('res-work-rules-journal', /darbo tvarkos taisykl/i),
-          findRelatedResource('res-job-description-journal', /pareigin.*nuostat/i),
-          findRelatedResource('res-professional-risk-journal', /profesin.*rizik|rizikos vertinim|\bprv\b/i),
-          findRelatedResource('res-safety-data-sheets', /saugos duomenų lap|\bsdl\b/i),
-        ];
-        const signatureFor = (linkedResource, role) => linkedResource && signatures
-          .filter((signature) => signature.employeeId === item.id && signature.resourceId === linkedResource.id && signature.role === role)
-          .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
-        const linkedProof = (linkedResource, signature) => {
-          if (!linkedResource) return '';
-          if (!signature) return item.resourceIds?.includes(linkedResource.id) ? '<span class="signature-pending">Laukia parašo</span>' : '';
-          const signedAt = new Date(signature.signedAt);
-          const timeText = Number.isNaN(signedAt.getTime()) ? '' : timeFormatter.format(signedAt);
-          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong><small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
-        };
-        const settingFor = (linkedResource, ...keys) => {
-          const settings = { ...linkedResource?.defaultSettings, ...org?.resourceSettings?.[linkedResource?.id] };
-          return keys.map((key) => settings[key]).find(Boolean) ?? '';
-        };
-        const dssWorker = signatureFor(dssResource, 'Darbuotojas');
-        const dssInstructor = signatureFor(dssResource, 'DSS specialistas');
-        const fireWorker = signatureFor(fireResource, 'Darbuotojas');
-        const fireInstructor = signatureFor(fireResource, 'DSS specialistas');
-        const rulesWorker = signatureFor(rulesResource, 'Darbuotojas');
-        const positionWorker = signatureFor(positionResource, 'Darbuotojas');
-        const riskWorker = signatureFor(riskResource, 'Darbuotojas');
-        const sdsWorker = signatureFor(sdsResource, 'Darbuotojas');
-        writeRow(row, [
-          escapeHtml(item.name),
-          escapeHtml(item.position || 'Darbuotojas'),
-          formatDate(dssWorker?.signedAt ?? dssInstructor?.signedAt),
-          linkedProof(dssResource, dssInstructor),
-          linkedProof(dssResource, dssWorker),
-          formatDate(fireWorker?.signedAt ?? fireInstructor?.signedAt),
-          linkedProof(fireResource, fireInstructor),
-          linkedProof(fireResource, fireWorker),
-          formatDate(rulesWorker?.signedAt),
-          linkedProof(rulesResource, rulesWorker),
-          formatDate(positionWorker?.signedAt),
-          escapeHtml(settingFor(positionResource, 'regulationNumber')),
-          linkedProof(positionResource, positionWorker),
-          formatDate(riskWorker?.signedAt),
-          escapeHtml(settingFor(riskResource, 'riskAssessmentNumber', 'cardNumber', 'documentNumber')),
-          linkedProof(riskResource, riskWorker),
-          formatDate(sdsWorker?.signedAt),
-          escapeHtml(settingFor(sdsResource, 'safetyDataSheetNumber', 'documentNumber')),
-          linkedProof(sdsResource, sdsWorker),
-        ]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
         const testResult = (item.testResults ?? [])
           .filter((result) => result.resourceId === resource.relatedTestId)

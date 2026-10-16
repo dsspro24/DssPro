@@ -21,6 +21,24 @@ Atidarykite Vite parodytą vietinį adresą. Tailwind CSS įkompiliuojamas kartu
 
 Rolių ir demo naudotojų pasirinkikliai palikti testavimui. Darbuotojo ir DSS PIN, parašai bei rodomas IP yra tik vietinio demo įrašai, ne teisiškai patvirtinti elektroniniai parašai. Prenumeratos veiksmai nekeičia realių mokėjimų, o kvietimai neišsiunčia el. laiškų.
 
+## Supabase cloud režimas
+
+Kai nustatyti `VITE_SUPABASE_URL` ir `VITE_SUPABASE_ANON_KEY`, aplikacija vietoje demo įjungia vadovo registraciją ir prisijungimą. Vadovas gali sukurti įmonę; įmonės darbo būsena saugoma Supabase ir apsaugota RLS taisyklėmis. Vieša (anon) užklausa įmonių įrašų nemato.
+
+Lokaliam cloud bandymui nukopijuokite `.env.example` į `.env.development.local` ir įrašykite Supabase URL bei anon raktą. `service_role` rakto į `VITE_` kintamuosius ar naršyklę dėti negalima.
+
+Supabase migracijoms:
+
+```bash
+npx supabase login
+npx supabase link --project-ref wickbchyltkpmudopnwc
+npx supabase db push --linked
+```
+
+Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir `development` aplinkoms. GitHub `main` pushai automatiškai paleidžia Vercel deploy.
+
+Cloud režime šiuo metu veikia vadovo autentifikacija, įmonės sukūrimas ir vadovo įmonės darbo būsenos saugojimas. Darbuotojų ir DSS specialistų atskiros paskyros, kvietimų siuntimas el. paštu, jų prieigos taisyklės bei realaus parašo patvirtinimas dar nėra prijungti; šių vaidmenų darbas ir PIN parašai lieka demo režimo funkcijos.
+
 ## Vietiniai duomenys
 
 Naršyklės raktas: `dsspro-local-demo-v1`. Norėdami pradėti nuo pradinių duomenų, pašalinkite šį raktą iš vietinės svetainės saugyklos ir atnaujinkite puslapį.

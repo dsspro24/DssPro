@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import LocalWorkspace from './LocalWorkspace.jsx';
+import CloudEntry from './CloudEntry.jsx';
+import { isSupabaseConfigured } from './lib/supabase.js';
 import { 
   Home, 
   BookOpen, 
@@ -22,6 +24,10 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  return isSupabaseConfigured ? <CloudEntry /> : <DemoApp />;
+}
+
+function DemoApp() {
   // Navigation / Tabs state
   const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'app'
   const [userRole, setUserRole] = useState('darbuotojas'); // 'darbuotojas' | 'dss' | 'vadovas' | 'kurejas'
