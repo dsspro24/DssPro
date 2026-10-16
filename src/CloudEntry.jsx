@@ -4,17 +4,71 @@ import LocalWorkspace from './LocalWorkspace.jsx';
 import { supabase } from './lib/supabase.js';
 
 async function loadManagerWorkspace(user) {
-  const [{ data: signingPinConfigured, error: pinError }, { data: profile, error: profileError }] = await Promise.all([
-    supabase.rpc('has_signing_pin'),
+  const [{ data: isCreator, error: creatorError }, { data: profile, error: profileError }] = await Promise.all([
+    supabase.rpc('is_creator'),
     supabase.from('profiles').select('full_name, account_type').eq('id', user.id).maybeSingle(),
   ]);
-  if (pinError) throw pinError;
+  if (creatorError) throw creatorError;
   if (profileError) throw profileError;
   const managerName = profile?.full_name ?? user.user_metadata?.full_name ?? '';
   const companyDetails = {
     companyName: user.user_metadata?.company_name ?? '',
     companyCode: user.user_metadata?.company_code ?? '',
   };
+
+  if (isCreator) {
+    const [organizationsResult, workspacesResult, catalogResult] = await Promise.all([
+      supabase.from('organizations').select('id, name, company_code').order('name'),
+      supabase.from('organization_data').select('organization_id, data'),
+      supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+    ]);
+    if (organizationsResult.error) throw organizationsResult.error;
+    if (workspacesResult.error) throw workspacesResult.error;
+    if (catalogResult.error) throw catalogResult.error;
+
+    const workspaceByOrganization = new Map(workspacesResult.data.map((workspace) => [workspace.organization_id, workspace.data]));
+    const resourcesById = new Map();
+    const subscriptionsById = new Map();
+    for (const workspaceData of workspaceByOrganization.values()) {
+      for (const resource of workspaceData?.resources ?? []) {
+        if (!resource.organizationId) resourcesById.set(resource.id, resource);
+      }
+      for (const subscription of workspaceData?.subscriptions ?? []) subscriptionsById.set(subscription.id, subscription);
+    }
+    for (const resource of catalogResult.data?.data?.resources ?? []) {
+      if (!resource.organizationId) resourcesById.set(resource.id, resource);
+    }
+
+    const organizations = organizationsResult.data.map((organization) => {
+      const workspaceData = workspaceByOrganization.get(organization.id);
+      const savedOrganization = workspaceData?.organizations?.find((item) => item.id === organization.id);
+      return {
+        ...savedOrganization,
+        id: organization.id,
+        name: organization.name,
+        companyCode: organization.company_code ?? '',
+      };
+    });
+
+    return {
+      creator: true,
+      managerName,
+      catalog: catalogResult.data?.data ?? null,
+      data: {
+        organizations,
+        employees: [],
+        archivedEmployees: [],
+        protocolBatches: [],
+        specialists: [],
+        signatures: [],
+        ...(resourcesById.size ? { resources: [...resourcesById.values()] } : {}),
+        subscriptions: [...subscriptionsById.values()],
+      },
+    };
+  }
+
+  const { data: signingPinConfigured, error: pinError } = await supabase.rpc('has_signing_pin');
+  if (pinError) throw pinError;
   if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
   if (profile?.account_type === 'dss_specialist') return { requiresDssSpecialist: true, managerName };
   if (profile?.account_type === 'employee') return { requiresEmployee: true, managerName };
@@ -32,16 +86,18 @@ async function loadManagerWorkspace(user) {
     .from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single();
   if (organizationError) throw organizationError;
 
-  const { data: savedWorkspace, error: workspaceError } = await supabase
-    .from('organization_data')
-    .select('data')
-    .eq('organization_id', organization.id)
-    .maybeSingle();
+  const [workspaceResult, catalogResult] = await Promise.all([
+    supabase.from('organization_data').select('data').eq('organization_id', organization.id).maybeSingle(),
+    supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+  ]);
+  const { data: savedWorkspace, error: workspaceError } = workspaceResult;
   if (workspaceError) throw workspaceError;
+  if (catalogResult.error) throw catalogResult.error;
 
   return {
     organization,
     managerName,
+    catalog: catalogResult.data?.data ?? null,
     data: savedWorkspace?.data ?? null,
   };
 }
@@ -216,7 +272,7 @@ export default function CloudEntry() {
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
-    return <LocalWorkspace userRole="vadovas" onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
+    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">

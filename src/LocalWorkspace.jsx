@@ -481,8 +481,26 @@ const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, aw
 const validityCheckTime = Date.now();
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
-  const [data, setData] = useState(() => initialCloudData ?? (cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData()));
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+  const [data, setData] = useState(() => {
+    const workspaceData = initialCloudData
+      ? { ...initialData, ...initialCloudData }
+      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData();
+    if (!cloudMode || !creatorCatalog) return workspaceData;
+
+    const resourcesById = new Map(workspaceData.resources.map((resource) => [resource.id, resource]));
+    for (const resource of creatorCatalog.resources ?? []) {
+      if (!resource.organizationId) resourcesById.set(resource.id, resource);
+    }
+    for (const resource of workspaceData.resources) {
+      if (resource.organizationId) resourcesById.set(resource.id, resource);
+    }
+    return {
+      ...workspaceData,
+      resources: [...resourcesById.values()],
+      resourceTypes: creatorCatalog.resourceTypes ?? workspaceData.resourceTypes,
+    };
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
   const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? 'org-statybu');
@@ -556,8 +574,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return undefined;
     }
 
+    if (!cloudUserId) return undefined;
+
+    if (userRole === 'kurejas') {
+      const timeout = window.setTimeout(async () => {
+        const { error } = await supabase.rpc('save_creator_workspace', {
+          input_resources: data.resources.filter((resource) => !resource.organizationId),
+          input_resource_types: data.resourceTypes,
+          input_subscriptions: data.subscriptions,
+        });
+        if (error) setNotice(`Kūrėjo duomenų išsaugoti nepavyko: ${error.message}`);
+      }, 500);
+
+      return () => window.clearTimeout(timeout);
+    }
+
     const organization = data.organizations.find((item) => item.id === selectedOrgId);
-    if (!organization || !cloudUserId) return undefined;
+    if (!organization) return undefined;
 
     const timeout = window.setTimeout(async () => {
       const { error } = await supabase.from('organization_data').upsert({
@@ -570,7 +603,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [data, cloudMode, cloudUserId, selectedOrgId]);
+  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole]);
 
   useEffect(() => {
     const frame = previewFrameRef.current;
