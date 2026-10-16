@@ -424,7 +424,7 @@ function DemoApp({ cloudMode = false }) {
                 onClick={() => setRegisterRole('dss')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'dss' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
-                {cloudMode ? <span className="inline-flex items-center gap-1.5">DSS specialisto paskyra<span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800">Nemokama</span></span> : 'DSS specialistas'}
+                {cloudMode ? 'DSS specialisto paskyra' : 'DSS specialistas'}
               </button>
             </div>
 
@@ -441,16 +441,16 @@ function DemoApp({ cloudMode = false }) {
 
               {cloudMode && <div><label className="block text-slate-500 mb-1">Slaptažodis</label><input name="password" type="password" minLength={8} autoComplete="new-password" required placeholder="Bent 8 simboliai" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" /></div>}
 
-              {(!cloudMode || registerRole === 'vadovas') && <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-500 mb-1">Įmonės pavadinimas</label>
-                  <input name="companyName" type="text" required placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <label className="block text-slate-500 mb-1">Įmonės pavadinimas{cloudMode && registerRole === 'dss' ? ' (neprivaloma)' : ''}</label>
+                  <input name="companyName" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
                 <div>
-                  <label className="block text-slate-500 mb-1">Įmonės kodas</label>
-                  <input name="companyCode" type="text" required placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <label className="block text-slate-500 mb-1">Įmonės kodas{cloudMode && registerRole === 'dss' ? ' (neprivaloma)' : ''}</label>
+                  <input name="companyCode" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
-              </div>}
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
