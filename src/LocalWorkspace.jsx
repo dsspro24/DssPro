@@ -47,6 +47,7 @@ import {
   Shirt,
   Trash2,
   Upload,
+  Users,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -404,7 +405,7 @@ const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
-  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
+  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['paskyros', 'Įmonės ir paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
 
 function loadData() {
@@ -483,7 +484,7 @@ const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, aw
 const validityCheckTime = Date.now();
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], creatorWorkspaces = {}, onCreatorPreview = () => {}, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [data, setData] = useState(() => {
     const workspaceData = initialCloudData
       ? { ...initialData, ...initialCloudData }
@@ -593,6 +594,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [profileMenuOpen]);
 
   useEffect(() => {
+    if (creatorReadOnlyPreview) return undefined;
     if (!cloudMode) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       return undefined;
@@ -644,7 +646,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole]);
+  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview]);
 
   useEffect(() => {
     const frame = previewFrameRef.current;
@@ -682,7 +684,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [archivePrintMode]);
 
   useEffect(() => {
-    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas' || creatorReadOnlyPreview) return undefined;
     let active = true;
     supabase.rpc('get_commission_signer_status', { input_organization_id: selectedOrgId })
       .then(({ data, error }) => {
@@ -691,7 +693,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         else setCommissionPinStatus({ organizationId: selectedOrgId, members: data ?? {} });
       });
     return () => { active = false; };
-  }, [cloudMode, selectedOrgId, userRole]);
+  }, [cloudMode, selectedOrgId, userRole, creatorReadOnlyPreview]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
@@ -1838,7 +1840,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <option value="darbuotojas">Darbuotojas</option><option value="dss">DSS specialistas</option><option value="vadovas">Įmonės vadovas</option><option value="kurejas">Turinio kūrėjas</option>
           </select>
         </label>}
-        {userRole === 'dss' && <label className="mb-4 text-xs text-emerald-100">Demo DSS paskyra
+        {userRole === 'dss' && <label className="mb-4 text-xs text-emerald-100">{cloudMode ? 'DSS specialistas' : 'Demo DSS paskyra'}
           <select value={selectedSpecialistId} onChange={(event) => { setSelectedSpecialistId(event.target.value); const org = data.organizations.find((item) => item.dss.includes(event.target.value) || item.dssInvitations?.some((invite) => invite.specialistId === event.target.value)); if (org) setSelectedOrgId(org.id); setMobileMenuOpen(false); }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">{data.specialists.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
         </label>}
         {userRole !== 'kurejas' && accessibleOrganizations.length > 1 && (
@@ -1866,6 +1868,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:min-h-16 sm:px-5 print:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <h1 className="text-lg font-bold text-slate-900">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</h1>
+            {creatorReadOnlyPreview && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">Kūrėjo peržiūra · {creatorReadOnlyPreview}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti peržiūrą</button></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
@@ -1918,7 +1921,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </div>
           </div>
         </header>
-        <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
+        <div inert={Boolean(creatorReadOnlyPreview)} className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
 
           {activeTab === 'skydelis' && (
@@ -2199,6 +2202,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
+
+          {activeTab === 'paskyros' && userRole === 'kurejas' && <section className="space-y-5">
+            <PageTitle title="Įmonės ir paskyros" subtitle="Peržiūrėkite registruotas paskyras ir atidarykite įmonės darbo vietos peržiūrą." />
+            <Panel title="Įmonės"><DataTable headers={['Įmonė', 'Vadovai', 'DSS specialistai', 'Darbo sritis', 'Peržiūra']} rows={data.organizations.map((org) => {
+              const organizationMemberships = creatorAccounts.flatMap((account) => (account.organizations ?? []).filter((membership) => membership.id === org.id).map((membership) => ({ ...account, membership })));
+              const managers = organizationMemberships.filter((account) => account.membership.role === 'manager').map((account) => account.fullName || account.email);
+              const specialists = organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.fullName || account.email);
+              const workspaceExists = Boolean(creatorWorkspaces[org.id]);
+              return [org.name, managers.join(', ') || org.manager || 'Nenurodytas', specialists.join(', ') || 'Nepriskirti', workspaceExists ? 'Paruošta' : 'Tuščia', <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'vadovas')}>Kaip vadovas</button><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'dss')}>Kaip DSS</button></div>];
+            })} empty="Įmonių dar nėra." /></Panel>
+            <Panel title="Registruoti vadovai ir DSS specialistai"><DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės']} rows={creatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas'])} empty="Vadovų ar DSS specialistų paskyrų dar nėra." /></Panel>
+          </section>}
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5"><PageTitle title="Įmonės prenumerata" subtitle="Demo leidžia peržiūrėti būsenas ir išbandyti pratęsimo bei atšaukimo veiksmus; mokėjimai neprijungti." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel></section>}
 

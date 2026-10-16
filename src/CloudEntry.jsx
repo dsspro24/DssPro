@@ -30,14 +30,16 @@ async function loadManagerWorkspace(user) {
   }
 
   if (isCreator) {
-    const [organizationsResult, workspacesResult, catalogResult] = await Promise.all([
+    const [organizationsResult, workspacesResult, catalogResult, accountsResult] = await Promise.all([
       supabase.from('organizations').select('id, name, company_code').order('name'),
       supabase.from('organization_data').select('organization_id, data'),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+      supabase.rpc('creator_list_accounts'),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
     if (workspacesResult.error) throw workspacesResult.error;
     if (catalogResult.error) throw catalogResult.error;
+    if (accountsResult.error) throw accountsResult.error;
 
     const workspaceByOrganization = new Map(workspacesResult.data.map((workspace) => [workspace.organization_id, workspace.data]));
     const resourcesById = new Map();
@@ -67,6 +69,8 @@ async function loadManagerWorkspace(user) {
       creator: true,
       managerName,
       catalog: catalogResult.data?.data ?? null,
+      creatorAccounts: accountsResult.data ?? [],
+      creatorWorkspaces: Object.fromEntries(workspaceByOrganization),
       data: {
         organizations,
         employees: [],
@@ -185,6 +189,7 @@ export default function CloudEntry() {
   const [authMode, setAuthMode] = useState('login');
   const [signupRole, setSignupRole] = useState('manager');
   const [workspace, setWorkspace] = useState(null);
+  const [creatorPreview, setCreatorPreview] = useState(null);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   const [notice, setNotice] = useState('');
@@ -368,6 +373,7 @@ export default function CloudEntry() {
   const signOut = async () => {
     await supabase.auth.signOut();
     setWorkspace(null);
+    setCreatorPreview(null);
     setWorkspaceStatus('idle');
     setForm({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   };
@@ -377,7 +383,44 @@ export default function CloudEntry() {
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
-    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
+    if (workspace.creator && creatorPreview) {
+      const sourceData = workspace.creatorWorkspaces?.[creatorPreview.organizationId];
+      const sourceOrganization = sourceData?.organizations?.find((item) => item.id === creatorPreview.organizationId)
+        ?? workspace.data.organizations.find((item) => item.id === creatorPreview.organizationId);
+      if (sourceOrganization) {
+        const dssId = sourceOrganization.dss?.[0] ?? `creator-preview-${sourceOrganization.id}`;
+        const dssSpecialist = sourceData?.specialists?.find((specialist) => specialist.id === dssId)
+          ?? { id: dssId, name: 'DSS specialistas (peržiūra)', email: '', status: 'Peržiūra' };
+        const previewOrganization = creatorPreview.role === 'dss'
+          ? { ...sourceOrganization, dss: [...new Set([...(sourceOrganization.dss ?? []), dssId])] }
+          : sourceOrganization;
+        const previewData = {
+          ...(sourceData ?? {}),
+          organizations: [previewOrganization],
+          employees: (sourceData?.employees ?? []).filter((employee) => employee.orgId === creatorPreview.organizationId),
+          archivedEmployees: (sourceData?.archivedEmployees ?? []).filter((record) => record.orgId === creatorPreview.organizationId),
+          protocolBatches: (sourceData?.protocolBatches ?? []).filter((batch) => batch.orgId === creatorPreview.organizationId),
+          specialists: creatorPreview.role === 'dss' ? [dssSpecialist] : sourceData?.specialists ?? [],
+          signatures: (sourceData?.signatures ?? []).filter((signature) => signature.orgId === creatorPreview.organizationId),
+          resources: sourceData?.resources ?? workspace.data.resources,
+          resourceTypes: sourceData?.resourceTypes ?? workspace.data.resourceTypes,
+          subscriptions: (sourceData?.subscriptions ?? []).filter((subscription) => subscription.orgId === creatorPreview.organizationId),
+        };
+        return <LocalWorkspace
+          userRole={creatorPreview.role}
+          onRoleChange={() => {}}
+          onExit={signOut}
+          initialCloudData={previewData}
+          cloudOrganization={{ id: sourceOrganization.id, name: sourceOrganization.name, company_code: sourceOrganization.companyCode }}
+          cloudManagerName={workspace.managerName}
+          cloudMode
+          cloudUserId={session.user.id}
+          creatorReadOnlyPreview={`${sourceOrganization.name} · kaip ${creatorPreview.role === 'vadovas' ? 'vadovas' : 'DSS specialistas'}`}
+          onExitCreatorPreview={() => setCreatorPreview(null)}
+        />;
+      }
+    }
+    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} creatorAccounts={workspace.creatorAccounts} creatorWorkspaces={workspace.creatorWorkspaces} onCreatorPreview={(organizationId, role) => setCreatorPreview({ organizationId, role })} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
