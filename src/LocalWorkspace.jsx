@@ -577,6 +577,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [workerSignPin, setWorkerSignPin] = useState('');
   const [workerSignError, setWorkerSignError] = useState('');
 
+  const saveCreatorWorkspaceSnapshot = (workspaceData) => {
+    const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
+      const { error } = await supabase.rpc('save_creator_workspace', {
+        input_resources: workspaceData.resources.filter((resource) => !resource.organizationId),
+        input_resource_types: workspaceData.resourceTypes,
+        input_subscriptions: workspaceData.subscriptions,
+      });
+      if (error) throw error;
+    });
+    creatorSaveQueue.current = saveRequest.catch(() => {});
+    return saveRequest;
+  };
+
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
     const closeOnOutsideClick = (event) => {
@@ -603,14 +616,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!cloudUserId) return undefined;
 
     if (userRole === 'kurejas') {
-      creatorSaveQueue.current = creatorSaveQueue.current.catch(() => {}).then(async () => {
-        const { error } = await supabase.rpc('save_creator_workspace', {
-          input_resources: data.resources.filter((resource) => !resource.organizationId),
-          input_resource_types: data.resourceTypes,
-          input_subscriptions: data.subscriptions,
-        });
-        if (error) setNotice(`Kūrėjo duomenų išsaugoti nepavyko: ${error.message}`);
-      });
+      saveCreatorWorkspaceSnapshot(data).catch((error) => setNotice(`Kūrėjo duomenų išsaugoti nepavyko: ${error.message}`));
       return undefined;
     }
 
@@ -1081,6 +1087,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
     setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');
     resetResourceForm();
+  };
+
+  const deleteCreatorResource = async (resource) => {
+    if (!window.confirm(`Ar tikrai norite ištrinti „${resource.title}“? Šablonas bus pašalintas iš kūrėjo bibliotekos ir gali būti pašalintas iš įmonių priskyrimų.`)) return;
+    const nextData = {
+      ...data,
+      resources: data.resources.filter((item) => item.id !== resource.id),
+      organizations: data.organizations.map((org) => ({ ...org, resources: org.resources.filter((id) => id !== resource.id) })),
+      employees: data.employees.map((employee) => ({ ...employee, resourceIds: employee.resourceIds.filter((id) => id !== resource.id) })),
+    };
+
+    if (cloudMode) {
+      try {
+        await saveCreatorWorkspaceSnapshot(nextData);
+      } catch (error) {
+        setNotice(`Šablono ištrinti nepavyko: ${error.message}`);
+        return;
+      }
+    }
+
+    setData(nextData);
+    setNotice(`Šablonas „${resource.title}“ ištrintas.`);
   };
 
   const saveCompanyProtocol = (event) => {
@@ -2239,7 +2267,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
             </Panel>
             <LibraryFilters resources={data.resources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
-            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => { if (!window.confirm(`Ar tikrai norite ištrinti „${resource.title}“? Šablonas bus pašalintas iš kūrėjo bibliotekos ir gali būti pašalintas iš įmonių priskyrimų.`)) return; setData((current) => ({ ...current, resources: current.resources.filter((item) => item.id !== resource.id), organizations: current.organizations.map((org) => ({ ...org, resources: org.resources.filter((id) => id !== resource.id) })), employees: current.employees.map((employee) => ({ ...employee, resourceIds: employee.resourceIds.filter((id) => id !== resource.id) })) })); }} /><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
+            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
           </section>}
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
