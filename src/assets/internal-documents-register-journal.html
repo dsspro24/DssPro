@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1e293b; background: #f8fafc; margin: 0; padding: 20px; font-size: 11px; line-height: 1.4; }
+        @page portrait-page { size: A4 portrait; margin: 15mm; }
+        .cover-page { page: portrait-page; max-width: 800px; min-height: 1050px; margin: 0 auto 30px; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .cover-field { width: 80%; margin-bottom: 35px; }
+        .cover-value { font-size: 18px; font-weight: 700; color: #0f172a; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; min-height: 32px; letter-spacing: .5px; text-transform: uppercase; }
+        .cover-label { font-size: 11px; color: #64748b; margin-top: 6px; font-style: italic; }
+        .cover-title-group { margin-top: 60px; margin-bottom: 40px; }
+        .cover-main-title { font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: .8px; line-height: 1.5; text-transform: uppercase; max-width: 90%; margin: 0 auto; }
+        .cover-subtitle { font-size: 26px; font-weight: 800; color: #2563eb; letter-spacing: 3px; margin-top: 35px; text-transform: uppercase; }
+        @page landscape-page { size: A4 landscape; margin: 10mm; }
+        .journal-page { page: landscape-page; max-width: 1160px; min-height: 750px; margin: 0 auto 30px; background: #fff; padding: 20px 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; }
+        .journal-header { text-align: center; margin-bottom: 12px; }
+        .journal-header .company-name { font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+        .journal-header .doc-name { font-size: 11px; font-weight: 600; color: #334155; margin-top: 2px; text-transform: uppercase; }
+        table.journal-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 4px; }
+        table.journal-table th, table.journal-table td { border: 1px solid #cbd5e1; padding: 4px; text-align: center; vertical-align: middle; }
+        table.journal-table th { background: #f1f5f9; color: #0f172a; font-weight: 600; line-height: 1.2; }
+        .th-num { background: #e2e8f0 !important; font-weight: 700; font-size: 9.5px; color: #475569; padding: 3px !important; }
+        tbody tr:nth-child(even) { background: #f8fafc; }
+        tbody tr { height: 26px; }
+        .col-name { width: 13%; }
+        .col-pos { width: 11%; }
+        .col-group-date { width: 7%; }
+        .col-group-mid { width: 7%; }
+        .col-group-sign { width: 6%; }
+        @media print {
+            body { background: none; padding: 0; }
+            .cover-page, .journal-page { border: none; box-shadow: none; padding: 0; margin: 0; max-width: 100%; min-height: auto; page-break-after: always; }
+            .journal-page { page-break-after: avoid; }
+        }
+    </style>
+</head>
+<body>
+<div class="cover-page">
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_NAME }}</div><div class="cover-label">(įmonės pavadinimas)</div></div>
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_CODE }}</div><div class="cover-label">(įmonės kodas)</div></div>
+    <div class="cover-title-group"><div class="cover-main-title">DARBUOTOJŲ SUPAŽINDINIMO SU ĮMONĖS VIDAUS NORMINIAIS DOKUMENTAIS REGISTRACIJOS</div><div class="cover-subtitle">Žurnalas</div></div>
+</div>
+<div class="journal-page">
+    <div class="journal-header"><div class="company-name">{{ COMPANY_NAME }}</div><div class="doc-name">DARBUOTOJŲ SUPAŽINDINIMO SU ĮMONĖS VIDAUS NORMINIAIS DOKUMENTAIS REGISTRACIJOS ŽURNALAS</div></div>
+    <table class="journal-table">
+        <thead>
+            <tr>
+                <th class="col-name" rowspan="2">Vardas Pavardė</th><th class="col-pos" rowspan="2">Pareigos</th>
+                <th colspan="3">Darbuotojų saugos ir sveikatos<br>įvadinis instruktavimas</th><th colspan="3">Gaisrinės saugos įvadinis<br>instruktavimas</th>
+                <th colspan="2">Supažindinimas su<br>Darbo tvarkos taisyklėmis</th><th colspan="3">Supažindinimas su<br>Pareiginiais nuostatais</th>
+                <th colspan="3">Supažindinimas su<br>Profesinės rizikos vertinimo dokumentais</th><th colspan="3">Supažindinimas su<br>saugos duomenų lapais</th>
+            </tr>
+            <tr>
+                <th class="col-group-date">Data</th><th class="col-group-mid">Instruktuojančio asmens parašas</th><th class="col-group-sign">Instruktuojamo asmens parašas</th>
+                <th class="col-group-date">Data</th><th class="col-group-mid">Instruktuojančio asmens parašas</th><th class="col-group-sign">Instruktuojamo asmens parašas</th>
+                <th class="col-group-date">Data</th><th class="col-group-sign">Parašas</th>
+                <th class="col-group-date">Data</th><th class="col-group-mid">PN Nr.</th><th class="col-group-sign">Parašas</th>
+                <th class="col-group-date">Data</th><th class="col-group-mid">PRV kort. Nr.</th><th class="col-group-sign">Parašas</th>
+                <th class="col-group-date">Data</th><th class="col-group-mid">SDL Nr.</th><th class="col-group-sign">Parašas</th>
+            </tr>
+            <tr>
+                <th class="th-num">1</th><th class="th-num">2</th><th class="th-num">3</th><th class="th-num">4</th><th class="th-num">5</th><th class="th-num">6</th><th class="th-num">7</th><th class="th-num">8</th><th class="th-num">9</th><th class="th-num">10</th><th class="th-num">11</th><th class="th-num">12</th><th class="th-num">13</th><th class="th-num">14</th><th class="th-num">15</th><th class="th-num">16</th><th class="th-num">17</th><th class="th-num">18</th><th class="th-num">19</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

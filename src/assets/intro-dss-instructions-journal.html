@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbuotojų saugos ir sveikatos įvadinių instruktavimų registravimo žurnalas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* ---------------- PORTRAIT (Viršelis) ---------------- */
+        @page portrait-page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .cover-page {
+            page: portrait-page;
+            max-width: 800px;
+            min-height: 1050px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .cover-field {
+            width: 80%;
+            margin-bottom: 35px;
+        }
+
+        .cover-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            border-bottom: 2px solid #cbd5e1;
+            padding-bottom: 6px;
+            min-height: 32px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .cover-label {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .cover-title-group {
+            margin-top: 60px;
+            margin-bottom: 40px;
+        }
+
+        .cover-main-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: 0.8px;
+            line-height: 1.5;
+            text-transform: uppercase;
+            max-width: 90%;
+            margin: 0 auto;
+        }
+
+        .cover-subtitle {
+            font-size: 26px;
+            font-weight: 800;
+            color: #2563eb;
+            letter-spacing: 3px;
+            margin-top: 35px;
+            text-transform: uppercase;
+        }
+
+        /* ---------------- LANDSCAPE (Žurnalo lentelė) ---------------- */
+        @page landscape-page {
+            size: A4 landscape;
+            margin: 12mm;
+        }
+
+        .journal-page {
+            page: landscape-page;
+            max-width: 1120px;
+            min-height: 750px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .journal-header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .journal-header .company-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+
+        .journal-header .doc-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 3px;
+            text-transform: uppercase;
+        }
+
+        table.journal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            margin-top: 5px;
+        }
+
+        table.journal-table th, 
+        table.journal-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5px 6px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        table.journal-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .th-num {
+            background-color: #e2e8f0 !important;
+            font-weight: 700;
+            font-size: 10.5px;
+            color: #475569;
+            padding: 3px !important;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        tbody tr {
+            height: 28px;
+        }
+
+        /* Stulpelių pločiai įvadinių instruktavimų žurnalui (8 stulpeliai) */
+        .col-1 { width: 9%; }  /* Instruktavimo data[cite: 6] */
+        .col-2 { width: 22%; } /* Instruktuojamojo vardas, pavardė[cite: 6] */
+        .col-3 { width: 17%; } /* Instruktuojamojo pareigos[cite: 6] */
+        .col-4 { width: 17%; } /* Instruktuojančiojo vardas, pavardė[cite: 6] */
+        .col-5 { width: 17%; } /* Instruktuojančiojo pareigos[cite: 6] */
+        .col-6 { width: 9%; }  /* Parašas: Instruktuojamojo[cite: 6] */
+        .col-7 { width: 9%; }  /* Parašas: Instruktuojančiojo[cite: 6] */
+
+        /* Spausdinimo nustatymai naršyklėje */
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .cover-page, .journal-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+                min-height: auto;
+                page-break-after: always;
+            }
+            .journal-page {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ================= 1 PUSLAPIS: VIRŠELIS (PORTRAIT) ================= -->
+<div class="cover-page">
+    <div class="cover-field">
+        <div class="cover-value">{{ COMPANY_NAME }}</div>
+        <div class="cover-label">(Įmonės pavadinimas)</div>
+    </div>
+
+    <div class="cover-field">
+        <div class="cover-value">{{ COMPANY_CODE }}</div>
+        <div class="cover-label">(Įmonės kodas)</div>
+    </div>
+
+    <div class="cover-title-group">
+        <div class="cover-main-title">
+            Darbuotojų saugos ir sveikatos įvadinių<br>instruktavimų registravimo
+        </div>
+        <div class="cover-subtitle">
+            Žurnalas
+        </div>
+    </div>
+</div>
+
+<!-- ================= 2 PUSLAPIS: ŽURNALO PILDYMO LENTELĖ (LANDSCAPE) ================= -->
+<div class="journal-page">
+    <div class="journal-header">
+        <div class="company-name">{{ COMPANY_NAME }}</div>
+        <div class="doc-name">DARBUOTOJŲ SAUGOS IR SVEIKATOS ĮVADINIŲ INSTRUKTAVIMŲ REGISTRAVIMO ŽURNALAS</div>
+    </div>
+
+    <table class="journal-table">
+        <thead>
+            <tr>
+                <th class="col-1" rowspan="2">Instruktavimo<br>data</th>
+                <th class="col-2" rowspan="2">Instruktuojamojo<br>vardas, pavardė</th>
+                <th class="col-3" rowspan="2">Instruktuojamojo pareigos</th>
+                <th class="col-4" rowspan="2">Instruktuojančiojo<br>vardas, pavardė</th>
+                <th class="col-5" rowspan="2">Instruktuojančiojo pareigos</th>
+                <th colspan="2">Parašai</th>
+            </tr>
+            <tr>
+                <th class="col-6">Instruktuojamojo</th>
+                <th class="col-7">Instruktuojančiojo</th>
+            </tr>
+            <tr>
+                <th class="th-num">1</th>
+                <th class="th-num">2</th>
+                <th class="th-num">3</th>
+                <th class="th-num">4</th>
+                <th class="th-num">5</th>
+                <th class="th-num">6</th>
+                <th class="th-num">7</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Tuščios eilutės pildymui -->
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

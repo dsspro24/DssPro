@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbuotojų supažindinimo kortelė</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .card-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px 35px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 18px;
+        }
+
+        .company-title {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+
+        .doc-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
+            margin: 12px auto 16px auto;
+            width: 80%;
+        }
+
+        .intro-section {
+            margin-bottom: 18px;
+        }
+
+        .intro-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        .topics-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .topics-list li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 4px;
+            color: #334155;
+            text-align: justify;
+            font-size: 10.5px;
+        }
+
+        .topics-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            top: 0;
+            color: #2563eb;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 10px;
+        }
+
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        tbody tr {
+            height: 24px;
+        }
+
+        /* Stulpelių pločiai */
+        .col-nr { width: 12%; }
+        .col-date { width: 10%; }
+        .col-name { width: 25%; }
+        .col-job { width: 17%; }
+        .col-sign { width: 13%; }
+        .col-sup-name { width: 14%; }
+        .col-sup-sign { width: 9%; }
+
+        /* Pritaikymas spausdinimui (Print / PDF) */
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .card-container {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            tbody tr {
+                height: 23px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card-container">
+    <div class="header">
+        <!-- SaaS dinaminiam pakeitimui: vietoj static pavadinimo naudojamas kintamasis -->
+        <div class="company-title">{{ COMPANY_NAME }}</div>
+        <div class="doc-title">DARBUOTOJŲ SUPAŽINDINIMO KORTELĖ</div>
+        <div class="divider"></div>
+    </div>
+
+    <div class="intro-section">
+        <div class="intro-title">Žemiau išvardyti darbuotojai supažindinti su:</div>
+        <ul class="topics-list">
+            <li>Psichologinio smurto, diskriminacijos ir priekabiavimo prevencijos politika;</li>
+            <li>Darbuotojų saugos ir sveikatos politika;</li>
+            <li>Gaisrinės saugos instrukcijos rengimo, keitimo, pildymo ir mokymo tvarka;</li>
+            <li>Incidentų tyrimo tvarka, nelaimingų atsitikimų darbe, profesinių ligų tyrimo ir registravimo tvarka;</li>
+            <li>Alkoholio įtakos organizmui ir administracinių nuobaudų taikymu būnant neblaiviam. Nušalinimo (dėl neblaivumo) nuo darbo schema. Darbuotojų neblaivumo (girtumo) kontrolės tvarka, prevencijos priemonių planas. Su eismu susijusių nelaimingų atsitikimų darbe mažinimu;</li>
+            <li>Profesinės rizikos vertinimo išvadomis, šalinimo mažinimo priemonių planu;</li>
+            <li>Kaip saugiai dirbti ir išvengiant nelaimingų atsitikimų atliekant darbus ant kopėčių, pastolių ir lipynių;</li>
+            <li>Darbuotojų supažindinimas su saugaus kopėčių, lipynių naudojimo ir patikros tvarkos aprašu;</li>
+            <li>Asmeninių apsauginių priemonių naudojimas. Nelaimingi atsitikimai.</li>
+        </ul>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="col-nr" rowspan="2">Sutarties<br>Nr.</th>
+                <th class="col-date" rowspan="2">Data</th>
+                <th class="col-name" rowspan="2">Darbuotojo<br>pavardė, vardas</th>
+                <th class="col-job" rowspan="2">Darbo<br>pobūdis</th>
+                <th class="col-sign" rowspan="2">Darbuotojo<br>parašas</th>
+                <th colspan="2">Supažindinusio</th>
+            </tr>
+            <tr>
+                <th class="col-sup-name">pavardė, vardas</th>
+                <th class="col-sup-sign">parašas</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Tuščios eilutės spausdinimui arba dinaminiam pildymui per tavo SaaS logic -->
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

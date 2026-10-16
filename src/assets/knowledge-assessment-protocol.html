@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mokymo programos žinių patikrinimo protokolas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 10.5px;
+            line-height: 1.35;
+        }
+
+        .protocol-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .company-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            color: #0f172a;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .doc-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+            text-transform: uppercase;
+            line-height: 1.4;
+        }
+
+        .doc-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+            text-transform: uppercase;
+            margin-top: 2px;
+            margin-bottom: 12px;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 10.5px;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .commission-section {
+            margin-bottom: 12px;
+            font-size: 10.5px;
+            color: #334155;
+        }
+
+        .commission-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .commission-row .label {
+            width: 140px;
+            font-weight: 600;
+        }
+
+        .commission-row .line {
+            flex-grow: 1;
+            border-bottom: 1px solid #94a3b8;
+            min-height: 16px;
+        }
+
+        table.protocol-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+        }
+
+        table.protocol-table th,
+        table.protocol-table td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 5px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        table.protocol-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        tbody tr {
+            height: 22px;
+        }
+
+        .col-contract { width: 12%; }
+        .col-name { width: 35%; text-align: left !important; padding-left: 8px !important; }
+        .col-position { width: 25%; text-align: left !important; padding-left: 8px !important; }
+        .col-decision { width: 14%; }
+        .col-sign { width: 14%; }
+
+        .signatures-section {
+            margin-top: 15px;
+            font-size: 10.5px;
+            color: #334155;
+        }
+
+        .sig-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            align-items: flex-start;
+        }
+
+        .sig-title {
+            width: 140px;
+            font-weight: 600;
+        }
+
+        .sig-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sig-pair {
+            display: flex;
+            gap: 20px;
+        }
+
+        .sig-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .sig-line {
+            border-bottom: 1px solid #94a3b8;
+            height: 16px;
+            width: 100%;
+        }
+
+        .sig-label {
+            font-size: 8.5px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .protocol-container {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="protocol-container">
+    <div class="header">
+        <div class="company-title">{{ COMPANY_NAME }}</div>
+        <div class="doc-title">{{ PROTOCOL_TITLE }}</div>
+        <div class="doc-subtitle">PROTOKOLAS</div>
+    </div>
+
+    <div class="meta-info">
+        <div>{{PROTOCOL_DATE}} Nr. {{PROTOCOL_NUMBER}}</div>
+        <div>{{ LOCATION_PLACE }}</div>
+    </div>
+
+    <div class="commission-section">
+        <div class="commission-row">
+            <div class="label">Komisijos pirmininkas:</div>
+            <div class="line"></div>
+        </div>
+        <div class="commission-row">
+            <div class="label">kurios nariai:</div>
+            <div class="line"></div>
+        </div>
+        <div class="commission-row">
+            <div class="label"></div>
+            <div class="line"></div>
+        </div>
+        <div style="margin-top: 10px; font-weight: 600;">apmokyti darbuotojai:</div>
+    </div>
+
+    <table class="protocol-table">
+        <thead>
+            <tr>
+                <th class="col-contract">Sutarties Nr.</th>
+                <th class="col-name">Vardas, pavardė</th>
+                <th class="col-position">Pareigos</th>
+                <th class="col-decision">Komisijos sprendimas</th>
+                <th class="col-sign">Parašas</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+
+    <div class="signatures-section">
+        <div class="sig-row">
+            <div class="sig-title">Komisijos pirmininkas:</div>
+            <div class="sig-content">
+                <div class="sig-pair">
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(parašas)</div>
+                    </div>
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(vardas, pavardė)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sig-row" style="margin-top: 12px;">
+            <div class="sig-title">Nariai:</div>
+            <div class="sig-content">
+                <div class="sig-pair">
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(parašas)</div>
+                    </div>
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(vardas, pavardė)</div>
+                    </div>
+                </div>
+                <div class="sig-pair" style="margin-top: 6px;">
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(parašas)</div>
+                    </div>
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div class="sig-label">(vardas, pavardė)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

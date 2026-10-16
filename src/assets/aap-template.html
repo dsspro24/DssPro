@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <meta charset="UTF-8">
+  <title>AAP dokumentai</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #000; background: #fff; font: 12px/1.45 "Times New Roman", serif; }
+    .page { max-width: 800px; min-height: 250mm; margin: 0 auto 24px; padding: 18px; background: #fff; }
+    .page-break { page-break-after: always; break-after: page; }
+    .company-header { font-size: 13px; font-weight: 700; }
+    .company-sub, .sub-text { font-size: 9px; }
+    .company-sub { margin-bottom: 18px; }
+    .doc-title { margin: 16px 0; text-align: center; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+    .identity { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; }
+    .form-row { display: flex; align-items: baseline; gap: 5px; margin-bottom: 9px; }
+    .form-row label { white-space: nowrap; }
+    .line { flex: 1; min-height: 16px; padding: 0 4px; border-bottom: 1px solid #000; }
+    .section-title { margin: 18px 0 8px; text-align: center; font-weight: 700; }
+    table { width: 100%; margin: 12px 0 18px; border-collapse: collapse; }
+    th, td { padding: 5px 6px; border: 1px solid #000; text-align: center; vertical-align: middle; font-size: 10px; }
+    th { font-weight: 700; }
+    td.text-left { text-align: left; }
+    .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px; }
+    .signature-entry { min-height: 74px; }
+    .signature-entry strong { display: block; min-height: 18px; }
+    .signature-entry .sig-line { min-height: 27px; margin-top: 18px; padding-top: 3px; border-top: 1px solid #000; text-align: center; font-size: 9px; }
+    .signed-name { font-weight: 700; }
+    .signed-date { font-size: 10px; }
+    .signed-detail { display: block; min-height: 14px; font-size: 9px; }
+    .issue-date { margin: 12px 0; text-align: right; }
+    .sub-text { margin: -5px 0 12px; text-align: center; }
+    @media print {
+      body { print-color-adjust: exact; }
+      .page { min-height: 0; margin: 0; padding: 0; }
+      .page-break { page-break-after: always; break-after: page; }
+    }
+  </style>
+</head>
+<body>
+  <section class="page page-break">
+    <div class="company-header">{{COMPANY_NAME}}</div>
+    <div class="company-sub">(įmonės arba padalinio pavadinimas)</div>
+    <h1 class="doc-title">Darbuotojo asmeninių apsaugos priemonių apskaitos<br>kortelė Nr. {{CARD_NUMBER}}</h1>
+    <div class="identity">
+      <div>
+        <div class="form-row"><label>Vardas</label><span class="line">{{EMPLOYEE_FIRST_NAME}}</span></div>
+        <div class="form-row"><label>Pavardė</label><span class="line">{{EMPLOYEE_LAST_NAME}}</span></div>
+        <div class="form-row"><label>Darbo sutarties Nr.</label><span class="line">{{CONTRACT_NO}}</span></div>
+        <div class="form-row"><label>Darbo laiko apskaitos žiniaraščio Nr.</label><span class="line"></span></div>
+        <div class="form-row"><label>Padalinys</label><span class="line">{{DEPARTMENT}}</span></div>
+        <div class="form-row"><label>Darbo vieta</label><span class="line"></span></div>
+        <div class="form-row"><label>Pareigos</label><span class="line">{{POSITION}}</span></div>
+        <div class="form-row"><label>Priėmimo į darbą data</label><span class="line"></span></div>
+      </div>
+      <div>
+        <div class="form-row"><label>Lytis</label><span class="line"></span><span>vyras / moteris</span></div>
+        <div class="form-row"><label>Ūgis</label><span class="line">{{HEIGHT}}</span></div>
+        <strong>Dydis:</strong>
+        <div class="form-row"><label>drabužio</label><span class="line">{{CLOTHING_SIZE}}</span></div>
+        <div class="form-row"><label>avalynės</label><span class="line">{{SHOE_SIZE}}</span></div>
+        <div class="form-row"><label>galvos apdangalo</label><span class="line">{{HEAD_SIZE}}</span></div>
+        <div class="form-row"><label>kitos</label><span class="line">{{OTHER_SIZES}}</span></div>
+      </div>
+    </div>
+    <div class="section-title">Asmeninės apsaugos priemonės (pagal patvirtintą sąrašą)</div>
+    <table>
+      <thead><tr><th>Eil. Nr.</th><th>Asmeninės apsaugos priemonės pavadinimas, tipas, markė, paskirtis ir t. t.</th><th>Pagrindas išduoti</th><th>Kiekis</th><th>Mato vienetas</th><th>Tinkamumo naudoti terminas</th></tr></thead>
+      <tbody>{{ACCOUNTING_ROWS}}</tbody>
+    </table>
+    <p>{{DOCUMENT_DATE}}</p>
+    <div class="signature-grid">
+      <div class="signature-entry"><strong>Darbdavys ar jo įgaliotas asmuo</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYER_NAME}}</span><br><span class="signed-date">{{EMPLOYER_DATE}}</span><span class="signed-detail">{{EMPLOYER_SIGNATURE_DETAILS}}</span><div class="sig-line">(parašas)</div></div>
+      <div class="signature-entry"><strong>Vieną egzempliorių gavau</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYEE_NAME}}</span><br><span class="signed-date">{{EMPLOYEE_DATE}}</span><span class="signed-detail">{{EMPLOYEE_SIGNATURE_DETAILS}}</span><div class="sig-line">(darbuotojo parašas)</div></div>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="company-header">{{COMPANY_NAME}}</div>
+    <h1 class="doc-title">Asmeninių apsaugos priemonių išdavimo (grąžinimo)<br>žiniaraštis Nr. {{REGISTER_NUMBER}}</h1>
+    <div class="issue-date">Išdavimo (grąžinimo) data <span class="line">{{ISSUE_DATE}}</span></div>
+    <div class="form-row"><label>Darbuotojas</label><span class="line">{{EMPLOYEE_NAME}}</span><strong>{{POSITION}}</strong></div>
+    <div class="form-row"><label>Darbo sutarties Nr.</label><span class="line">{{CONTRACT_NO}}</span></div>
+    <div class="sub-text">(vardas, pavardė, padalinys, pareigos, darbo sutarties Nr.)</div>
+    <table>
+      <thead><tr><th>Eil. Nr.</th><th>Asmeninės apsaugos priemonės kodas</th><th>Asmeninės apsaugos priemonės pavadinimas</th><th>Mato vnt.</th><th>Kiekis</th><th>Kaina, Eur</th><th>Suma, Eur</th></tr></thead>
+      <tbody>{{ISSUE_ROWS}}</tbody>
+    </table>
+    <div class="form-row"><label>Suma žodžiais:</label><span class="line">{{TOTAL_AMOUNT_WORDS}}</span><strong>{{TOTAL_AMOUNT}}</strong></div>
+    <div class="signature-grid">
+      <div class="signature-entry"><strong>Išdavė</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYER_NAME}}</span><br><span class="signed-date">{{EMPLOYER_DATE}}</span><span class="signed-detail">{{EMPLOYER_SIGNATURE_DETAILS}}</span><div class="sig-line">(pareigos, vardas, pavardė, parašas)</div></div>
+      <div class="signature-entry"><strong>Gavo</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYEE_NAME}}</span><br><span class="signed-date">{{EMPLOYEE_DATE}}</span><span class="signed-detail">{{EMPLOYEE_SIGNATURE_DETAILS}}</span><div class="sig-line">(pareigos, vardas, pavardė, parašas)</div></div>
+    </div>
+  </section>
+</body>
+</html>
