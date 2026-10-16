@@ -4,6 +4,15 @@ import LocalWorkspace from './LocalWorkspace.jsx';
 import { supabase } from './lib/supabase.js';
 
 async function loadManagerWorkspace(user) {
+  const [{ data: signingPinConfigured, error: pinError }, { data: profile, error: profileError }] = await Promise.all([
+    supabase.rpc('has_signing_pin'),
+    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+  ]);
+  if (pinError) throw pinError;
+  if (profileError) throw profileError;
+  const managerName = profile?.full_name ?? user.user_metadata?.full_name ?? '';
+  if (!signingPinConfigured) return { requiresSigningPin: true, managerName };
+
   const { data: memberships, error: membershipError } = await supabase
     .from('organization_memberships')
     .select('organization_id, role')
@@ -13,10 +22,8 @@ async function loadManagerWorkspace(user) {
   const managerMembership = memberships.find((membership) => membership.role === 'manager');
   if (!managerMembership) return null;
 
-  const [{ data: organization, error: organizationError }, { data: profile }] = await Promise.all([
-    supabase.from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single(),
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
-  ]);
+  const { data: organization, error: organizationError } = await supabase
+    .from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single();
   if (organizationError) throw organizationError;
 
   const { data: savedWorkspace, error: workspaceError } = await supabase
@@ -28,7 +35,7 @@ async function loadManagerWorkspace(user) {
 
   return {
     organization,
-    managerName: profile?.full_name ?? user.user_metadata?.full_name ?? '',
+    managerName,
     data: savedWorkspace?.data ?? null,
   };
 }
@@ -39,7 +46,7 @@ export default function CloudEntry() {
   const [authMode, setAuthMode] = useState('login');
   const [workspace, setWorkspace] = useState(null);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', companyName: '', companyCode: '' });
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   const [notice, setNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -74,7 +81,7 @@ export default function CloudEntry() {
       .then((loadedWorkspace) => {
         if (!active) return;
         setWorkspace(loadedWorkspace);
-        setWorkspaceStatus(loadedWorkspace ? 'ready' : 'organization-needed');
+        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
       })
       .catch((error) => {
         if (!active) return;
@@ -92,6 +99,9 @@ export default function CloudEntry() {
     setSubmitting(true);
     try {
       if (authMode === 'signup') {
+        if (!/^\d{4}$/.test(form.signingPin) || form.signingPin !== form.confirmSigningPin) {
+          throw new Error('Pasirašymo PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
+        }
         const { data, error } = await supabase.auth.signUp({
           email: form.email.trim(),
           password: form.password,
@@ -101,8 +111,16 @@ export default function CloudEntry() {
           },
         });
         if (error) throw error;
-        if (data.session) setSession(data.session);
-        else setNotice('Paskyra sukurta. Patvirtinkite el. paštą ir tada prisijunkite.');
+        if (data.session) {
+          const { error: pinSetError } = await supabase.rpc('set_signing_pin', { input_pin: form.signingPin });
+          if (pinSetError) throw pinSetError;
+          const loadedWorkspace = await loadManagerWorkspace(data.session.user);
+          setSession(data.session);
+          setWorkspace(loadedWorkspace);
+          setWorkspaceStatus(loadedWorkspace ? 'ready' : 'organization-needed');
+        } else {
+          setNotice('Paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite; PIN nustatymas bus užbaigtas prieš įmonės kūrimą.');
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email: form.email.trim(), password: form.password });
         if (error) throw error;
@@ -110,6 +128,29 @@ export default function CloudEntry() {
       }
     } catch (error) {
       setErrorMessage(error.message || 'Nepavyko prisijungti. Patikrinkite duomenis ir bandykite dar kartą.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const finishSigningPinSetup = async (event) => {
+    event.preventDefault();
+    if (!session?.user) return;
+    setErrorMessage('');
+    if (!/^\d{4}$/.test(form.signingPin) || form.signingPin !== form.confirmSigningPin) {
+      setErrorMessage('Pasirašymo PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('set_signing_pin', { input_pin: form.signingPin });
+      if (error) throw error;
+      const loadedWorkspace = await loadManagerWorkspace(session.user);
+      setWorkspace(loadedWorkspace);
+      setWorkspaceStatus(loadedWorkspace ? 'ready' : 'organization-needed');
+      setForm((current) => ({ ...current, signingPin: '', confirmSigningPin: '' }));
+    } catch (error) {
+      setErrorMessage(error.message || 'Nepavyko nustatyti pasirašymo PIN.');
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +191,7 @@ export default function CloudEntry() {
     await supabase.auth.signOut();
     setWorkspace(null);
     setWorkspaceStatus('idle');
-    setForm({ fullName: '', email: '', password: '', companyName: '', companyCode: '' });
+    setForm({ fullName: '', email: '', password: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   };
 
   if (!authReady || (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading'))) {
@@ -164,12 +205,15 @@ export default function CloudEntry() {
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
     <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-emerald-950 text-emerald-200"><Building2 size={21} /></span><div><p className="text-lg font-bold">DSS Pro</p><p className="text-sm text-slate-500">Vadovo paskyra</p></div></div>
-      {session && workspaceStatus === 'organization-needed' ? <>
+      {session && workspaceStatus === 'pin-needed' ? <>
+        <h1 className="text-xl font-bold">Nustatykite pasirašymo PIN</h1><p className="mt-1 text-sm text-slate-600">PIN bus naudojamas dokumentams pasirašyti. Jis saugomas užšifruotu hash’u ir niekada nerodomas nustatymuose.</p>
+        <form onSubmit={finishSigningPinSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">4 skaitmenų PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Nustatyti PIN'}</button></form>
+      </> : session && workspaceStatus === 'organization-needed' ? <>
         <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų.</p>
         <form onSubmit={createOrganization} className="mt-5 space-y-4"><label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label><label className="block text-sm font-medium">Įmonės kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><Building2 size={16} />{submitting ? 'Kuriama…' : 'Sukurti įmonę'}</button></form>
       </> : session && workspaceStatus === 'error' ? <><h1 className="text-xl font-bold">Nepavyko atidaryti įmonės</h1><p className="mt-2 text-sm text-rose-700">{errorMessage}</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold" onClick={signOut}>Atsijungti</button></> : <>
         <h1 className="text-xl font-bold">{authMode === 'signup' ? 'Sukurkite vadovo paskyrą' : 'Prisijunkite'}</h1><p className="mt-1 text-sm text-slate-600">{authMode === 'signup' ? 'Patvirtinus el. paštą galėsite sukurti įmonės paskyrą.' : 'Prisijungimas prie jūsų DSS Pro įmonės.'}</p>
-        <form onSubmit={handleAuth} className="mt-5 space-y-4">{authMode === 'signup' && <label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>}<label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button></form>
+        <form onSubmit={handleAuth} className="mt-5 space-y-4">{authMode === 'signup' && <><label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label></>}<label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>{authMode === 'signup' && <><label className="block text-sm font-medium">Pasirašymo PIN (4 skaitmenys)<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite pasirašymo PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label></>}<button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button></form>
         <button type="button" className="mt-4 w-full text-sm font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); setErrorMessage(''); setNotice(''); }}>{authMode === 'signup' ? 'Jau turite paskyrą? Prisijunkite' : 'Neturite paskyros? Registruokitės'}</button>
       </>}
       {notice && <p role="status" className="mt-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}

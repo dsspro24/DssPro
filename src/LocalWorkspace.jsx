@@ -534,6 +534,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [pinConfirm, setPinConfirm] = useState('');
   const [managerPinDraft, setManagerPinDraft] = useState('');
   const [managerPinConfirm, setManagerPinConfirm] = useState('');
+  const [managerCurrentPin, setManagerCurrentPin] = useState('');
   const [employerSigningTarget, setEmployerSigningTarget] = useState(null);
   const [employerSignPin, setEmployerSignPin] = useState('');
   const [employerSignError, setEmployerSignError] = useState('');
@@ -1337,6 +1338,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice('Vadovo pasirašymo PIN nustatytas šioje naršyklėje.');
   };
 
+  const changeCloudManagerPin = async (event) => {
+    event.preventDefault();
+    if (!/^\d{4}$/.test(managerCurrentPin) || !/^\d{4}$/.test(managerPinDraft) || managerPinDraft !== managerPinConfirm) {
+      setNotice('Įveskite seną PIN ir du kartus tą patį naują 4 skaitmenų PIN.');
+      return;
+    }
+    const { data: changed, error } = await supabase.rpc('change_signing_pin', {
+      input_current_pin: managerCurrentPin,
+      input_new_pin: managerPinDraft,
+    });
+    if (error) {
+      setNotice(`PIN pakeisti nepavyko: ${error.message}`);
+      return;
+    }
+    if (!changed) {
+      setNotice('Senas PIN neteisingas arba per daug kartų bandyta.');
+      return;
+    }
+    setManagerCurrentPin('');
+    setManagerPinDraft('');
+    setManagerPinConfirm('');
+    setNotice('Pasirašymo PIN pakeistas.');
+  };
+
   const saveAapItems = (event) => {
     event.preventDefault();
     updateOrg(currentOrg.id, (org) => ({ ...org, aapItems: aapDraft.map((item) => ({ ...item, quantity: Number(item.quantity) || 0, unitPrice: Number(item.unitPrice) || 0 })) }));
@@ -1349,7 +1374,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const requestEmployerSign = (employee, resource) => {
-    if (!currentOrg.managerPin || currentOrg.managerPin.length !== 4) {
+    if (!cloudMode && (!currentOrg.managerPin || currentOrg.managerPin.length !== 4)) {
       setActiveTab('imone');
       setNotice('Įmonės nustatymuose vadovas turi susikurti 4 skaitmenų parašo PIN.');
       return;
@@ -1359,12 +1384,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setEmployerSignError('');
   };
 
-  const confirmEmployerSign = (event) => {
+  const confirmEmployerSign = async (event) => {
     event.preventDefault();
     const org = data.organizations.find((item) => item.id === employerSigningTarget.orgId);
     const employee = data.employees.find((item) => item.id === employerSigningTarget.employeeId);
     const resource = data.resources.find((item) => item.id === employerSigningTarget.resourceId);
-    if (!org || employerSignPin !== org.managerPin) {
+    if (!org || !employee || !resource) {
+      setEmployerSignError('Nepavyko rasti pasirašomo dokumento.');
+      return;
+    }
+    let pinMatches = employerSignPin === org.managerPin;
+    if (cloudMode) {
+      const { data: verified, error } = await supabase.rpc('verify_signing_pin', { input_pin: employerSignPin });
+      if (error) {
+        setEmployerSignError('PIN patikrinti nepavyko. Bandykite dar kartą.');
+        return;
+      }
+      pinMatches = verified === true;
+    }
+    if (!pinMatches) {
       setEmployerSignError('Vadovo PIN kodas neteisingas.');
       return;
     }
@@ -1766,7 +1804,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p><CommissionEditor org={currentOrg} updateOrg={updateOrg} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => setCommissionSigningTarget(null)} /></Panel>
-              <Panel title="Vadovo parašo PIN"><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></Panel>
+              <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>
               <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>
             </div>
           </section>}
