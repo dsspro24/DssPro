@@ -95,7 +95,10 @@ export default function CloudEntry() {
         const { data, error } = await supabase.auth.signUp({
           email: form.email.trim(),
           password: form.password,
-          options: { data: { full_name: form.fullName.trim() } },
+          options: {
+            data: { full_name: form.fullName.trim() },
+            emailRedirectTo: window.location.origin,
+          },
         });
         if (error) throw error;
         if (data.session) setSession(data.session);
