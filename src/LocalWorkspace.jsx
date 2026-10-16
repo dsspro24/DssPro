@@ -530,6 +530,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [taskSearch, setTaskSearch] = useState('');
   const [specialistQuery, setSpecialistQuery] = useState('');
   const [employeeForm, setEmployeeForm] = useState({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [employeePositionDraft, setEmployeePositionDraft] = useState('');
   const [inviteResourceIds, setInviteResourceIds] = useState(['res-fire', 'res-height', 'res-aap']);
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
@@ -550,6 +551,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [readConfirmed, setReadConfirmed] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  const [workerCurrentPin, setWorkerCurrentPin] = useState('');
   const [managerPinDraft, setManagerPinDraft] = useState('');
   const [managerPinConfirm, setManagerPinConfirm] = useState('');
   const [managerCurrentPin, setManagerCurrentPin] = useState('');
@@ -584,6 +586,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           input_subscriptions: data.subscriptions,
         });
         if (error) setNotice(`Kūrėjo duomenų išsaugoti nepavyko: ${error.message}`);
+      }, 500);
+
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (userRole === 'darbuotojas') {
+      const employee = data.employees.find((item) => item.orgId === selectedOrgId);
+      if (!employee) return undefined;
+      const assignedResourceIds = new Set(employee.resourceIds ?? []);
+      const inputProgress = Object.fromEntries(Object.entries(employee.progressByResource ?? {}).filter(([resourceId]) => assignedResourceIds.has(resourceId)));
+      const timeout = window.setTimeout(async () => {
+        const { error } = await supabase.rpc('save_employee_workspace', {
+          input_sizes: employee.sizes ?? {},
+          input_progress: inputProgress,
+        });
+        if (error) setNotice(`Darbuotojo duomenų išsaugoti nepavyko: ${error.message}`);
       }, 500);
 
       return () => window.clearTimeout(timeout);
@@ -872,26 +890,27 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`„${resourceSettingsTarget.title}“ nustatymai išsaugoti įmonei.`);
   };
 
-  const recordWorkerSignature = (employee, resource) => {
+  const recordWorkerSignature = (employee, resource, savedSignature = null) => {
     const existing = hasCurrentWorkerSignature(employee.id, resource.id);
     if (existing) return;
+    const signature = savedSignature ?? {
+      id: `sig-${Date.now()}`,
+      orgId: employee.orgId,
+      employeeId: employee.id,
+      contractNumber: employee.contractNumber ?? '',
+      resourceId: resource.id,
+      aapSnapshot: resource.id === 'res-aap' ? createAapSnapshot(employee, data.organizations.find((org) => org.id === employee.orgId)) : undefined,
+      signer: employee.name,
+      role: 'Darbuotojas',
+      signatureMethod: 'PIN',
+      signedAt: new Date().toISOString(),
+      validUntil: getValidityUntil(resource.validityMonths),
+      ip: '127.0.0.1 (demo)',
+    };
     setData((current) => ({
       ...current,
       employees: current.employees.map((item) => item.id === employee.id ? { ...item, progressByResource: { ...item.progressByResource, [resource.id]: 'completed' } } : item),
-      signatures: [...current.signatures, {
-        id: `sig-${Date.now()}`,
-        orgId: employee.orgId,
-        employeeId: employee.id,
-        contractNumber: employee.contractNumber ?? '',
-        resourceId: resource.id,
-        aapSnapshot: resource.id === 'res-aap' ? createAapSnapshot(employee, data.organizations.find((org) => org.id === employee.orgId)) : undefined,
-        signer: employee.name,
-        role: 'Darbuotojas',
-        signatureMethod: 'PIN',
-        signedAt: new Date().toISOString(),
-        validUntil: getValidityUntil(resource.validityMonths),
-        ip: '127.0.0.1 (demo)',
-      }],
+      signatures: [...current.signatures, signature],
     }));
     setNotice(`Dokumentas „${resource.title}“ pasirašytas PIN kodu.`);
   };
@@ -906,7 +925,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('Prieš pasirašydami AAP kortelę, užpildykite batų, drabužių, kelnių ir striukės dydžius.');
       return;
     }
-    if (!employee.pin || employee.pin.length !== 4) {
+    if (!cloudMode && (!employee.pin || employee.pin.length !== 4)) {
       setActiveTab('paskyra');
       setNotice('Pirmiausia paskyroje susikurkite 4 skaitmenų pasirašymo PIN.');
       return;
@@ -916,7 +935,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setWorkerSignError('');
   };
 
-  const confirmWorkerSign = (event) => {
+  const confirmWorkerSign = async (event) => {
     event.preventDefault();
     const employee = data.employees.find((item) => item.id === workerSigningTarget.employeeId);
     const resource = data.resources.find((item) => item.id === workerSigningTarget.resourceId);
@@ -931,11 +950,41 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('Prieš pasirašydami AAP kortelę, užpildykite batų, drabužių, kelnių ir striukės dydžius.');
       return;
     }
-    if (!employee || workerSignPin !== employee.pin) {
-      setWorkerSignError('PIN kodas neteisingas.');
+    if (!employee || !resource) {
+      setWorkerSignError('Nepavyko rasti pasirašomo dokumento.');
       return;
     }
-    recordWorkerSignature(employee, resource);
+    if (cloudMode && userRole === 'darbuotojas') {
+      const assignedResourceIds = new Set(employee.resourceIds ?? []);
+      const inputProgress = Object.fromEntries(Object.entries(employee.progressByResource ?? {}).filter(([resourceId]) => assignedResourceIds.has(resourceId)));
+      inputProgress[resource.id] = 'completed';
+      const { error: progressError } = await supabase.rpc('save_employee_workspace', {
+        input_sizes: employee.sizes ?? {},
+        input_progress: inputProgress,
+      });
+      if (progressError) {
+        setWorkerSignError('Dokumento būsenos išsaugoti nepavyko. Bandykite dar kartą.');
+        return;
+      }
+      const { data: signature, error } = await supabase.rpc('record_employee_signature', {
+        input_resource_id: resource.id,
+        input_pin: workerSignPin,
+      });
+      if (error) {
+        setWorkerSignError(error.message || 'PIN patikrinti nepavyko.');
+        return;
+      }
+      if (!signature) {
+        setWorkerSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
+        return;
+      }
+      recordWorkerSignature(employee, resource, signature);
+    } else if (workerSignPin !== employee.pin) {
+      setWorkerSignError('PIN kodas neteisingas.');
+      return;
+    } else {
+      recordWorkerSignature(employee, resource);
+    }
     setWorkerSigningTarget(null);
     setWorkerSignPin('');
   };
@@ -1081,7 +1130,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
-  const submitQuiz = (event) => {
+  const submitQuiz = async (event) => {
     event.preventDefault();
     const questions = previewResource?.questions ?? [];
     const correctCount = questions.filter((question, index) => {
@@ -1091,9 +1140,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       return Number(quizAnswers[index]) === question.correctIndex;
     }).length;
-    const score = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
-    const passed = score >= 80;
-    const result = { resourceId: previewResource.id, score, passed, completedAt: new Date().toISOString(), ip: '127.0.0.1 (demo)' };
+    let score = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
+    let passed = score >= 80;
+    let completedAt = new Date().toISOString();
+    if (cloudMode && userRole === 'darbuotojas') {
+      const { data: result, error } = await supabase.rpc('submit_employee_test', {
+        input_resource_id: previewResource.id,
+        input_answers: questions.map((_, index) => quizAnswers[index] ?? null),
+      });
+      if (error) {
+        setNotice(`Testo rezultato išsaugoti nepavyko: ${error.message}`);
+        return;
+      }
+      score = result.score;
+      passed = result.passed;
+      completedAt = result.completedAt;
+    }
+    const result = { resourceId: previewResource.id, score, passed, completedAt, ip: cloudMode ? 'Server verified' : '127.0.0.1 (demo)' };
     setQuizResult({ resourceId: previewResource.id, score, passed });
     setData((current) => {
       const employee = current.employees.find((item) => item.id === currentEmployee.id);
@@ -1112,7 +1175,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     });
   };
 
-  const inviteEmployee = (event) => {
+  const inviteEmployee = async (event) => {
     event.preventDefault();
     const name = `${employeeForm.firstName.trim()} ${employeeForm.lastName.trim()}`.trim();
     const email = employeeForm.email.trim().toLowerCase();
@@ -1120,23 +1183,47 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!name || !email || !contractNumber || employeeEmailError || employeeContractNumberError) return;
     const invitedAt = new Date().toISOString();
     const invitedEmployee = {
-      id: `emp-${Date.now()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: 'Pakviestas', inviteCount: 1, invitedAt,
+      id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: 'Pakviestas', inviteCount: 1, invitedAt,
       medicalCertificateValidUntil: employeeForm.medicalCertificateValidUntil || '',
       resourceIds: inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)), sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '',
     };
-    setData((current) => {
-      const { batches, resourceIds } = addEmployeeToProtocolBatches(current, invitedEmployee);
-      return {
+    const { batches, resourceIds } = addEmployeeToProtocolBatches(data, invitedEmployee);
+    const employeeToInvite = { ...invitedEmployee, resourceIds };
+    setInviteSubmitting(true);
+    try {
+      if (cloudMode) {
+        const { error } = await supabase.functions.invoke('invite-employee', {
+          body: {
+            organizationId: currentOrg.id,
+            employee: employeeToInvite,
+            protocolBatches: batches,
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) {
+          let message = error.message;
+          if (error.context instanceof Response) {
+            const details = await error.context.clone().json().catch(() => null);
+            message = details?.error ?? message;
+          }
+          throw new Error(message);
+        }
+      }
+      setData((current) => ({
         ...current,
-        employees: [...current.employees, { ...invitedEmployee, resourceIds }],
+        employees: [...current.employees, employeeToInvite],
         protocolBatches: batches,
-      };
-    });
-    setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
-    setEmployeeSearch('');
-    setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
-    setNotice(`Kvietimas ${email} paruoštas. El. laiškų siuntimas bus prijungtas vėliau.`);
-    event.currentTarget.closest('dialog')?.close();
+      }));
+      setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
+      setEmployeeSearch('');
+      setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
+      setNotice(cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
+      event.currentTarget.closest('dialog')?.close();
+    } catch (error) {
+      setNotice(`Darbuotojo pakviesti nepavyko: ${error.message || 'patikrinkite el. pašto siuntimo nustatymus.'}`);
+    } finally {
+      setInviteSubmitting(false);
+    }
   };
 
   const saveAssignmentPreset = (event) => {
@@ -1508,10 +1595,29 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(action === 'cancel' ? 'Prenumerata atšaukta demo aplinkoje.' : 'Prenumerata pratęsta demo aplinkoje.');
   };
 
-  const savePin = (event) => {
+  const savePin = async (event) => {
     event.preventDefault();
     if (!/^\d{4}$/.test(pinDraft) || pinDraft !== pinConfirm) {
       setNotice('PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
+      return;
+    }
+    if (cloudMode && userRole === 'darbuotojas') {
+      if (!/^\d{4}$/.test(workerCurrentPin)) {
+        setNotice('Įveskite dabartinį 4 skaitmenų PIN.');
+        return;
+      }
+      const { data: changed, error } = await supabase.rpc('change_signing_pin', {
+        input_current_pin: workerCurrentPin,
+        input_new_pin: pinDraft,
+      });
+      if (error || !changed) {
+        setNotice('PIN pakeisti nepavyko. Patikrinkite dabartinį PIN ir bandykite dar kartą.');
+        return;
+      }
+      setWorkerCurrentPin('');
+      setPinDraft('');
+      setPinConfirm('');
+      setNotice('Pasirašymo PIN pakeistas.');
       return;
     }
     if (userRole === 'dss') {
@@ -1678,7 +1784,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'skydelis' && (
             <section className="mx-auto w-full max-w-[1400px] space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? 'Įmonių saugos priežiūra' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : `${roleLabels[userRole]} darbo vieta · vietinis demo, duomenys išsaugomi šioje naršyklėje`}</p></div></div>
+              <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? 'Įmonių saugos priežiūra' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div></div>
               {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div>
                   : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={orgEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => employee.medicalCertificateValidUntil && new Date(employee.medicalCertificateValidUntil).getTime() < validityCheckTime).length} /></div>
@@ -1779,7 +1885,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>
                   <label className="block text-sm font-medium">Darbuotojo ruošinys<select className={`${inputClass} mt-1`} value={selectedAssignmentPresetId} onChange={(event) => { const presetId = event.target.value; const preset = (currentOrg.employeeAssignmentPresets ?? []).find((item) => item.id === presetId); setSelectedAssignmentPresetId(presetId); if (preset) setInviteResourceIds(preset.resourceIds.filter((id) => currentOrg.resources.includes(id))); }}><option value="">Pasirinkti ruošinį</option>{(currentOrg.employeeAssignmentPresets ?? []).map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · {preset.resourceIds.length} dokumentai</option>)}</select>{!(currentOrg.employeeAssignmentPresets ?? []).length && <span className="mt-1 block text-xs font-normal text-slate-500">Ruošinius susikurkite darbuotojų sąrašo skiltyje „Ruošiniai“.</span>}</label>
                   <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => <label className="flex items-center gap-2 text-sm" key={resource.id}><input type="checkbox" checked={inviteResourceIds.includes(resource.id)} onChange={(event) => { setSelectedAssignmentPresetId(''); setInviteResourceIds((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id)); }} />{resource.title}</label>)}{!currentOrg.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</div></fieldset>
-                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass}><Plus size={16} />Pakviesti</button></div>
+                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
                 </form>
               </dialog>}
               {userRole === 'vadovas' && <dialog id="assignment-presets-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
@@ -1857,7 +1963,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="text-sm font-medium">Med. pažymėjimas · galioja iki<input className={`${inputClass} mt-1`} type="date" value={employeeForm.medicalCertificateValidUntil} onChange={(event) => setEmployeeForm({ ...employeeForm, medicalCertificateValidUntil: event.target.value })} /></label>
                 </div>
                 <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => <label className="flex items-center gap-2 text-sm" key={resource.id}><input type="checkbox" checked={inviteResourceIds.includes(resource.id)} onChange={(event) => setInviteResourceIds((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id))} />{resource.title}</label>)}{!currentOrg.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</div></fieldset>
-                <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass}><Plus size={16} />Pakviesti</button></div>
+                <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
               </form>
             </dialog>
             <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
@@ -1952,7 +2058,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
 
-          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle="PIN vietiniame demo saugomas tik šios naršyklės duomenyse. Produkcijoje reikės saugaus serverinio patvirtinimo." /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3"><label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />Nustatyti PIN</button></form></Panel></section>}
+          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && userRole === 'darbuotojas' && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5"><PageTitle title="Įmonės prenumerata" subtitle="Demo leidžia peržiūrėti būsenas ir išbandyti pratęsimo bei atšaukimo veiksmus; mokėjimai neprijungti." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel></section>}
 

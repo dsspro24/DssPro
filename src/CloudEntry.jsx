@@ -3,6 +3,15 @@ import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import LocalWorkspace from './LocalWorkspace.jsx';
 import { supabase } from './lib/supabase.js';
 
+function getWorkspaceStatus(workspace) {
+  if (workspace?.requiresEmployeePassword) return 'employee-password-needed';
+  if (workspace?.requiresSigningPin) return 'pin-needed';
+  if (workspace?.requiresDssSpecialist) return 'dss-specialist';
+  if (workspace?.requiresEmployee) return 'employee-account';
+  if (workspace?.requiresOrganization) return 'organization-needed';
+  return workspace ? 'ready' : 'organization-needed';
+}
+
 async function loadManagerWorkspace(user) {
   const [{ data: isCreator, error: creatorError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.rpc('is_creator'),
@@ -15,6 +24,10 @@ async function loadManagerWorkspace(user) {
     companyName: user.user_metadata?.company_name ?? '',
     companyCode: user.user_metadata?.company_code ?? '',
   };
+
+  if (profile?.account_type === 'employee' && user.user_metadata?.employee_needs_password) {
+    return { requiresEmployeePassword: true, managerName };
+  }
 
   if (isCreator) {
     const [organizationsResult, workspacesResult, catalogResult] = await Promise.all([
@@ -75,9 +88,34 @@ async function loadManagerWorkspace(user) {
 
   const { data: memberships, error: membershipError } = await supabase
     .from('organization_memberships')
-    .select('organization_id, role')
+    .select('organization_id, role, employee_id')
     .eq('user_id', user.id);
   if (membershipError) throw membershipError;
+
+  if (profile?.account_type === 'employee') {
+    const employeeMembership = memberships.find((membership) => membership.role === 'employee');
+    if (!employeeMembership) return { requiresEmployee: true, managerName };
+    const { data: employeeWorkspace, error: employeeWorkspaceError } = await supabase.rpc('get_employee_workspace');
+    if (employeeWorkspaceError) throw employeeWorkspaceError;
+    const employeeData = employeeWorkspace.data;
+    return {
+      employee: true,
+      managerName,
+      organization: employeeWorkspace.organization,
+      data: {
+        ...employeeData,
+        resources: (employeeData.resources ?? []).map((resource) => ({
+          ...resource,
+          questions: (resource.questions ?? []).map((question) => {
+            const safeQuestion = { ...question };
+            delete safeQuestion.correctIndex;
+            delete safeQuestion.correctIndices;
+            return safeQuestion;
+          }),
+        })),
+      },
+    };
+  }
 
   const managerMembership = memberships.find((membership) => membership.role === 'manager');
   if (!managerMembership) return { requiresOrganization: true, managerName, ...companyDetails };
@@ -109,7 +147,7 @@ export default function CloudEntry() {
   const [signupRole, setSignupRole] = useState('manager');
   const [workspace, setWorkspace] = useState(null);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   const [notice, setNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -144,7 +182,7 @@ export default function CloudEntry() {
       .then((loadedWorkspace) => {
         if (!active) return;
         setWorkspace(loadedWorkspace);
-        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresDssSpecialist ? 'dss-specialist' : loadedWorkspace?.requiresEmployee ? 'employee-account' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+        setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
         if (loadedWorkspace?.companyName) {
           setForm((current) => ({ ...current, companyName: loadedWorkspace.companyName, companyCode: loadedWorkspace.companyCode }));
         }
@@ -187,7 +225,7 @@ export default function CloudEntry() {
           const loadedWorkspace = await loadManagerWorkspace(data.session.user);
           setSession(data.session);
           setWorkspace(loadedWorkspace);
-          setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresDssSpecialist ? 'dss-specialist' : loadedWorkspace?.requiresEmployee ? 'employee-account' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+          setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
         } else {
           setNotice('Paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite; PIN nustatymas bus užbaigtas prieš įmonės kūrimą.');
         }
@@ -217,13 +255,41 @@ export default function CloudEntry() {
       if (error) throw error;
       const loadedWorkspace = await loadManagerWorkspace(session.user);
       setWorkspace(loadedWorkspace);
-      setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresDssSpecialist ? 'dss-specialist' : loadedWorkspace?.requiresEmployee ? 'employee-account' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+      setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
       if (loadedWorkspace?.companyName) {
         setForm((current) => ({ ...current, companyName: loadedWorkspace.companyName, companyCode: loadedWorkspace.companyCode }));
       }
       setForm((current) => ({ ...current, signingPin: '', confirmSigningPin: '' }));
     } catch (error) {
       setErrorMessage(error.message || 'Nepavyko nustatyti pasirašymo PIN.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const finishEmployeePasswordSetup = async (event) => {
+    event.preventDefault();
+    if (form.password.length < 8 || form.password !== form.confirmPassword) {
+      setErrorMessage('Slaptažodis turi būti bent 8 simbolių, o abu įrašai turi sutapti.');
+      return;
+    }
+    setErrorMessage('');
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: form.password,
+        data: { employee_needs_password: false },
+      });
+      if (error) throw error;
+      const updatedUser = data.user ?? session?.user;
+      if (!updatedUser) throw new Error('Nepavyko patvirtinti darbuotojo paskyros.');
+      const loadedWorkspace = await loadManagerWorkspace(updatedUser);
+      setSession((current) => current ? { ...current, user: updatedUser } : current);
+      setWorkspace(loadedWorkspace);
+      setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
+      setForm((current) => ({ ...current, password: '', confirmPassword: '' }));
+    } catch (error) {
+      setErrorMessage(error.message || 'Nepavyko nustatyti slaptažodžio.');
     } finally {
       setSubmitting(false);
     }
@@ -264,7 +330,7 @@ export default function CloudEntry() {
     await supabase.auth.signOut();
     setWorkspace(null);
     setWorkspaceStatus('idle');
-    setForm({ fullName: '', email: '', password: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
+    setForm({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   };
 
   if (!authReady || (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading'))) {
@@ -272,13 +338,16 @@ export default function CloudEntry() {
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
-    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
+    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
     <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-emerald-950 text-emerald-200"><Building2 size={21} /></span><div><p className="text-lg font-bold">DSS Pro</p><p className="text-sm text-slate-500">Prisijungimas prie paskyros</p></div></div>
-      {session && workspaceStatus === 'employee-account' ? <>
+      {session && workspaceStatus === 'employee-password-needed' ? <>
+        <h1 className="text-xl font-bold">Susikurkite slaptažodį</h1><p className="mt-1 text-sm text-slate-600">Kvietimas patvirtintas. Susikurkite slaptažodį, o kitame žingsnyje nustatykite PIN dokumentams pasirašyti.</p>
+        <form onSubmit={finishEmployeePasswordSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">Naujas slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete="new-password" minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite slaptažodį<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete="new-password" minLength={8} value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Sukurti slaptažodį'}</button></form>
+      </> : session && workspaceStatus === 'employee-account' ? <>
         <h1 className="text-xl font-bold">Darbuotojo paskyra</h1><p className="mt-1 text-sm text-slate-600">Prisijungėte kaip darbuotojas. Įmonės DSS dokumentai atsiras, kai vadovas jus pakvies ir priskirs įmonei.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
       </> : session && workspaceStatus === 'dss-specialist' ? <>
         <h1 className="text-xl font-bold">DSS specialisto paskyra</h1><p className="mt-1 text-sm text-slate-600">Jūs prisijungėte kaip DSS specialistas. Kad matytumėte įmonės dokumentus, įmonės vadovas turi jus pakviesti šiuo el. paštu: <strong>{session.user.email}</strong>.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
