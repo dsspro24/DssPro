@@ -6,7 +6,7 @@ import { supabase } from './lib/supabase.js';
 async function loadManagerWorkspace(user) {
   const [{ data: signingPinConfigured, error: pinError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.rpc('has_signing_pin'),
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('full_name, account_type').eq('id', user.id).maybeSingle(),
   ]);
   if (pinError) throw pinError;
   if (profileError) throw profileError;
@@ -16,6 +16,7 @@ async function loadManagerWorkspace(user) {
     companyCode: user.user_metadata?.company_code ?? '',
   };
   if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
+  if (profile?.account_type === 'dss_specialist') return { requiresDssSpecialist: true, managerName };
 
   const { data: memberships, error: membershipError } = await supabase
     .from('organization_memberships')
@@ -85,7 +86,7 @@ export default function CloudEntry() {
       .then((loadedWorkspace) => {
         if (!active) return;
         setWorkspace(loadedWorkspace);
-        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresDssSpecialist ? 'dss-specialist' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
         if (loadedWorkspace?.companyName) {
           setForm((current) => ({ ...current, companyName: loadedWorkspace.companyName, companyCode: loadedWorkspace.companyCode }));
         }
@@ -127,7 +128,7 @@ export default function CloudEntry() {
           const loadedWorkspace = await loadManagerWorkspace(data.session.user);
           setSession(data.session);
           setWorkspace(loadedWorkspace);
-          setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+          setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresDssSpecialist ? 'dss-specialist' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
         } else {
           setNotice('Paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite; PIN nustatymas bus užbaigtas prieš įmonės kūrimą.');
         }
@@ -218,7 +219,9 @@ export default function CloudEntry() {
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
     <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-emerald-950 text-emerald-200"><Building2 size={21} /></span><div><p className="text-lg font-bold">DSS Pro</p><p className="text-sm text-slate-500">Vadovo paskyra</p></div></div>
-      {session && workspaceStatus === 'pin-needed' ? <>
+      {session && workspaceStatus === 'dss-specialist' ? <>
+        <h1 className="text-xl font-bold">DSS specialisto paskyra</h1><p className="mt-1 text-sm text-slate-600">Jūs prisijungėte kaip DSS specialistas. Paskyra nemokama. Kad matytumėte įmonės dokumentus, įmonės vadovas turi jus pakviesti šiuo el. paštu: <strong>{session.user.email}</strong>.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
+      </> : session && workspaceStatus === 'pin-needed' ? <>
         <h1 className="text-xl font-bold">Nustatykite pasirašymo PIN</h1><p className="mt-1 text-sm text-slate-600">PIN bus naudojamas dokumentams pasirašyti. Jis saugomas užšifruotu hash’u ir niekada nerodomas nustatymuose.</p>
         <form onSubmit={finishSigningPinSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">4 skaitmenų PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Nustatyti PIN'}</button></form>
       </> : session && workspaceStatus === 'organization-needed' ? <>

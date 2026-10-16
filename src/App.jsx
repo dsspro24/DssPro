@@ -204,7 +204,13 @@ function DemoApp({ cloudMode = false }) {
         email,
         password,
         options: {
-          data: { full_name: fullName, company_name: companyName, company_code: companyCode, signing_pin: signingPin },
+          data: {
+            full_name: fullName,
+            account_type: registerRole === 'dss' ? 'dss_specialist' : 'manager',
+            company_name: companyName,
+            company_code: companyCode,
+            signing_pin: signingPin,
+          },
           emailRedirectTo: window.location.origin,
         },
       });
@@ -407,20 +413,20 @@ function DemoApp({ cloudMode = false }) {
           <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
             <h3 className="font-bold text-slate-800 text-base mb-4">Sukurkite paskyrą</h3>
 
-            {!cloudMode && <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
               <button 
                 onClick={() => setRegisterRole('vadovas')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'vadovas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
-                Įmonės vadovas
+                {cloudMode ? 'Vadovo paskyra' : 'Įmonės vadovas'}
               </button>
               <button 
                 onClick={() => setRegisterRole('dss')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'dss' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
-                DSS specialistas
+                {cloudMode ? <span className="inline-flex items-center gap-1.5">DSS specialisto paskyra<span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800">Nemokama</span></span> : 'DSS specialistas'}
               </button>
-            </div>}
+            </div>
 
             <form onSubmit={cloudMode ? handleCloudSignup : (e) => { e.preventDefault(); setCurrentPage('app'); setUserRole(registerRole); setActiveTab('skydelis'); }} className="space-y-3 text-xs">
               <div>
@@ -435,7 +441,7 @@ function DemoApp({ cloudMode = false }) {
 
               {cloudMode && <div><label className="block text-slate-500 mb-1">Slaptažodis</label><input name="password" type="password" minLength={8} autoComplete="new-password" required placeholder="Bent 8 simboliai" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" /></div>}
 
-              <div className="grid grid-cols-2 gap-3">
+              {(!cloudMode || registerRole === 'vadovas') && <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1">Įmonės pavadinimas</label>
                   <input name="companyName" type="text" required placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
@@ -444,7 +450,7 @@ function DemoApp({ cloudMode = false }) {
                   <label className="block text-slate-500 mb-1">Įmonės kodas</label>
                   <input name="companyCode" type="text" required placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
-              </div>
+              </div>}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
