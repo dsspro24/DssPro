@@ -37,7 +37,7 @@ npx supabase db push --linked
 
 Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir `development` aplinkoms. GitHub `main` pushai automatiškai paleidžia Vercel deploy.
 
-Cloud režime veikia vadovo registracija ir prisijungimas, nemokama DSS specialisto paskyra su bendru prisijungimo ekranu, vadovo įmonės sukūrimas ir įmonės darbo būsenos saugojimas. DSS specialisto paskyra prisijungus laukia įmonės vadovo pakvietimo; cloud kvietimų siuntimas, specialistų dokumentų prieiga ir jų atskiras pasirašymo PIN dar nėra prijungti. Darbuotojų paskyros, jų prieigos taisyklės ir realaus elektroninio parašo patvirtinimas taip pat dar nėra prijungti.
+Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Darbuotojo profilio tipas taip pat atpažįstamas prisijungus. Vadovas gali sukurti įmonę ir saugoti jos darbo būseną. DSS specialisto paskyra prisijungus laukia įmonės vadovo pakvietimo; cloud kvietimų siuntimas, specialistų dokumentų prieiga ir jų atskiras pasirašymo PIN dar nėra prijungti. Darbuotojų paskyrų kūrimas, kvietimai, jų dokumentų cloud prieiga ir realaus elektroninio parašo patvirtinimas taip pat dar nėra prijungti.
 
 ## Vietiniai duomenys
 
