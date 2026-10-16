@@ -11,7 +11,11 @@ async function loadManagerWorkspace(user) {
   if (pinError) throw pinError;
   if (profileError) throw profileError;
   const managerName = profile?.full_name ?? user.user_metadata?.full_name ?? '';
-  if (!signingPinConfigured) return { requiresSigningPin: true, managerName };
+  const companyDetails = {
+    companyName: user.user_metadata?.company_name ?? '',
+    companyCode: user.user_metadata?.company_code ?? '',
+  };
+  if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
 
   const { data: memberships, error: membershipError } = await supabase
     .from('organization_memberships')
@@ -20,7 +24,7 @@ async function loadManagerWorkspace(user) {
   if (membershipError) throw membershipError;
 
   const managerMembership = memberships.find((membership) => membership.role === 'manager');
-  if (!managerMembership) return null;
+  if (!managerMembership) return { requiresOrganization: true, managerName, ...companyDetails };
 
   const { data: organization, error: organizationError } = await supabase
     .from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single();
@@ -81,7 +85,10 @@ export default function CloudEntry() {
       .then((loadedWorkspace) => {
         if (!active) return;
         setWorkspace(loadedWorkspace);
-        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+        setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+        if (loadedWorkspace?.companyName) {
+          setForm((current) => ({ ...current, companyName: loadedWorkspace.companyName, companyCode: loadedWorkspace.companyCode }));
+        }
       })
       .catch((error) => {
         if (!active) return;
@@ -106,18 +113,21 @@ export default function CloudEntry() {
           email: form.email.trim(),
           password: form.password,
           options: {
-            data: { full_name: form.fullName.trim() },
+            data: {
+              full_name: form.fullName.trim(),
+              company_name: form.companyName.trim(),
+              company_code: form.companyCode.trim(),
+              signing_pin: form.signingPin,
+            },
             emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
         if (data.session) {
-          const { error: pinSetError } = await supabase.rpc('set_signing_pin', { input_pin: form.signingPin });
-          if (pinSetError) throw pinSetError;
           const loadedWorkspace = await loadManagerWorkspace(data.session.user);
           setSession(data.session);
           setWorkspace(loadedWorkspace);
-          setWorkspaceStatus(loadedWorkspace ? 'ready' : 'organization-needed');
+          setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
         } else {
           setNotice('Paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite; PIN nustatymas bus užbaigtas prieš įmonės kūrimą.');
         }
@@ -147,7 +157,10 @@ export default function CloudEntry() {
       if (error) throw error;
       const loadedWorkspace = await loadManagerWorkspace(session.user);
       setWorkspace(loadedWorkspace);
-      setWorkspaceStatus(loadedWorkspace ? 'ready' : 'organization-needed');
+      setWorkspaceStatus(loadedWorkspace?.requiresSigningPin ? 'pin-needed' : loadedWorkspace?.requiresOrganization ? 'organization-needed' : loadedWorkspace ? 'ready' : 'organization-needed');
+      if (loadedWorkspace?.companyName) {
+        setForm((current) => ({ ...current, companyName: loadedWorkspace.companyName, companyCode: loadedWorkspace.companyCode }));
+      }
       setForm((current) => ({ ...current, signingPin: '', confirmSigningPin: '' }));
     } catch (error) {
       setErrorMessage(error.message || 'Nepavyko nustatyti pasirašymo PIN.');

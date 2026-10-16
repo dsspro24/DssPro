@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LocalWorkspace from './LocalWorkspace.jsx';
 import CloudEntry from './CloudEntry.jsx';
-import { isSupabaseConfigured } from './lib/supabase.js';
+import { isSupabaseConfigured, supabase } from './lib/supabase.js';
 import { 
   Home, 
   BookOpen, 
@@ -24,16 +24,41 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  return isSupabaseConfigured ? <CloudEntry /> : <DemoApp />;
+  return isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
 }
 
-function DemoApp() {
+function CloudLandingGate() {
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (active) setSession(nextSession);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  if (!authReady) return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Jungiama prie DSS Pro…</p></main>;
+  return session ? <CloudEntry onExit={() => setSession(null)} /> : <DemoApp cloudMode />;
+}
+
+function DemoApp({ cloudMode = false }) {
   // Navigation / Tabs state
   const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'app'
   const [userRole, setUserRole] = useState('darbuotojas'); // 'darbuotojas' | 'dss' | 'vadovas' | 'kurejas'
   const [activeTab, setActiveTab] = useState('skydelis'); 
   const [courseFilter, setCourseFilter] = useState('visi'); // 'visi' | 'mano' | 'baigti'
   const [registerRole, setRegisterRole] = useState('vadovas');
+  const [cloudSignupFeedback, setCloudSignupFeedback] = useState('');
 
   // Interactive Mock States
   const [sizes, setSizes] = useState({ shoes: '43', clothing: 'L', pants: '50', height: '182', weight: '80' });
@@ -157,6 +182,40 @@ function DemoApp() {
     setActiveTab('skydelis');
   };
 
+  const handleCloudSignup = async (event) => {
+    event.preventDefault();
+    setCloudSignupFeedback('');
+    const signupForm = new FormData(event.currentTarget);
+    const fullName = String(signupForm.get('fullName') ?? '').trim();
+    const email = String(signupForm.get('email') ?? '').trim();
+    const password = String(signupForm.get('password') ?? '');
+    const companyName = String(signupForm.get('companyName') ?? '').trim();
+    const companyCode = String(signupForm.get('companyCode') ?? '').trim();
+    const signingPin = String(signupForm.get('signingPin') ?? '');
+    const confirmSigningPin = String(signupForm.get('confirmSigningPin') ?? '');
+
+    if (!/^\d{4}$/.test(signingPin) || signingPin !== confirmSigningPin) {
+      setCloudSignupFeedback('Pasirašymo PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName, company_name: companyName, company_code: companyCode, signing_pin: signingPin },
+          emailRedirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      if (data.session) setCurrentPage('app');
+      else setCloudSignupFeedback('Paskyra sukurta. Patvirtinkite el. paštą; PIN ir įmonės duomenys bus paruošti prisijungus.');
+    } catch (error) {
+      setCloudSignupFeedback(error.message || 'Nepavyko sukurti paskyros. Patikrinkite duomenis.');
+    }
+  };
+
   const selectedDocsCount = dssDocuments.filter(d => d.selected).length;
 
   const filteredCourses = courses.filter(course => {
@@ -189,7 +248,7 @@ function DemoApp() {
                 onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
                 className="bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-bold px-5 py-2 rounded-full text-xs transition-all cursor-pointer shadow-md"
               >
-                Prisijungti / Paskyra
+                {cloudMode ? 'Prisijungti' : 'Prisijungti / Paskyra'}
               </button>
             </header>
 
@@ -348,7 +407,7 @@ function DemoApp() {
           <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
             <h3 className="font-bold text-slate-800 text-base mb-4">Sukurkite paskyrą</h3>
 
-            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
+            {!cloudMode && <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
               <button 
                 onClick={() => setRegisterRole('vadovas')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'vadovas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
@@ -361,44 +420,47 @@ function DemoApp() {
               >
                 DSS specialistas
               </button>
-            </div>
+            </div>}
 
-            <form onSubmit={(e) => { e.preventDefault(); setCurrentPage('app'); setUserRole(registerRole); setActiveTab('skydelis'); }} className="space-y-3 text-xs">
+            <form onSubmit={cloudMode ? handleCloudSignup : (e) => { e.preventDefault(); setCurrentPage('app'); setUserRole(registerRole); setActiveTab('skydelis'); }} className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-500 mb-1">Vardas ir pavardė</label>
-                <input type="text" required placeholder="Jonas Jonaitis" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                <input name="fullName" type="text" required placeholder="Jonas Jonaitis" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
               </div>
 
               <div>
                 <label className="block text-slate-500 mb-1">El. paštas</label>
-                <input type="email" required placeholder="jonas@imone.lt" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                <input name="email" type="email" required placeholder="jonas@imone.lt" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
               </div>
+
+              {cloudMode && <div><label className="block text-slate-500 mb-1">Slaptažodis</label><input name="password" type="password" minLength={8} autoComplete="new-password" required placeholder="Bent 8 simboliai" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" /></div>}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1">Įmonės pavadinimas</label>
-                  <input type="text" required placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="companyName" type="text" required placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1">Įmonės kodas</label>
-                  <input type="text" required placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="companyCode" type="text" required placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1">PIN kodas parašui</label>
-                  <input type="password" maxLength={4} required placeholder="••••" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="signingPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" required placeholder="••••" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1">Pakartokite PIN</label>
-                  <input type="password" maxLength={4} required placeholder="••••" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="confirmSigningPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" required placeholder="••••" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
               </div>
 
               <button type="submit" className="w-full py-3 bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-black rounded-xl mt-2 cursor-pointer transition-all shadow-md">
-                Sukurti nemokamą paskyrą
+                {cloudMode ? 'Sukurti paskyrą' : 'Sukurti nemokamą paskyrą'}
               </button>
+              {cloudSignupFeedback && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">{cloudSignupFeedback}</p>}
             </form>
           </div>
 
@@ -416,6 +478,7 @@ function DemoApp() {
   // SKYDELIS SU DINAMIŠKAIS MENIU SKIRTUKAIS PAGAL ROLE
   // ==========================================
   if (currentPage === 'app') {
+    if (cloudMode) return <CloudEntry onExit={() => setCurrentPage('landing')} />;
     return <LocalWorkspace userRole={userRole} onRoleChange={handleRoleChange} onExit={() => setCurrentPage('landing')} />;
   }
 
