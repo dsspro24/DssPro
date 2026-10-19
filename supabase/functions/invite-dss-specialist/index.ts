@@ -49,13 +49,16 @@ Deno.serve(async (request) => {
     return response(400, { error: 'DSS invitation data is invalid' });
   }
 
-  const { data: managerMembership, error: managerMembershipError } = await userClient
-    .from('organization_memberships')
-    .select('role')
-    .eq('organization_id', organizationId)
-    .eq('user_id', manager.id)
-    .maybeSingle();
-  if (managerMembershipError || managerMembership?.role !== 'manager') {
+  const [{ data: managerMembership, error: managerMembershipError }, { data: isCreator, error: creatorError }] = await Promise.all([
+    userClient
+      .from('organization_memberships')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', manager.id)
+      .maybeSingle(),
+    userClient.rpc('is_creator'),
+  ]);
+  if (managerMembershipError || creatorError || (managerMembership?.role !== 'manager' && !isCreator)) {
     return response(403, { error: 'Only an organization manager can invite DSS specialists' });
   }
 

@@ -73,12 +73,13 @@ async function loadManagerWorkspace(user) {
       creatorWorkspaces: Object.fromEntries(workspaceByOrganization),
       data: {
         organizations,
-        employees: [],
-        archivedEmployees: [],
-        protocolBatches: [],
-        specialists: [],
-        signatures: [],
+        employees: [...workspaceByOrganization.values()].flatMap((item) => item?.employees ?? []),
+        archivedEmployees: [...workspaceByOrganization.values()].flatMap((item) => item?.archivedEmployees ?? []),
+        protocolBatches: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolBatches ?? []),
+        specialists: [...workspaceByOrganization.values()].flatMap((item) => item?.specialists ?? []),
+        signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
         ...(resourcesById.size ? { resources: [...resourcesById.values()] } : {}),
+        resourceTypes: catalogResult.data?.data?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
         subscriptions: [...subscriptionsById.values()],
       },
     };

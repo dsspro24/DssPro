@@ -608,7 +608,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [profileMenuOpen]);
 
   useEffect(() => {
-    if (creatorReadOnlyPreview) return undefined;
     if (!cloudMode) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       return undefined;
@@ -696,7 +695,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [archivePrintMode]);
 
   useEffect(() => {
-    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas' || creatorReadOnlyPreview) return undefined;
+    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
     let active = true;
     supabase.rpc('get_commission_signer_status', { input_organization_id: selectedOrgId })
       .then(({ data, error }) => {
@@ -705,7 +704,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         else setCommissionPinStatus({ organizationId: selectedOrgId, members: data ?? {} });
       });
     return () => { active = false; };
-  }, [cloudMode, selectedOrgId, userRole, creatorReadOnlyPreview]);
+  }, [cloudMode, selectedOrgId, userRole]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
@@ -1913,7 +1912,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:min-h-16 sm:px-5 print:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <h1 className="text-lg font-bold text-slate-900">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</h1>
-            {creatorReadOnlyPreview && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">Kūrėjo peržiūra · {creatorReadOnlyPreview}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti peržiūrą</button></div>}
+            {creatorReadOnlyPreview && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">Kūrėjo vadovo prieiga · {creatorReadOnlyPreview}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti darbą</button></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
@@ -1966,7 +1965,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </div>
           </div>
         </header>
-        <div inert={Boolean(creatorReadOnlyPreview)} className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
+        <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
 
           {activeTab === 'skydelis' && (
