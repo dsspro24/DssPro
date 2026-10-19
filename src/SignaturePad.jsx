@@ -79,7 +79,7 @@ export default function SignaturePad({ value, onChange }) {
 
   return <div className="space-y-2">
     <div className="flex items-center justify-between">
-      <span className="text-sm font-semibold text-slate-700">Parašas pirštu arba pele</span>
+      <span className="text-sm font-semibold text-slate-700">Parašas</span>
       <button type="button" aria-label="Išvalyti parašą" title="Išvalyti parašą" className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50" onClick={clear}>
         <Eraser size={14} />Išvalyti
       </button>
