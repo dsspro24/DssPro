@@ -52,6 +52,47 @@ import {
   X,
 } from 'lucide-react';
 
+async function downloadPdfHtml(html, title) {
+  const { default: html2pdf } = await import('html2pdf.js');
+  const frame = document.createElement('iframe');
+  frame.setAttribute('sandbox', 'allow-same-origin');
+  frame.title = title;
+  frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0';
+  const loaded = new Promise((resolve, reject) => {
+    frame.addEventListener('load', resolve, { once: true });
+    frame.addEventListener('error', reject, { once: true });
+  });
+  frame.srcdoc = html;
+  document.body.append(frame);
+
+  try {
+    await loaded;
+    const filename = `${title.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_') || 'DSS_Pro'}.pdf`;
+    await html2pdf().set({
+      filename,
+      margin: [12, 12, 12, 12],
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 794 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from(frame.contentDocument.body).save();
+  } finally {
+    frame.remove();
+  }
+}
+
+function createArchivePdfHtml(element) {
+  const clone = element.cloneNode(true);
+  clone.classList.add('archive-print-target');
+  clone.querySelectorAll('.archive-print-controls').forEach((control) => control.remove());
+  clone.querySelectorAll('.archive-person-print-title').forEach((title) => { title.style.display = 'block'; });
+  const styles = [...document.head.querySelectorAll('style, link[rel="stylesheet"]')]
+    .map((style) => style.outerHTML)
+    .join('\n');
+  const printOverrides = '<style>body{margin:0;background:#fff}.archive-print-target{position:relative!important;inset:auto!important;display:block!important;width:100%!important;max-width:none!important;max-height:none!important;height:auto!important;overflow:visible!important;border:0!important;background:#fff!important;box-shadow:none!important;color:#111827!important;padding:0!important}.archive-print-target *{visibility:visible!important}.archive-person-print-title{display:block!important}</style>';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Darbuotojų archyvas</title>${styles}${printOverrides}</head><body>${clone.outerHTML}</body></html>`;
+}
+
 const STORAGE_KEY = 'dsspro-local-demo-v1';
 const defaultAapItems = [
   { id: 'aap-helmet', code: '', name: 'Galvos apdangalas (šalmas)', reason: '', quantity: 1, unit: 'Vnt.', validity: 'pagal gamintojo nurodymus', unitPrice: '' },
@@ -551,8 +592,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [previewResource, setPreviewResource] = useState(null);
   const creatorSaveQueue = useRef(Promise.resolve());
   const previewFrameRef = useRef(null);
-  const autoPrintPreviewRef = useRef(false);
-  const autoPrintWindowRef = useRef(null);
+  const archiveDownloadModeRef = useRef(null);
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [readConfirmed, setReadConfirmed] = useState(false);
@@ -654,27 +694,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return () => window.clearTimeout(timeout);
   }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview]);
 
-  useEffect(() => {
-    const printWindow = autoPrintWindowRef.current;
-    if (!previewResource || !autoPrintPreviewRef.current || !printWindow || printWindow.closed) return undefined;
-    autoPrintPreviewRef.current = false;
-    autoPrintWindowRef.current = null;
-
-    const printFrame = printWindow.document.createElement('iframe');
-    printFrame.title = previewResource.title;
-    printFrame.setAttribute('sandbox', 'allow-modals');
-    printFrame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0';
-    printFrame.addEventListener('load', () => {
-      printWindow.focus();
-      printFrame.contentWindow?.focus();
-      printFrame.contentWindow?.print();
-      printFrame.contentWindow?.addEventListener('afterprint', () => printWindow.close(), { once: true });
-    }, { once: true });
-    printFrame.srcdoc = previewResource.printHtml;
-    printWindow.document.title = previewResource.title;
-    printWindow.document.body.replaceChildren(printFrame);
-  }, [previewResource]);
-
   useLayoutEffect(() => {
     const frame = previewFrameRef.current;
     if (frame) {
@@ -685,13 +704,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   useEffect(() => {
     if (!archivePrintMode) return undefined;
-    const clearPrintMode = () => setArchivePrintMode(null);
-    const timeout = window.setTimeout(() => window.print(), 150);
-    window.addEventListener('afterprint', clearPrintMode, { once: true });
-    return () => {
-      window.clearTimeout(timeout);
-      window.removeEventListener('afterprint', clearPrintMode);
-    };
+    if (archiveDownloadModeRef.current === archivePrintMode) return undefined;
+    archiveDownloadModeRef.current = archivePrintMode;
+    const target = document.querySelector(archivePrintMode === 'all' ? '.archive-print-all' : '.archive-print-target');
+    if (!target) {
+      archiveDownloadModeRef.current = null;
+      return undefined;
+    }
+    const title = target.querySelector('h1, h2')?.textContent?.trim() || 'Darbuotoju_archyvas';
+    downloadPdfHtml(createArchivePdfHtml(target), title)
+      .catch((error) => setNotice(`Archyvo PDF atsisiųsti nepavyko: ${error.message}`))
+      .finally(() => {
+        archiveDownloadModeRef.current = null;
+        setArchivePrintMode(null);
+      });
+    return undefined;
   }, [archivePrintMode]);
 
   useEffect(() => {
@@ -1178,9 +1205,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
       return;
     }
-    autoPrintWindowRef.current?.close();
-    autoPrintWindowRef.current = autoPrint ? window.open('', '_blank') : null;
-    autoPrintPreviewRef.current = Boolean(autoPrintWindowRef.current);
     const aapCatalogPreview = resource.id === 'res-aap' && userRole === 'vadovas' && activeTab === 'biblioteka';
     const companySettings = templateOnly ? {} : currentOrg?.resourceSettings?.[resource.id] ?? {};
     const configuredResource = {
@@ -1202,6 +1226,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && hasCurrentWorkerSignature(currentEmployee.id, resource.id));
     const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
     previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, data.signatures), resource.title);
+    if (autoPrint) {
+      downloadPdfHtml(previewDocument.printHtml, resource.title)
+        .catch((error) => setNotice(`PDF atsisiųsti nepavyko: ${error.message}`));
+      return;
+    }
     setPreviewResource(previewDocument);
     setQuizAnswers({});
     setQuizResult(null);
@@ -2295,7 +2324,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei; vėliau priskyrimą galėsite pakeisti bibliotekoje.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setProtocolSource(null)}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
-      {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => { const frame = previewFrameRef.current; frame?.contentWindow?.focus(); frame?.contentWindow?.print(); }}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
+      {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => downloadPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF atsisiųsti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
       {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="w-full max-w-sm rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="mt-1 text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p><label className="mt-4 block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p className="mt-2 text-sm text-rose-700">{workerSignError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setWorkerSigningTarget(null)}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="w-full max-w-sm rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="mt-1 text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><label className="mt-4 block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p className="mt-2 text-sm text-rose-700">{employerSignError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setEmployerSigningTarget(null)}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="mt-1 text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p><div className="mt-4 max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<label className="mt-4 block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="mt-2 text-sm text-rose-700">{dssSigningError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
