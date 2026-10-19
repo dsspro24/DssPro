@@ -379,6 +379,14 @@ export default function CloudEntry() {
     setForm({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   };
 
+  const refreshCreatorWorkspace = async ({ exitPreview = false } = {}) => {
+    if (!session?.user) return;
+    const loadedWorkspace = await loadManagerWorkspace(session.user);
+    setWorkspace(loadedWorkspace);
+    setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
+    if (exitPreview) setCreatorPreview(null);
+  };
+
   if (!authReady || (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading'))) {
     return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Jungiama prie DSS Pro…</p></main>;
   }
@@ -418,10 +426,27 @@ export default function CloudEntry() {
           cloudUserId={session.user.id}
           creatorReadOnlyPreview={`${sourceOrganization.name} · kaip ${creatorPreview.role === 'vadovas' ? 'vadovas' : 'DSS specialistas'}`}
           onExitCreatorPreview={() => setCreatorPreview(null)}
+          onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
+          onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
         />;
       }
     }
-    return <LocalWorkspace userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'} onRoleChange={() => {}} onExit={signOut} initialCloudData={workspace.data} creatorCatalog={workspace.catalog} creatorAccounts={workspace.creatorAccounts} creatorWorkspaces={workspace.creatorWorkspaces} onCreatorPreview={(organizationId, role) => setCreatorPreview({ organizationId, role })} cloudOrganization={workspace.organization} cloudManagerName={workspace.managerName} cloudMode cloudUserId={session.user.id} />;
+    return <LocalWorkspace
+      userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'}
+      onRoleChange={() => {}}
+      onExit={signOut}
+      initialCloudData={workspace.data}
+      creatorCatalog={workspace.catalog}
+      creatorAccounts={workspace.creatorAccounts}
+      creatorWorkspaces={workspace.creatorWorkspaces}
+      onCreatorPreview={(organizationId, role) => setCreatorPreview({ organizationId, role })}
+      onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
+      onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
+      cloudOrganization={workspace.organization}
+      cloudManagerName={workspace.managerName}
+      cloudMode
+      cloudUserId={session.user.id}
+    />;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">

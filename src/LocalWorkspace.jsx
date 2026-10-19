@@ -537,7 +537,7 @@ const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, aw
 const validityCheckTime = Date.now();
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], creatorWorkspaces = {}, onCreatorPreview = () => {}, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], creatorWorkspaces = {}, onCreatorPreview = () => {}, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [data, setData] = useState(() => {
     const workspaceData = initialCloudData
       ? { ...initialData, ...initialCloudData }
@@ -1160,6 +1160,63 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       employees: current.employees.map((employee) => ({ ...employee, resourceIds: employee.resourceIds.filter((id) => id !== resource.id) })),
     }));
     setNotice(`Šablonas „${resource.title}“ ištrintas.`);
+  };
+
+  const deleteCreatorArchivedEmployees = async (organization, archiveIds = null) => {
+    if (!cloudMode || !(userRole === 'kurejas' || (userRole === 'vadovas' && creatorReadOnlyPreview))) return;
+    const records = (data.archivedEmployees ?? []).filter((record) => record.orgId === organization.id
+      && (archiveIds === null || archiveIds.includes(record.id)));
+    if (!records.length) return;
+    const employeeNames = records.map((record) => record.employee.name).join(', ');
+    if (!window.confirm(`Ištrinti ${records.length === 1 ? 'archyvo įrašą' : `visus ${records.length} archyvo įrašus`} įmonėje „${organization.name}“? Bus pašalinti darbuotojų duomenys, parašai, testų rezultatai ir protokolų priskyrimai. Tai negrįžtama.`)) return;
+
+    const { data: deletedCount, error } = await supabase.rpc('creator_delete_archived_employees', {
+      input_organization_id: organization.id,
+      input_archive_ids: archiveIds,
+    });
+    if (error) {
+      setNotice(`Archyvo ištrinti nepavyko: ${error.message}`);
+      return;
+    }
+
+    const employeeIds = new Set(records.map((record) => record.employee.id));
+    const recordIds = new Set(records.map((record) => record.id));
+    setData((current) => ({
+      ...current,
+      archivedEmployees: (current.archivedEmployees ?? []).filter((record) => !recordIds.has(record.id)),
+      signatures: current.signatures.filter((signature) => signature.orgId !== organization.id || !employeeIds.has(signature.employeeId)),
+      protocolBatches: (current.protocolBatches ?? []).map((batch) => batch.orgId === organization.id
+        ? { ...batch, employeeIds: batch.employeeIds.filter((employeeId) => !employeeIds.has(employeeId)) }
+        : batch).filter((batch) => batch.employeeIds.length > 0),
+    }));
+    setArchiveDetailsId(null);
+    setNotice(`Ištrinta ${deletedCount} archyvo ${deletedCount === 1 ? 'įrašas' : 'įrašų'}: ${employeeNames}.`);
+    await onCreatorWorkspaceChanged();
+  };
+
+  const deleteCreatorOrganization = async (organization) => {
+    if (!cloudMode || userRole !== 'kurejas') return;
+    const typedName = window.prompt(`Norėdami ištrinti visą įmonę ir jos duomenis, įrašykite tikslų pavadinimą:\n${organization.name}`);
+    if (typedName?.trim() !== organization.name.trim()) return;
+    if (!window.confirm(`Galutinai ištrinti „${organization.name}“? Bus pašalinti visi darbuotojai, archyvai, parašai, dokumentai, priskyrimai, prenumeratos ir susiję failai. Šio veiksmo atšaukti negalima.`)) return;
+
+    const { data: result, error } = await supabase.functions.invoke('creator-delete-organization', {
+      body: { organizationId: organization.id },
+    });
+    if (error) {
+      const details = error.context instanceof Response ? await error.context.clone().json().catch(() => null) : null;
+      setNotice(`Įmonės ištrinti nepavyko: ${details?.error ?? error.message}`);
+      return;
+    }
+    if (!result?.deleted) {
+      setNotice('Įmonės ištrinti nepavyko: Supabase nepatvirtino trynimo.');
+      return;
+    }
+
+    if (result.storageCleanupComplete === false) {
+      window.alert(`Įmonė ištrinta, bet dalies failų pašalinti nepavyko: ${result.warning}`);
+    }
+    await onCreatorOrganizationDeleted();
   };
 
   const saveCompanyProtocol = (event) => {
@@ -2278,13 +2335,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'archyvas' && userRole === 'vadovas' && <section className="archive-page space-y-5">
-            <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." /><button type="button" className={buttonClass} disabled={!archivedOrgEmployees.length} onClick={() => setArchivePrintMode('all')}><Download size={16} />Atsisiųsti visą archyvą</button></div>
+            <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." /><div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!archivedOrgEmployees.length} onClick={() => setArchivePrintMode('all')}><Download size={16} />Atsisiųsti visą archyvą</button>{creatorReadOnlyPreview && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40" disabled={!archivedOrgEmployees.length} onClick={() => deleteCreatorArchivedEmployees(currentOrg)}><Trash2 size={16} />Ištrinti visą archyvą</button>}</div></div>
             <p className="archive-print-controls text-sm text-slate-500">Archyvo įrašai skirti tik peržiūrai: pasirašymo datos ir kiti duomenys nekoreguojami.</p>
             {archivedOrgEmployees.length ? <div className="archive-print-controls grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{archivedOrgEmployees.map((record) => <button key={record.id} type="button" className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-emerald-700 hover:bg-emerald-50/40" onClick={() => setArchiveDetailsId(record.id)}><span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{record.employee.name}</span><span className="mt-1 block text-xs text-slate-500">Sutartis: {record.employee.contractNumber || 'Nenurodyta'} · {record.signatures.length} parašų</span></span><ChevronRight size={18} className="shrink-0 text-slate-400" /></button>)}</div> : <p className="archive-print-controls rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Šios įmonės archyve darbuotojų dar nėra.</p>}
             {archivePrintMode === 'all' && <div className="archive-print-target archive-print-all"><h1 className="mb-2 text-2xl font-bold">{currentOrg?.name} · Darbuotojų archyvas</h1><p className="mb-6 text-sm text-slate-500">Archyvuota {new Date().toLocaleString('lt-LT')}</p>{archivedOrgEmployees.map((record) => <ArchiveEmployeeDetails key={record.id} record={record} organizationName={currentOrg?.name} />)}</div>}
           </section>}
 
-          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
+          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>{creatorReadOnlyPreview && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
@@ -2295,7 +2352,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               const managers = organizationMemberships.filter((account) => account.membership.role === 'manager').map((account) => account.fullName || account.email);
               const specialists = organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.fullName || account.email);
               const workspaceExists = Boolean(creatorWorkspaces[org.id]);
-              return [org.name, managers.join(', ') || org.manager || 'Nenurodytas', specialists.join(', ') || 'Nepriskirti', workspaceExists ? 'Paruošta' : 'Tuščia', <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'vadovas')}>Kaip vadovas</button><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'dss')}>Kaip DSS</button></div>];
+              const archivedCount = (creatorWorkspaces[org.id]?.archivedEmployees ?? []).length;
+              return [org.name, managers.join(', ') || org.manager || 'Nenurodytas', specialists.join(', ') || 'Nepriskirti', workspaceExists ? 'Paruošta' : 'Tuščia', <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'vadovas')}>Kaip vadovas</button><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'dss')}>Kaip DSS</button><button type="button" disabled={!archivedCount} className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40" onClick={() => deleteCreatorArchivedEmployees(org)}>Trinti archyvą ({archivedCount})</button><button type="button" className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100" onClick={() => deleteCreatorOrganization(org)}>Ištrinti įmonę</button></div>];
             })} empty="Įmonių dar nėra." /></Panel>
             <Panel title="Registruoti vadovai ir DSS specialistai"><DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės']} rows={creatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas'])} empty="Vadovų ar DSS specialistų paskyrų dar nėra." /></Panel>
           </section>}
