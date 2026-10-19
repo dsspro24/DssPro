@@ -552,6 +552,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const creatorSaveQueue = useRef(Promise.resolve());
   const previewFrameRef = useRef(null);
   const autoPrintPreviewRef = useRef(false);
+  const autoPrintWindowRef = useRef(null);
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [readConfirmed, setReadConfirmed] = useState(false);
@@ -655,19 +656,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview]);
 
   useEffect(() => {
-    const frame = previewFrameRef.current;
-    if (!previewResource || !autoPrintPreviewRef.current || !frame) return undefined;
-    const printDocument = () => {
-      if (!autoPrintPreviewRef.current) return;
-      autoPrintPreviewRef.current = false;
-      frame.contentWindow?.print();
-    };
-    frame.addEventListener('load', printDocument, { once: true });
-    const timeout = window.setTimeout(printDocument, 1500);
-    return () => {
-      frame.removeEventListener('load', printDocument);
-      window.clearTimeout(timeout);
-    };
+    const printWindow = autoPrintWindowRef.current;
+    if (!previewResource || !autoPrintPreviewRef.current || !printWindow || printWindow.closed) return undefined;
+    autoPrintPreviewRef.current = false;
+    autoPrintWindowRef.current = null;
+
+    const printFrame = printWindow.document.createElement('iframe');
+    printFrame.title = previewResource.title;
+    printFrame.setAttribute('sandbox', 'allow-modals');
+    printFrame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0';
+    printFrame.addEventListener('load', () => {
+      printWindow.focus();
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      printFrame.contentWindow?.addEventListener('afterprint', () => printWindow.close(), { once: true });
+    }, { once: true });
+    printFrame.srcdoc = previewResource.printHtml;
+    printWindow.document.title = previewResource.title;
+    printWindow.document.body.replaceChildren(printFrame);
   }, [previewResource]);
 
   useLayoutEffect(() => {
@@ -1173,7 +1179,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
       return;
     }
-    autoPrintPreviewRef.current = autoPrint;
+    autoPrintWindowRef.current?.close();
+    autoPrintWindowRef.current = autoPrint ? window.open('', '_blank') : null;
+    autoPrintPreviewRef.current = Boolean(autoPrintWindowRef.current);
     const aapCatalogPreview = resource.id === 'res-aap' && userRole === 'vadovas' && activeTab === 'biblioteka';
     const companySettings = templateOnly ? {} : currentOrg?.resourceSettings?.[resource.id] ?? {};
     const configuredResource = {
@@ -1217,6 +1225,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     let score = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
     let passed = score >= 80;
     let completedAt = new Date().toISOString();
+    let verifiedIp = null;
     if (cloudMode && userRole === 'darbuotojas') {
       const { data: result, error } = await supabase.rpc('submit_employee_test', {
         input_resource_id: previewResource.id,
@@ -1229,8 +1238,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       score = result.score;
       passed = result.passed;
       completedAt = result.completedAt;
+      verifiedIp = result.ip;
     }
-    const result = { resourceId: previewResource.id, score, passed, completedAt, ip: cloudMode ? 'Server verified' : '127.0.0.1 (demo)' };
+    const result = { resourceId: previewResource.id, score, passed, completedAt, ip: verifiedIp ?? '127.0.0.1 (demo)' };
     setQuizResult({ resourceId: previewResource.id, score, passed });
     setData((current) => {
       const employee = current.employees.find((item) => item.id === currentEmployee.id);
