@@ -29,6 +29,7 @@
     .signed-name { font-weight: 700; }
     .signed-date { font-size: 10px; }
     .signed-detail { display: block; min-height: 14px; font-size: 9px; }
+    .signed-image { display: block; width: 150px; height: 30px; object-fit: contain; object-position: left center; }
     .issue-date { margin: 12px 0; text-align: right; }
     .sub-text { margin: -5px 0 12px; text-align: center; }
     @media print {
@@ -71,8 +72,8 @@
     </table>
     <p>{{DOCUMENT_DATE}}</p>
     <div class="signature-grid">
-      <div class="signature-entry"><strong>Darbdavys ar jo įgaliotas asmuo</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYER_NAME}}</span><br><span class="signed-date">{{EMPLOYER_DATE}}</span><span class="signed-detail">{{EMPLOYER_SIGNATURE_DETAILS}}</span><div class="sig-line">(parašas)</div></div>
-      <div class="signature-entry"><strong>Vieną egzempliorių gavau</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYEE_NAME}}</span><br><span class="signed-date">{{EMPLOYEE_DATE}}</span><span class="signed-detail">{{EMPLOYEE_SIGNATURE_DETAILS}}</span><div class="sig-line">(darbuotojo parašas)</div></div>
+      <div class="signature-entry"><strong>Darbdavys ar jo įgaliotas asmuo</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYER_NAME}}</span><br><span class="signed-date">{{EMPLOYER_DATE}}</span><span class="signed-detail">{{EMPLOYER_SIGNATURE_DETAILS}}</span>{{EMPLOYER_SIGNATURE_IMAGE}}<div class="sig-line">(parašas)</div></div>
+      <div class="signature-entry"><strong>Vieną egzempliorių gavau</strong><span class="signed-name">Vardas, pavardė: {{EMPLOYEE_NAME}}</span><br><span class="signed-date">{{EMPLOYEE_DATE}}</span><span class="signed-detail">{{EMPLOYEE_SIGNATURE_DETAILS}}</span>{{EMPLOYEE_SIGNATURE_IMAGE}}<div class="sig-line">(darbuotojo parašas)</div></div>
     </div>
   </section>
 

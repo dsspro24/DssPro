@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import SignaturePad from './SignaturePad.jsx';
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
@@ -629,6 +630,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerSignPin, setWorkerSignPin] = useState('');
   const [workerSignError, setWorkerSignError] = useState('');
+  const [signatureInk, setSignatureInk] = useState('');
 
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
@@ -992,6 +994,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       signatureMethod: 'PIN',
       signedAt: new Date().toISOString(),
       validUntil: getValidityUntil(resource.validityMonths),
+      signatureImage: signatureInk,
       ip: '127.0.0.1 (demo)',
     };
     setData((current) => ({
@@ -1018,6 +1021,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     setWorkerSigningTarget({ employeeId: employee.id, resourceId: resource.id });
+    setSignatureInk('');
     setWorkerSignPin('');
     setWorkerSignError('');
   };
@@ -1041,6 +1045,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setWorkerSignError('Nepavyko rasti pasirašomo dokumento.');
       return;
     }
+    if (!signatureInk) {
+      setWorkerSignError('Nupieškite parašą prieš patvirtindami PIN.');
+      return;
+    }
     if (cloudMode && userRole === 'darbuotojas') {
       const assignedResourceIds = new Set(employee.resourceIds ?? []);
       const inputProgress = Object.fromEntries(Object.entries(employee.progressByResource ?? {}).filter(([resourceId]) => assignedResourceIds.has(resourceId)));
@@ -1053,9 +1061,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setWorkerSignError('Dokumento būsenos išsaugoti nepavyko. Bandykite dar kartą.');
         return;
       }
-      const { data: signature, error } = await supabase.rpc('record_employee_signature', {
+      const { data: signature, error } = await supabase.rpc('record_employee_signature_with_image', {
         input_resource_id: resource.id,
         input_pin: workerSignPin,
+        input_signature_image: signatureInk,
       });
       if (error) {
         setWorkerSignError(error.message || 'PIN patikrinti nepavyko.');
@@ -1074,6 +1083,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     setWorkerSigningTarget(null);
     setWorkerSignPin('');
+    setSignatureInk('');
   };
 
   const completeReadThenSign = (employee, resource) => {
@@ -1605,6 +1615,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     setDssSigningTasks(tasks);
+    setSignatureInk('');
     setSignPinDraft('');
     setDssReviewConfirmed(false);
     setDssSigningError('');
@@ -1621,6 +1632,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setDssSigningError('Patvirtinkite, kad peržiūrėjote visus pasirinktus dokumentus.');
       return;
     }
+    if (!signatureInk) {
+      setDssSigningError('Nupieškite parašą prieš patvirtindami PIN.');
+      return;
+    }
     const tasksToSign = dssSigningTasks.filter((task) => dssTasks.some((pendingTask) => pendingTask.id === task.id));
     if (!tasksToSign.length) {
       setDssSigningError('Pasirašytinų dokumentų nebėra.');
@@ -1629,11 +1644,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (cloudMode) {
       const signatures = [];
       for (const task of tasksToSign) {
-        const { data: signature, error } = await supabase.rpc('record_dss_signature', {
+        const { data: signature, error } = await supabase.rpc('record_dss_signature_with_image', {
           input_organization_id: task.orgId,
           input_employee_id: task.employeeId,
           input_resource_id: task.resourceId,
           input_pin: signPinDraft,
+          input_signature_image: signatureInk,
         });
         if (error || !signature) {
           if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
@@ -1659,6 +1675,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           signatureMethod: 'PIN',
           signedAt,
           validUntil: getValidityUntil(resource?.validityMonths),
+          signatureImage: signatureInk,
           ip: '127.0.0.1 (demo)',
         };
       })] }));
@@ -1668,6 +1685,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setDssReviewConfirmed(false);
     setDssSigningError('');
     setSelectedDssTaskIds([]);
+    setSignatureInk('');
     setNotice(`DSS dokumentai pasirašyti PIN kodu: ${tasksToSign.length}.`);
   };
 
@@ -1725,6 +1743,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     setEmployerSigningTarget({ employeeId: employee.id, resourceId: resource.id, orgId: employee.orgId });
+    setSignatureInk('');
     setEmployerSignPin('');
     setEmployerSignError('');
   };
@@ -1738,11 +1757,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployerSignError('Nepavyko rasti pasirašomo dokumento.');
       return;
     }
+    if (!signatureInk) {
+      setEmployerSignError('Nupieškite parašą prieš patvirtindami PIN.');
+      return;
+    }
     if (cloudMode) {
-      const { data: signature, error } = await supabase.rpc('record_manager_signature', {
+      const { data: signature, error } = await supabase.rpc('record_manager_signature_with_image', {
         input_employee_id: employee.id,
         input_resource_id: resource.id,
         input_pin: employerSignPin,
+        input_signature_image: signatureInk,
       });
       if (error) {
         setEmployerSignError(error.message || 'Vadovo parašo įrašyti nepavyko.');
@@ -1769,11 +1793,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         signatureMethod: 'PIN',
         signedAt: new Date().toISOString(),
         validUntil: getValidityUntil(resource.validityMonths),
+        signatureImage: signatureInk,
         ip: '127.0.0.1 (demo)',
       }] }));
     }
     setEmployerSigningTarget(null);
     setEmployerSignPin('');
+    setSignatureInk('');
     setNotice('Darbdavio parašas patvirtintas PIN kodu.');
   };
 
@@ -1788,6 +1814,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     setCommissionSigningTarget({ employeeId: employee.id, resourceId: resource.id, orgId: employee.orgId, member });
+    setSignatureInk('');
     setActiveTab('imone');
     setCommissionSignPin('');
     setCommissionSignError('');
@@ -1821,13 +1848,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setCommissionSignError('Komisijos nario PIN kodas neteisingas.');
       return;
     }
+    if (!signatureInk) {
+      setCommissionSignError('Nupieškite parašą prieš patvirtindami PIN.');
+      return;
+    }
     if (cloudMode) {
-      const { data: signature, error } = await supabase.rpc('record_commission_signature', {
+      const { data: signature, error } = await supabase.rpc('record_commission_signature_with_image', {
         input_organization_id: org.id,
         input_employee_id: employee.id,
         input_resource_id: resource.id,
         input_signer_name: target.member,
         input_pin: commissionSignPin,
+        input_signature_image: signatureInk,
       });
       if (error) {
         setCommissionSignError(error.message || 'Komisijos parašo įrašyti nepavyko.');
@@ -1854,11 +1886,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         signatureMethod: 'PIN',
         signedAt: new Date().toISOString(),
         validUntil: getValidityUntil(resource.validityMonths),
+        signatureImage: signatureInk,
         ip: '127.0.0.1 (demo)',
       }] }));
     }
     setCommissionSigningTarget(null);
     setCommissionSignPin('');
+    setSignatureInk('');
     setNotice(`Komisijos nario „${target.member}“ parašas patvirtintas PIN kodu.`);
   };
 
@@ -2186,7 +2220,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     if (!resource) return null;
                     const status = getTaskStatus(employeeDetails, resource);
                     const signatures = data.signatures.filter((signature) => signature.employeeId === employeeDetails.id && signature.resourceId === resourceId).sort((left, right) => new Date(left.signedAt) - new Date(right.signedAt));
-                    return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} />{signatures.length ? <div className="mt-2 space-y-1">{signatures.map((signature) => <p className="text-xs text-slate-500" key={signature.id}>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')}</p>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
+                    return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} />{signatures.length ? <div className="mt-2 space-y-2">{signatures.map((signature) => <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500" key={signature.id}>{signature.signatureImage && <img className="h-8 w-24 rounded border border-slate-200 bg-white object-contain" src={signature.signatureImage} alt={`${signature.signer} parašas`} />}<span>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')} · IP {signature.ip ?? 'Nenurodytas'}</span></div>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
                   })}</div> : <p className="text-sm text-slate-500">Darbuotojui dokumentai nepriskirti.</p>}</div>
                 </div>}
               </dialog>}
@@ -2227,7 +2261,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
                 {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
-              <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p><CommissionEditor org={currentOrg} updateOrg={updateOrg} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => setCommissionSigningTarget(null)} /></Panel>
+              <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p>{commissionSigningTarget?.orgId === currentOrg?.id && <SignaturePad value={signatureInk} onChange={setSignatureInk} />}<CommissionEditor org={currentOrg} updateOrg={updateOrg} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => { setCommissionSigningTarget(null); setSignatureInk(''); }} /></Panel>
               <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>
               <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>
             </div>
@@ -2395,9 +2429,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei; vėliau priskyrimą galėsite pakeisti bibliotekoje.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setProtocolSource(null)}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
       {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
-      {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="w-full max-w-sm rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="mt-1 text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p><label className="mt-4 block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p className="mt-2 text-sm text-rose-700">{workerSignError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setWorkerSigningTarget(null)}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
-      {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="w-full max-w-sm rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="mt-1 text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><label className="mt-4 block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p className="mt-2 text-sm text-rose-700">{employerSignError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => setEmployerSigningTarget(null)}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
-      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="mt-1 text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p><div className="mt-4 max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<label className="mt-4 block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="mt-2 text-sm text-rose-700">{dssSigningError}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
+      {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
+      {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
+      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p><div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
     </div>
   );
 }
@@ -2445,7 +2479,7 @@ function Metric({ label, value, accent = 'slate', hint }) {
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
 function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [] }) { return <DataTable headers={['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė', 'Pasirašymo būdas', 'Data', 'Galioja iki', 'IP / aplinka']} rows={signatures.map((signature) => [signature.contractNumber || 'Nenurodytas', resources.find((resource) => resource.id === signature.resourceId)?.title ?? archivedEmployees.flatMap((record) => record.resources).find((resource) => resource.id === signature.resourceId)?.title ?? 'Dokumentas', `${signature.signer} · ${signature.role}`, signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu', new Date(signature.signedAt).toLocaleString('lt-LT'), signature.validUntil ? new Date(signature.validUntil).toLocaleDateString('lt-LT') : 'Nenustatyta', signature.ip])} empty="Parašų dar nėra." />; }
+function SignatureTable({ signatures, resources, archivedEmployees = [] }) { return <DataTable headers={['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė', 'Parašas', 'Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas']} rows={signatures.map((signature) => [signature.contractNumber || 'Nenurodytas', resources.find((resource) => resource.id === signature.resourceId)?.title ?? archivedEmployees.flatMap((record) => record.resources).find((resource) => resource.id === signature.resourceId)?.title ?? 'Dokumentas', `${signature.signer} · ${signature.role}`, signature.signatureImage ? <img className="h-12 w-32 rounded border border-slate-200 bg-white object-contain" src={signature.signatureImage} alt={`${signature.signer} parašas`} /> : 'Nėra', signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu', new Date(signature.signedAt).toLocaleString('lt-LT'), signature.validUntil ? new Date(signature.validUntil).toLocaleDateString('lt-LT') : 'Nenustatyta', signature.ip])} empty="Parašų dar nėra." />; }
 function getResourceWorkflowStatus(employee, resource, signatures, organizations, now, specialists = []) {
   if (!employee || !resource) return { key: 'todo', label: 'Nepradėta' };
   const workerSignature = signatures.filter((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
@@ -2519,6 +2553,10 @@ function createAapSnapshot(employee, org) {
     items: (org.aapItems ?? defaultAapItems).map((item) => ({ ...item })),
   };
 }
+function signatureImageHtml(signature) {
+  if (!signature?.signatureImage) return '';
+  return `<img class="signature-image" src="${escapeHtml(signature.signatureImage)}" alt="${escapeHtml(signature.signer ?? 'Pasirašiusio asmens')} parašas">`;
+}
 function appendSignatureAudit(html, resource, employee, org, signatures, specialists) {
   const employees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   if (!employees.length) return html;
@@ -2532,12 +2570,12 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
     const signedAt = signature ? new Date(signature.signedAt) : null;
     const validDate = signedAt && !Number.isNaN(signedAt.getTime());
     const status = signer.status === 'signed' ? pinSignedStatusLabel : signer.status === 'expired' ? 'Galiojimas pasibaigė' : 'Laukia parašo';
-    return `<tr><td>${escapeHtml(person.name)} · ${escapeHtml(person.contractNumber ?? '')}</td><td>${escapeHtml(signer.role)}</td><td>${escapeHtml(signer.signedBy ?? signer.name)}</td><td>${validDate ? dateFormatter.format(signedAt) : ''}</td><td>${validDate ? timeFormatter.format(signedAt) : ''}</td><td>${escapeHtml(signature?.ip ?? '')}</td><td>${status}</td></tr>`;
+    return `<tr><td>${escapeHtml(person.name)} · ${escapeHtml(person.contractNumber ?? '')}</td><td>${escapeHtml(signer.role)}</td><td>${escapeHtml(signer.signedBy ?? signer.name)}</td><td>${signatureImageHtml(signature)}</td><td>${validDate ? dateFormatter.format(signedAt) : ''}</td><td>${validDate ? timeFormatter.format(signedAt) : ''}</td><td>${escapeHtml(signature?.ip ?? '')}</td><td>${status}</td></tr>`;
   }).join('');
-  const auditMarkup = `<section class="signature-audit"><h2>Parašų registras</h2><table><thead><tr><th>Darbuotojas / sutarties Nr.</th><th>Rolė</th><th>Pasirašantis asmuo</th><th>Data</th><th>Tikslus laikas</th><th>IP adresas / aplinka</th><th>Būsena</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  const auditMarkup = `<section class="signature-audit"><h2>Parašų registras</h2><table><thead><tr><th>Darbuotojas / sutarties Nr.</th><th>Rolė</th><th>Pasirašantis asmuo</th><th>Parašas</th><th>Data</th><th>Tikslus laikas</th><th>IP adresas / aplinka</th><th>Būsena</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const style = parsed.createElement('style');
-  style.textContent = '.signature-audit{break-inside:avoid;page-break-inside:avoid;margin:18px 0 0;padding-top:10px;border-top:1px solid #94a3b8;color:#0f172a;font:10px/1.35 Arial,sans-serif}.signature-audit h2{margin:0 0 6px;font-size:12px}.signature-audit table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}.signature-audit th,.signature-audit td{border:1px solid #94a3b8;padding:4px;text-align:left;overflow-wrap:anywhere}.signature-audit th{background:#f1f5f9}';
+  style.textContent = '.signature-audit{break-inside:avoid;page-break-inside:avoid;margin:18px 0 0;padding-top:10px;border-top:1px solid #94a3b8;color:#0f172a;font:10px/1.35 Arial,sans-serif}.signature-audit h2{margin:0 0 6px;font-size:12px}.signature-audit table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}.signature-audit th,.signature-audit td{border:1px solid #94a3b8;padding:4px;text-align:left;overflow-wrap:anywhere}.signature-audit th{background:#f1f5f9}.signature-image{display:block;width:96px;height:30px;object-fit:contain}';
   parsed.head.append(style);
   const pageContainers = [...parsed.querySelectorAll('.journal-page, .card-container')];
   (pageContainers.at(-1) ?? parsed.body).insertAdjacentHTML('beforeend', auditMarkup);
@@ -2577,13 +2615,13 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     const signedAt = new Date(signature.signedAt);
     const dateTime = Number.isNaN(signedAt.getTime()) ? '' : `${dateFormatter.format(signedAt)} ${timeFormatter.format(signedAt)}`;
     const status = entry.status === 'expired' ? 'Galiojimas pasibaigė' : pinSignedStatusLabel;
-    return `<span class="signature-proof"><strong>${escapeHtml(name)}</strong><small>${status} · ${escapeHtml(dateTime)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+    return `<span class="signature-proof"><strong>${escapeHtml(name)}</strong>${signatureImageHtml(signature)}<small>${status} · ${escapeHtml(dateTime)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
   };
   const writeRow = (row, values) => [...row.cells].forEach((cell, index) => { cell.innerHTML = values[index] ?? ''; });
   const nameFor = (entry) => entry ? escapeHtml(entry.signedBy ?? entry.name) : '';
   const otherEntries = (entries) => entries.filter((entry) => entry.role !== 'Darbuotojas');
   const style = parsed.createElement('style');
-  style.textContent = '.signature-proof,.signature-pending{display:block;font-size:7.5px;line-height:1.2;overflow-wrap:anywhere}.signature-proof strong,.signature-proof small{display:block}.signature-pending{color:#92400e;font-style:italic}';
+  style.textContent = '.signature-proof,.signature-pending{display:block;font-size:7.5px;line-height:1.2;overflow-wrap:anywhere}.signature-proof strong,.signature-proof small{display:block}.signature-image{display:block;width:96px;height:30px;object-fit:contain;margin:2px 0}.signature-pending{color:#92400e;font-style:italic}';
   parsed.head.append(style);
 
   if (resource.templateKind === 'fire-safety-journal') {
@@ -2593,7 +2631,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const signature = signatures.filter((item) => item.resourceId === resource.id && item.role === 'DSS specialistas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
       const signerName = specialists.find((person) => org?.dss?.includes(person.id))?.name ?? 'DSS specialistas';
       const approval = signature
-        ? `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong><small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeFormatter.format(new Date(signature.signedAt)))}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`
+        ? `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeFormatter.format(new Date(signature.signedAt)))}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`
         : `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>`;
       writeRow(row, [settings.instructionNumber, settings.instructionTitle || resource.title, formatDate(signature?.signedAt || settings.date), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, settings.changedInstruction].map((value) => value ?? ''));
       row.cells[3].innerHTML = `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${signature ? escapeHtml(signature.signer) : escapeHtml(signerName)}<br>${approval}`;
@@ -2642,7 +2680,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           const date = formatDate(signature.signedAt);
           const time = new Date(signature.signedAt);
           const timeText = Number.isNaN(time.getTime()) ? '' : timeFormatter.format(time);
-          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong><small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const [dssResource, fireResource, rulesResource, positionResource, riskResource, sdsResource] = related;
         const dssWorker = relatedSignature(dssResource, 'Darbuotojas');
@@ -2699,7 +2737,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           if (!signature) return pending ? `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>` : '';
           const signedAt = new Date(signature.signedAt);
           const timeText = Number.isNaN(signedAt.getTime()) ? '' : timeFormatter.format(signedAt);
-          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong><small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const hasCardAssignment = item.resourceIds?.includes(resource.id);
         const instructionDate = workerSignature?.signedAt ?? testResult?.completedAt;
@@ -2823,6 +2861,8 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     '{{EMPLOYER_DATE}}': `Data: ${formatDate(employerSignature?.signedAt)}`,
     '{{EMPLOYEE_SIGNATURE_DETAILS}}': escapeHtml(signatureDetails(workerSignature)),
     '{{EMPLOYER_SIGNATURE_DETAILS}}': escapeHtml(signatureDetails(employerSignature)),
+    '{{EMPLOYEE_SIGNATURE_IMAGE}}': signatureImageHtml(workerSignature),
+    '{{EMPLOYER_SIGNATURE_IMAGE}}': signatureImageHtml(employerSignature),
     '{{DOCUMENT_DATE}}': today,
     '{{ISSUE_DATE}}': formatDate(workerSignature?.signedAt),
     '{{TOTAL_AMOUNT}}': `${formatAmount(total)} Eur`,
@@ -2830,7 +2870,27 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     '{{ACCOUNTING_ROWS}}': makeRows(),
     '{{ISSUE_ROWS}}': makeRows(true),
   };
-  return Object.entries(values).reduce((html, [token, value]) => html.replaceAll(token, value), resource.html || '');
+  const html = Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), resource.html || '');
+  if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const insertSignatureImage = (label, signature) => {
+    if (!signature?.signatureImage) return;
+    const entry = [...parsed.querySelectorAll('.signature-entry')].find((item) => item.textContent?.includes(label));
+    const line = entry?.querySelector('.sig-line');
+    if (!entry || !line || entry.querySelector('.signature-image')) return;
+    const image = parsed.createElement('img');
+    image.className = 'signature-image';
+    image.src = signature.signatureImage;
+    image.alt = `${signature.signer} parašas`;
+    line.before(image);
+  };
+  insertSignatureImage('Darbdavys ar jo įgaliotas asmuo', employerSignature);
+  insertSignatureImage('Vieną egzempliorių gavau', workerSignature);
+  const style = parsed.createElement('style');
+  style.textContent = '.signature-image{display:block;width:150px;height:30px;object-fit:contain;object-position:left center}';
+  parsed.head.append(style);
+  return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
 function buildQuizPreviewHtml(resource) {
   const multipleAnswersAllowed = resource.questions.some((question) => Array.isArray(question.correctIndices));
@@ -2959,9 +3019,10 @@ function WorkflowBadge({ status }) {
 function RequiredSignerList({ employee, resource, org, signatures, now, specialists }) {
   const signers = getRequiredSignerEntries(employee, resource, org, signatures, now, specialists);
   return <div className="mt-2 grid grid-cols-1 gap-1" aria-label="Reikalingi parašai">{signers.map((signer) => {
+    const signature = signer.signedAt && signatures.find((item) => item.employeeId === employee.id && item.resourceId === resource.id && item.role === signer.role && item.signer === signer.signedBy && item.signedAt === signer.signedAt);
     const statusLabel = signer.status === 'signed' ? 'pasirašė PIN kodu' : signer.status === 'expired' ? 'galiojimas baigėsi' : 'trūksta';
     const tone = signer.status === 'signed' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800';
-    return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas pasibaigė'}</span>{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
+    return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas pasibaigė'}</span>{signature?.signatureImage && <img className="mt-1 h-8 w-28 rounded border border-white/70 bg-white object-contain" src={signature.signatureImage} alt={`${signer.name} parašas`} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
 function SubscriptionCard({ subscription, onAction }) {
