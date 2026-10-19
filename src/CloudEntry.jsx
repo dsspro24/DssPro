@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import LocalWorkspace from './LocalWorkspace.jsx';
 import { supabase } from './lib/supabase.js';
+import { hydrateSignatureImages } from './lib/storageAssets.js';
 
 function getWorkspaceStatus(workspace) {
   if (workspace?.requiresEmployeePassword) return 'employee-password-needed';
@@ -10,6 +11,38 @@ function getWorkspaceStatus(workspace) {
   if (workspace?.requiresEmployee) return 'employee-account';
   if (workspace?.requiresOrganization) return 'organization-needed';
   return workspace ? 'ready' : 'organization-needed';
+}
+
+async function hydrateResourceAssets(resources = []) {
+  return Promise.all(resources.map(async (resource) => {
+    if (!resource || typeof resource !== 'object') return resource;
+    const hydrated = { ...resource };
+    const imageUrl = hydrated.imageUrl ?? (typeof hydrated.image === 'string' && !hydrated.image.startsWith('data:') ? hydrated.image : null);
+    if (imageUrl) {
+      hydrated.imageUrl = imageUrl;
+      hydrated.image = imageUrl;
+    }
+    if (!hydrated.html && hydrated.htmlUrl) {
+      const result = await fetch(hydrated.htmlUrl);
+      if (!result.ok) throw new Error(`Nepavyko įkelti HTML šablono: ${result.status}`);
+      hydrated.html = await result.text();
+    }
+    return hydrated;
+  }));
+}
+
+async function hydrateWorkspaceAssets(workspace) {
+  if (!workspace || typeof workspace !== 'object') return workspace;
+  const [resources, signatures] = await Promise.all([
+    hydrateResourceAssets(workspace.resources ?? []),
+    hydrateSignatureImages(workspace.signatures ?? []),
+  ]);
+  const archivedEmployees = await Promise.all((workspace.archivedEmployees ?? []).map(async (record) => ({
+    ...record,
+    resources: await hydrateResourceAssets(record.resources ?? []),
+    signatures: await hydrateSignatureImages(record.signatures ?? []),
+  })));
+  return { ...workspace, resources, signatures, archivedEmployees };
 }
 
 async function loadManagerWorkspace(user) {
@@ -30,6 +63,9 @@ async function loadManagerWorkspace(user) {
   }
 
   if (isCreator) {
+    const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: {} });
+    if (assetMigrationError) throw new Error(`Nepavyko perkelti senų failų į Storage: ${assetMigrationError.message}`);
+
     const [organizationsResult, workspacesResult, catalogResult, accountsResult] = await Promise.all([
       supabase.from('organizations').select('id, name, company_code').order('name'),
       supabase.from('organization_data').select('organization_id, data'),
@@ -41,7 +77,12 @@ async function loadManagerWorkspace(user) {
     if (catalogResult.error) throw catalogResult.error;
     if (accountsResult.error) throw accountsResult.error;
 
-    const workspaceByOrganization = new Map(workspacesResult.data.map((workspace) => [workspace.organization_id, workspace.data]));
+    const hydratedWorkspaces = await Promise.all(workspacesResult.data.map(async (workspace) => [
+      workspace.organization_id,
+      await hydrateWorkspaceAssets(workspace.data),
+    ]));
+    const workspaceByOrganization = new Map(hydratedWorkspaces);
+    const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const resourcesById = new Map();
     const subscriptionsById = new Map();
     for (const workspaceData of workspaceByOrganization.values()) {
@@ -50,7 +91,7 @@ async function loadManagerWorkspace(user) {
       }
       for (const subscription of workspaceData?.subscriptions ?? []) subscriptionsById.set(subscription.id, subscription);
     }
-    for (const resource of catalogResult.data?.data?.resources ?? []) {
+    for (const resource of hydratedCatalog?.resources ?? []) {
       if (!resource.organizationId) resourcesById.set(resource.id, resource);
     }
 
@@ -68,7 +109,7 @@ async function loadManagerWorkspace(user) {
     return {
       creator: true,
       managerName,
-      catalog: catalogResult.data?.data ?? null,
+      catalog: hydratedCatalog,
       creatorAccounts: accountsResult.data ?? [],
       creatorWorkspaces: Object.fromEntries(workspaceByOrganization),
       data: {
@@ -79,7 +120,7 @@ async function loadManagerWorkspace(user) {
         specialists: [...workspaceByOrganization.values()].flatMap((item) => item?.specialists ?? []),
         signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
         ...(resourcesById.size ? { resources: [...resourcesById.values()] } : {}),
-        resourceTypes: catalogResult.data?.data?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
+        resourceTypes: hydratedCatalog?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
         subscriptions: [...subscriptionsById.values()],
       },
     };
@@ -93,6 +134,8 @@ async function loadManagerWorkspace(user) {
     .select('organization_id, role, employee_id')
     .eq('user_id', user.id);
   if (membershipError) throw membershipError;
+  const { error: memberAssetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: {} });
+  if (memberAssetMigrationError) throw new Error(`Nepavyko perkelti įmonės failų į Storage: ${memberAssetMigrationError.message}`);
 
   if (profile?.account_type === 'dss_specialist') {
     const dssMemberships = memberships.filter((membership) => membership.role === 'dss_specialist');
@@ -107,7 +150,12 @@ async function loadManagerWorkspace(user) {
     if (workspacesResult.error) throw workspacesResult.error;
     if (catalogResult.error) throw catalogResult.error;
 
-    const workspaceByOrganization = new Map(workspacesResult.data.map((item) => [item.organization_id, item.data]));
+    const hydratedWorkspaces = await Promise.all(workspacesResult.data.map(async (item) => [
+      item.organization_id,
+      await hydrateWorkspaceAssets(item.data),
+    ]));
+    const workspaceByOrganization = new Map(hydratedWorkspaces);
+    const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const resourcesById = new Map();
     const organizations = organizationsResult.data.map((organization) => {
       const workspaceData = workspaceByOrganization.get(organization.id);
@@ -115,7 +163,7 @@ async function loadManagerWorkspace(user) {
       for (const resource of workspaceData?.resources ?? []) resourcesById.set(resource.id, resource);
       return { ...savedOrganization, id: organization.id, name: organization.name, companyCode: organization.company_code ?? '', dss: [...new Set([...(savedOrganization.dss ?? []), user.id])] };
     });
-    for (const resource of catalogResult.data?.data?.resources ?? []) {
+    for (const resource of hydratedCatalog?.resources ?? []) {
       if (!resource.organizationId) resourcesById.set(resource.id, resource);
     }
 
@@ -130,7 +178,7 @@ async function loadManagerWorkspace(user) {
         specialists: [{ id: user.id, name: managerName, email: user.email ?? '', status: 'Paskyra patvirtinta' }],
         signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
         resources: [...resourcesById.values()],
-        resourceTypes: catalogResult.data?.data?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
+        resourceTypes: hydratedCatalog?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
         subscriptions: [],
       },
     };
@@ -141,7 +189,7 @@ async function loadManagerWorkspace(user) {
     if (!employeeMembership) return { requiresEmployee: true, managerName };
     const { data: employeeWorkspace, error: employeeWorkspaceError } = await supabase.rpc('get_employee_workspace');
     if (employeeWorkspaceError) throw employeeWorkspaceError;
-    const employeeData = employeeWorkspace.data;
+    const employeeData = await hydrateWorkspaceAssets(employeeWorkspace.data);
     return {
       employee: true,
       managerName,
@@ -175,12 +223,14 @@ async function loadManagerWorkspace(user) {
   const { data: savedWorkspace, error: workspaceError } = workspaceResult;
   if (workspaceError) throw workspaceError;
   if (catalogResult.error) throw catalogResult.error;
+  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
+  const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
 
   return {
     organization,
     managerName,
-    catalog: catalogResult.data?.data ?? null,
-    data: savedWorkspace?.data ?? null,
+    catalog: hydratedCatalog,
+    data: hydratedWorkspace,
   };
 }
 

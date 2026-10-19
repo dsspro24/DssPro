@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
+import { removeSignatureAsset, uploadCreatorAsset, uploadSignatureDataUrl } from './lib/storageAssets.js';
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
@@ -104,6 +105,34 @@ function createArchivePdfHtml(element) {
     .join('\n');
   const printOverrides = '<style>body{margin:0;background:#fff}.archive-print-target{position:relative!important;inset:auto!important;display:block!important;width:100%!important;max-width:none!important;max-height:none!important;height:auto!important;overflow:visible!important;border:0!important;background:#fff!important;box-shadow:none!important;color:#111827!important;padding:0!important}.archive-print-target *{visibility:visible!important}.archive-person-print-title{display:block!important}</style>';
   return `<!doctype html><html><head><meta charset="utf-8"><title>Darbuotojų archyvas</title>${styles}${printOverrides}</head><body>${clone.outerHTML}</body></html>`;
+}
+
+function resourceForDatabase(resource) {
+  const databaseResource = { ...resource };
+  delete databaseResource.image;
+  delete databaseResource.html;
+  const imageUrl = resource.imageUrl ?? (resource.image && !resource.image.startsWith('data:') ? resource.image : null);
+  if (imageUrl) databaseResource.imageUrl = imageUrl;
+  if (resource.htmlUrl) databaseResource.htmlUrl = resource.htmlUrl;
+  return databaseResource;
+}
+
+function workspaceForDatabase(workspace) {
+  const cleanSignature = (signature) => {
+    const databaseSignature = { ...signature };
+    delete databaseSignature.signatureImage;
+    return databaseSignature;
+  };
+  return {
+    ...workspace,
+    resources: (workspace.resources ?? []).map(resourceForDatabase),
+    signatures: (workspace.signatures ?? []).map(cleanSignature),
+    archivedEmployees: (workspace.archivedEmployees ?? []).map((record) => ({
+      ...record,
+      resources: (record.resources ?? []).map(resourceForDatabase),
+      signatures: (record.signatures ?? []).map(cleanSignature),
+    })),
+  };
 }
 
 const STORAGE_KEY = 'dsspro-local-demo-v1';
@@ -596,6 +625,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [assignmentPresetDraft, setAssignmentPresetDraft] = useState({ id: '', name: '', resourceIds: [] });
   const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
   const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'] });
+  const [resourceFileUploading, setResourceFileUploading] = useState(false);
   const [editingResourceId, setEditingResourceId] = useState(null);
   const [protocolSource, setProtocolSource] = useState(null);
   const [protocolTitle, setProtocolTitle] = useState('');
@@ -635,7 +665,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
       const { error } = await supabase.rpc('save_creator_workspace', {
-        input_resources: workspaceData.resources.filter((resource) => !resource.organizationId),
+        input_resources: workspaceData.resources.filter((resource) => !resource.organizationId).map(resourceForDatabase),
         input_resource_types: workspaceData.resourceTypes,
         input_subscriptions: workspaceData.subscriptions,
       });
@@ -698,7 +728,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const timeout = window.setTimeout(async () => {
       const { error } = await supabase.from('organization_data').upsert({
         organization_id: organization.id,
-        data,
+        data: workspaceForDatabase(data),
         updated_by: cloudUserId,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'organization_id' });
@@ -1061,20 +1091,29 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setWorkerSignError('Dokumento būsenos išsaugoti nepavyko. Bandykite dar kartą.');
         return;
       }
+      let uploadedSignature;
+      try {
+        uploadedSignature = await uploadSignatureDataUrl(employee.orgId, signatureInk);
+      } catch (error) {
+        setWorkerSignError(`Parašo įkelti nepavyko: ${error.message}`);
+        return;
+      }
       const { data: signature, error } = await supabase.rpc('record_employee_signature_with_image', {
         input_resource_id: resource.id,
         input_pin: workerSignPin,
-        input_signature_image: signatureInk,
+        input_signature_image: uploadedSignature.path,
       });
       if (error) {
+        await removeSignatureAsset(uploadedSignature.path);
         setWorkerSignError(error.message || 'PIN patikrinti nepavyko.');
         return;
       }
       if (!signature) {
+        await removeSignatureAsset(uploadedSignature.path);
         setWorkerSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
         return;
       }
-      recordWorkerSignature(employee, resource, signature);
+      recordWorkerSignature(employee, resource, { ...signature, signatureImage: uploadedSignature.signedUrl });
     } else if (workerSignPin !== employee.pin) {
       setWorkerSignError('PIN kodas neteisingas.');
       return;
@@ -1093,10 +1132,29 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const handleResourceFile = async (file, field) => {
     if (!file) return;
-    if (file.size > 1_500_000) {
-      setNotice('Failas per didelis vietiniam demo. Pasirinkite iki 1,5 MB failą.');
+    if (file.size > 10_000_000) {
+      setNotice('Failas per didelis. Didžiausias leidžiamas dydis yra 10 MB.');
       return;
     }
+    if (cloudMode && userRole === 'kurejas') {
+      setResourceFileUploading(true);
+      try {
+        const { publicUrl } = await uploadCreatorAsset(file);
+        if (field === 'html') {
+          const html = await file.text();
+          const parsed = new DOMParser().parseFromString(html, 'text/html');
+          setResourceForm((current) => ({ ...current, html, htmlUrl: publicUrl, title: current.title || parsed.title || '' }));
+        } else {
+          setResourceForm((current) => ({ ...current, image: publicUrl, imageUrl: publicUrl }));
+        }
+      } catch (error) {
+        setNotice(`Failo įkelti nepavyko: ${error.message}`);
+      } finally {
+        setResourceFileUploading(false);
+      }
+      return;
+    }
+
     if (field === 'html') {
       const html = await file.text();
       const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -1110,7 +1168,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const resetResourceForm = () => {
     setEditingResourceId(null);
-    setResourceForm({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'] });
+    setResourceForm({ title: '', type: 'Testas', category: '', image: '', imageUrl: '', html: '', htmlUrl: '', validityMonths: 12, requiredSigners: ['Darbuotojas'] });
     setDraftQuestions([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   };
 
@@ -1120,8 +1178,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       title: resource.title ?? '',
       type: resource.type ?? 'Testas',
       category: resource.category ?? '',
-      image: resource.image ?? '',
+      image: resource.imageUrl ?? resource.image ?? '',
+      imageUrl: resource.imageUrl ?? '',
       html: resource.html ?? '',
+      htmlUrl: resource.htmlUrl ?? '',
       validityMonths: resource.validityMonths ?? 12,
       requiredSigners: resource.requiredSigners ?? ['Darbuotojas'],
     });
@@ -1140,7 +1200,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const resource = { ...data.resources.find((item) => item.id === editingResourceId), ...resourceForm, id: editingResourceId ?? `res-${Date.now()}`, title: resourceForm.title.trim(), category: resourceForm.category.trim() || resourceTypeDisplayNames[resourceForm.type], validityMonths: Number(resourceForm.validityMonths) || 12, questions: resourceForm.type === 'Testas' ? questions : [], signatures: true };
     if (cloudMode && userRole === 'kurejas') {
       const { error } = await supabase.rpc('save_creator_resource', {
-        input_resource: resource,
+        input_resource: resourceForDatabase(resource),
         input_resource_types: data.resourceTypes,
       });
       if (error) {
@@ -1644,19 +1704,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (cloudMode) {
       const signatures = [];
       for (const task of tasksToSign) {
+        let uploadedSignature;
+        try {
+          uploadedSignature = await uploadSignatureDataUrl(task.orgId, signatureInk);
+        } catch (error) {
+          if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+          setDssSigningError(`Parašo įkelti nepavyko: ${error.message}`);
+          return;
+        }
         const { data: signature, error } = await supabase.rpc('record_dss_signature_with_image', {
           input_organization_id: task.orgId,
           input_employee_id: task.employeeId,
           input_resource_id: task.resourceId,
           input_pin: signPinDraft,
-          input_signature_image: signatureInk,
+          input_signature_image: uploadedSignature.path,
         });
         if (error || !signature) {
+          await removeSignatureAsset(uploadedSignature.path);
           if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
           setDssSigningError(error?.message || 'PIN neteisingas arba per daug kartų bandyta.');
           return;
         }
-        signatures.push(signature);
+        signatures.push({ ...signature, signatureImage: uploadedSignature.signedUrl });
       }
       setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
     } else {
@@ -1762,21 +1831,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     if (cloudMode) {
+      let uploadedSignature;
+      try {
+        uploadedSignature = await uploadSignatureDataUrl(org.id, signatureInk);
+      } catch (error) {
+        setEmployerSignError(`Parašo įkelti nepavyko: ${error.message}`);
+        return;
+      }
       const { data: signature, error } = await supabase.rpc('record_manager_signature_with_image', {
         input_employee_id: employee.id,
         input_resource_id: resource.id,
         input_pin: employerSignPin,
-        input_signature_image: signatureInk,
+        input_signature_image: uploadedSignature.path,
       });
       if (error) {
+        await removeSignatureAsset(uploadedSignature.path);
         setEmployerSignError(error.message || 'Vadovo parašo įrašyti nepavyko.');
         return;
       }
       if (!signature) {
+        await removeSignatureAsset(uploadedSignature.path);
         setEmployerSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
         return;
       }
-      setData((current) => ({ ...current, signatures: [...current.signatures, signature] }));
+      setData((current) => ({ ...current, signatures: [...current.signatures, { ...signature, signatureImage: uploadedSignature.signedUrl }] }));
     } else {
       if (employerSignPin !== org.managerPin) {
         setEmployerSignError('Vadovo PIN kodas neteisingas.');
@@ -1853,23 +1931,32 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     if (cloudMode) {
+      let uploadedSignature;
+      try {
+        uploadedSignature = await uploadSignatureDataUrl(org.id, signatureInk);
+      } catch (error) {
+        setCommissionSignError(`Parašo įkelti nepavyko: ${error.message}`);
+        return;
+      }
       const { data: signature, error } = await supabase.rpc('record_commission_signature_with_image', {
         input_organization_id: org.id,
         input_employee_id: employee.id,
         input_resource_id: resource.id,
         input_signer_name: target.member,
         input_pin: commissionSignPin,
-        input_signature_image: signatureInk,
+        input_signature_image: uploadedSignature.path,
       });
       if (error) {
+        await removeSignatureAsset(uploadedSignature.path);
         setCommissionSignError(error.message || 'Komisijos parašo įrašyti nepavyko.');
         return;
       }
       if (!signature) {
+        await removeSignatureAsset(uploadedSignature.path);
         setCommissionSignError('PIN kodas neteisingas arba per daug kartų bandyta.');
         return;
       }
-      setData((current) => ({ ...current, signatures: [...current.signatures, signature] }));
+      setData((current) => ({ ...current, signatures: [...current.signatures, { ...signature, signatureImage: uploadedSignature.signedUrl }] }));
     } else {
       if (commissionSignPin !== org.commissionPins?.[target.member]) {
         setCommissionSignError('Komisijos nario PIN kodas neteisingas.');
@@ -2405,8 +2492,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <label className="text-sm font-medium">Kategorija<input className={`${inputClass} mt-1`} value={resourceForm.category} onChange={(event) => setResourceForm({ ...resourceForm, category: event.target.value })} placeholder="Priešgaisrinė sauga" /></label>
                 <label className="text-sm font-medium">Galiojimas (mėn.)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={resourceForm.validityMonths} onChange={(event) => setResourceForm({ ...resourceForm, validityMonths: event.target.value })} /></label>
                 <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3 md:col-span-2"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{[['Darbuotojas', 'Darbuotojas'], ['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas'], ['Komisijos narys', 'Komisijos nariai']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={resourceForm.requiredSigners.includes(role)} disabled={role === 'Darbuotojas'} onChange={(event) => setResourceForm((current) => ({ ...current, requiredSigners: event.target.checked ? [...new Set([...current.requiredSigners, role])] : current.requiredSigners.filter((item) => item !== role) }))} />{label}{role === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div><p className="text-xs text-slate-500">Komisijos narių parašo reikės kiekvienam įmonės komisijos nariui.</p></fieldset>
-                <label className="flex cursor-pointer items-center gap-2 self-end rounded-lg border border-slate-300 px-3 py-2 text-sm"><Upload size={16} />{editingResourceId ? 'Pakeisti HTML failą' : 'Įkelti HTML šabloną'}<input className="sr-only" type="file" accept=".html,.htm,text/html" onChange={(event) => handleResourceFile(event.target.files?.[0], 'html')} /></label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"><ImagePlus size={16} />Priskirti viršelio nuotrauką<input className="sr-only" type="file" accept="image/*" onChange={(event) => handleResourceFile(event.target.files?.[0], 'image')} /></label>
+                <label className={`flex cursor-pointer items-center gap-2 self-end rounded-lg border border-slate-300 px-3 py-2 text-sm ${resourceFileUploading ? 'pointer-events-none opacity-60' : ''}`}><Upload size={16} />{resourceFileUploading ? 'Įkeliamas failas…' : editingResourceId ? 'Pakeisti HTML failą' : 'Įkelti HTML šabloną'}<input className="sr-only" type="file" accept=".html,.htm,text/html" disabled={resourceFileUploading} onChange={(event) => handleResourceFile(event.target.files?.[0], 'html')} /></label>
+                <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm ${resourceFileUploading ? 'pointer-events-none opacity-60' : ''}`}><ImagePlus size={16} />{resourceFileUploading ? 'Įkeliamas failas…' : 'Priskirti viršelio nuotrauką'}<input className="sr-only" type="file" accept="image/*" disabled={resourceFileUploading} onChange={(event) => handleResourceFile(event.target.files?.[0], 'image')} /></label>
                 {resourceForm.image && <img className="h-16 w-28 rounded-md object-cover" src={resourceForm.image} alt="Pasirinktas viršelis" />}
                 {resourceForm.html && <p className="self-center text-xs text-emerald-800">HTML paruoštas · {new DOMParser().parseFromString(resourceForm.html, 'text/html').body.textContent?.trim().slice(0, 90) || 'Tuščias dokumentas'}</p>}
                 <details className="rounded-lg border border-slate-200 p-3 md:col-span-2"><summary className="cursor-pointer text-sm font-semibold">Redaguoti HTML turinį</summary><label className="mt-3 block text-sm font-medium">HTML kodas<textarea className={`${inputClass} mt-1 min-h-64 font-mono text-xs`} spellCheck={false} value={resourceForm.html} onChange={(event) => setResourceForm((current) => ({ ...current, html: event.target.value }))} /></label></details>
