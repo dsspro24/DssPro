@@ -75,14 +75,17 @@ Deno.serve(async (request) => {
   const files = [
     ...(Array.isArray(deletedOrganization.assetFiles) ? deletedOrganization.assetFiles : []),
     ...(Array.isArray(deletedOrganization.exportFiles) ? deletedOrganization.exportFiles : []),
-  ].filter((file: Record<string, unknown>) => ['organization-assets', 'organization-exports'].includes(String(file.bucket))
+    ...(Array.isArray(deletedOrganization.signatureFiles) ? deletedOrganization.signatureFiles : []),
+  ].filter((file: Record<string, unknown>) => ['organization-assets', 'organization-exports', 'signature-assets'].includes(String(file.bucket))
     && typeof file.path === 'string' && file.path.length > 0);
 
   try {
     files.push(...(await listStorageFiles(adminClient, 'organization-assets', organizationId))
       .map((path) => ({ bucket: 'organization-assets', path })));
+    files.push(...(await listStorageFiles(adminClient, 'signature-assets', organizationId))
+      .map((path) => ({ bucket: 'signature-assets', path })));
     const uniqueFiles = [...new Map(files.map((file: Record<string, string>) => [`${file.bucket}:${file.path}`, file])).values()];
-    for (const bucket of ['organization-assets', 'organization-exports']) {
+    for (const bucket of ['organization-assets', 'organization-exports', 'signature-assets']) {
       const paths = uniqueFiles.filter((file: Record<string, string>) => file.bucket === bucket).map((file: Record<string, string>) => file.path);
       for (let index = 0; index < paths.length; index += 100) {
         const { error } = await adminClient.storage.from(bucket).remove(paths.slice(index, index + 100));

@@ -1251,6 +1251,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
     const employeeIds = new Set(records.map((record) => record.employee.id));
     const recordIds = new Set(records.map((record) => record.id));
+    const signaturePaths = [...new Set(records.flatMap((record) => record.signatures ?? []).map((signature) => signature.signaturePath).filter(Boolean))];
+    if (signaturePaths.length) {
+      const { error: storageError } = await supabase.storage.from('signature-assets').remove(signaturePaths);
+      if (storageError) setNotice(`Archyvo įrašai ištrinti, bet parašų failus pašalinti nepavyko: ${storageError.message}`);
+    }
     setData((current) => ({
       ...current,
       archivedEmployees: (current.archivedEmployees ?? []).filter((record) => !recordIds.has(record.id)),

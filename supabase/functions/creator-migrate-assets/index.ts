@@ -225,21 +225,24 @@ Deno.serve(async (request) => {
 
   const counters = { images: 0, documents: 0, signatures: 0, workspaces: 0 };
   const urlCache = new Map<string, string>();
-  const { data: catalog, error: catalogError } = await adminClient
-    .from('creator_workspace_data')
-    .select('data, updated_at')
-    .eq('id', true)
-    .maybeSingle();
-  if (catalogError) return response(500, { error: catalogError.message });
+  if (isCreator) {
+    const { data: catalog, error: catalogError } = await adminClient
+      .from('creator_workspace_data')
+      .select('data, updated_by, updated_at')
+      .eq('id', true)
+      .maybeSingle();
+    if (catalogError) return response(500, { error: catalogError.message });
 
-  if (catalog?.data) {
-    const result = await migrateWorkspace(adminClient, null, catalog.data, counters, urlCache);
-    if (result.changed) {
-      const { error } = await adminClient.from('creator_workspace_data').update({
-        data: result.data,
-        updated_at: new Date().toISOString(),
-      }).eq('id', true).eq('updated_at', catalog.updated_at);
-      if (error) return response(500, { error: `Could not update creator catalog: ${error.message}` });
+    if (catalog?.data) {
+      const result = await migrateWorkspace(adminClient, null, catalog.data, counters, urlCache);
+      if (result.changed) {
+        const { error } = await adminClient.from('creator_workspace_data').update({
+          data: result.data,
+          updated_by: catalog.updated_by,
+          updated_at: new Date().toISOString(),
+        }).eq('id', true).eq('updated_at', catalog.updated_at);
+        if (error) return response(500, { error: `Could not update creator catalog: ${error.message}` });
+      }
     }
   }
 
@@ -247,7 +250,7 @@ Deno.serve(async (request) => {
   for (let offset = 0; ; offset += pageSize) {
     let workspaceQuery = adminClient
       .from('organization_data')
-      .select('organization_id, data, updated_at');
+      .select('organization_id, data, updated_by, updated_at');
     if (!isCreator) workspaceQuery = workspaceQuery.in('organization_id', organizationIds);
     const { data: workspaces, error } = await workspaceQuery
       .order('organization_id')
@@ -260,7 +263,7 @@ Deno.serve(async (request) => {
       if (!result.changed) continue;
       const { error: updateError } = await adminClient.from('organization_data').update({
         data: result.data,
-        updated_by: user.id,
+        updated_by: workspace.updated_by,
         updated_at: new Date().toISOString(),
       }).eq('organization_id', workspace.organization_id).eq('updated_at', workspace.updated_at);
       if (updateError) return response(500, { error: `Could not update organization ${workspace.organization_id}: ${updateError.message}` });
