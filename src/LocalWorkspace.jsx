@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
-import { removeSignatureAsset, uploadCreatorAsset, uploadSignatureDataUrl } from './lib/storageAssets.js';
+import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureDataUrl } from './lib/storageAssets.js';
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
@@ -118,6 +118,11 @@ function resourceForDatabase(resource) {
 }
 
 function workspaceForDatabase(workspace) {
+  const databaseWorkspace = { ...workspace };
+  delete databaseWorkspace.commissionAssignments;
+  delete databaseWorkspace.protocolCommissionSignatures;
+  delete databaseWorkspace.commissionInvitations;
+  delete databaseWorkspace.commissionTasks;
   const cleanSignature = (signature) => {
     const databaseSignature = { ...signature };
     delete databaseSignature.signatureImage;
@@ -129,7 +134,7 @@ function workspaceForDatabase(workspace) {
     return databaseIssuance;
   };
   return {
-    ...workspace,
+    ...databaseWorkspace,
     resources: (workspace.resources ?? []).map(resourceForDatabase),
     signatures: (workspace.signatures ?? []).map(cleanSignature),
     aapIssuances: (workspace.aapIssuances ?? []).map(cleanAapIssuance),
@@ -415,6 +420,10 @@ const initialData = {
   archivedEmployees: [],
   protocolBatches: [],
   aapIssuances: [],
+  commissionAssignments: [],
+  protocolCommissionSignatures: [],
+  commissionInvitations: [],
+  commissionTasks: [],
   specialists: [
     { id: 'spec-rasa', name: 'Rasa Norkienė', email: 'rasa.norkiene@dss.lt', status: 'Paskyra patvirtinta', pin: '' },
     { id: 'spec-mindaugas', name: 'Mindaugas Valaitis', email: 'mindaugas@dss.lt', status: 'Paskyra patvirtinta', pin: '' },
@@ -675,6 +684,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [commissionSignPin, setCommissionSignPin] = useState('');
   const [commissionSignError, setCommissionSignError] = useState('');
   const [commissionPinStatus, setCommissionPinStatus] = useState({ organizationId: null, members: {} });
+  const [commissionInvitationTarget, setCommissionInvitationTarget] = useState(null);
+  const [protocolCommissionTaskTarget, setProtocolCommissionTaskTarget] = useState(null);
+  const [commissionConsentChecked, setCommissionConsentChecked] = useState(false);
+  const [commissionActionSubmitting, setCommissionActionSubmitting] = useState(false);
+  const [commissionActionError, setCommissionActionError] = useState('');
   const [dssSigningTasks, setDssSigningTasks] = useState([]);
   const [signPinDraft, setSignPinDraft] = useState('');
   const [dssSigningError, setDssSigningError] = useState('');
@@ -812,6 +826,42 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
+  const pendingCommissionInvitations = (data.commissionInvitations ?? []).filter((invitation) => invitation.status === 'pending' && (!currentEmployee || invitation.employeeId === currentEmployee.id));
+  const commissionProtocolTasks = cloudMode
+    ? (data.commissionTasks ?? []).filter((task) => !currentEmployee || task.employeeId === currentEmployee.id)
+    : (data.commissionAssignments ?? [])
+      .filter((assignment) => assignment.organizationId === currentEmployee?.orgId && assignment.employeeId === currentEmployee?.id && assignment.status === 'accepted')
+      .flatMap((assignment) => (data.protocolBatches ?? [])
+        .filter((batch) => batch.orgId === assignment.organizationId && batch.protocolDate && batch.employeeIds?.length
+          && assignment.respondedAt
+          && new Date(assignment.respondedAt).toISOString().slice(0, 10) <= batch.protocolDate)
+        .map((batch) => {
+          const resource = data.resources.find((item) => item.id === batch.resourceId && item.templateKind === 'knowledge-assessment-protocol');
+          if (!resource) return null;
+          const allPassed = !resource.relatedTestId || batch.employeeIds.every((employeeId) => data.employees
+            .find((item) => item.id === employeeId)
+            ?.testResults?.some((result) => result.resourceId === resource.relatedTestId && result.passed));
+          if (!allPassed) return null;
+          const signatures = (data.protocolCommissionSignatures ?? []).filter((signature) => signature.batchId === batch.id);
+          return {
+            assignmentId: assignment.id,
+            employeeId: assignment.employeeId,
+            role: assignment.role,
+            batchId: batch.id,
+            batchNumber: batch.number,
+            protocolDate: batch.protocolDate,
+            resourceId: resource.id,
+            resourceTitle: resource.title,
+            hasSigned: signatures.some((signature) => signature.assignmentId === assignment.id),
+            employeeNames: batch.employeeIds.map((employeeId) => data.employees.find((item) => item.id === employeeId)?.name).filter(Boolean),
+            commissionAssignments: (data.commissionAssignments ?? []).filter((item) => item.organizationId === assignment.organizationId && item.status === 'accepted'),
+            protocolCommissionSignatures: signatures,
+          };
+        })
+        .filter(Boolean));
+  const pendingCommissionTasks = commissionProtocolTasks.filter((task) => !task.hasSigned);
+  const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
+  const currentCommissionAssignments = (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id);
   const orgEmployees = data.employees.filter((employee) => employee.orgId === currentOrg?.id);
   const archivedOrgEmployees = (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id);
   const archiveDetailRecord = archivedOrgEmployees.find((record) => record.id === archiveDetailsId);
@@ -1016,6 +1066,209 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const inviteEmployeeToCommission = async (employeeId, role) => {
+    const employee = data.employees.find((item) => item.id === employeeId && item.orgId === currentOrg?.id);
+    if (!employee) {
+      setNotice('Pasirinktas darbuotojas nerastas šioje įmonėje.');
+      return false;
+    }
+    if ((data.commissionAssignments ?? []).some((item) => item.organizationId === currentOrg.id && item.employeeId === employee.id && ['pending', 'accepted'].includes(item.status))) {
+      setNotice(`${employee.name} jau turi aktyvų komisijos paskyrimą.`);
+      return false;
+    }
+    if (role === 'Komisijos pirmininkas' && (data.commissionAssignments ?? []).some((item) => item.organizationId === currentOrg.id && item.role === role && ['pending', 'accepted'].includes(item.status))) {
+      setNotice('Komisijos pirmininkas jau paskirtas arba dar neatsakė į kvietimą.');
+      return false;
+    }
+    if (cloudMode) {
+      const { data: assignment, error } = await supabase.rpc('invite_employee_to_commission', {
+        input_organization_id: currentOrg.id,
+        input_employee_id: employee.id,
+        input_role: role,
+      });
+      if (error) {
+        setNotice(`Komisijos kvietimo išsiųsti nepavyko: ${error.message}`);
+        return false;
+      }
+      setData((current) => ({
+        ...current,
+        commissionAssignments: [...(current.commissionAssignments ?? []).filter((item) => item.id !== assignment.id), assignment],
+      }));
+    } else {
+      const assignment = {
+        id: `commission-${crypto.randomUUID()}`,
+        organizationId: currentOrg.id,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeeEmail: employee.email,
+        role,
+        status: 'pending',
+        invitedAt: new Date().toISOString(),
+      };
+      setData((current) => ({
+        ...current,
+        commissionAssignments: [...(current.commissionAssignments ?? []), assignment],
+        commissionInvitations: [...(current.commissionInvitations ?? []), { ...assignment, organizationName: currentOrg.name }],
+      }));
+    }
+    setNotice(`${employee.name} išsiųstas kvietimas tapti ${role === 'Komisijos pirmininkas' ? 'komisijos pirmininku' : 'DSS komisijos nariu'}.`);
+    return true;
+  };
+
+  const revokeCommissionAssignment = async (assignment) => {
+    if (cloudMode) {
+      const { data: revoked, error } = await supabase.rpc('revoke_employee_commission_assignment', {
+        input_organization_id: assignment.organizationId,
+        input_assignment_id: assignment.id,
+      });
+      if (error || !revoked) {
+        setNotice(`Komisijos paskyrimo atšaukti nepavyko: ${error?.message ?? 'paskyrimas nerastas.'}`);
+        return;
+      }
+    }
+    setData((current) => {
+      const commissionAssignments = (current.commissionAssignments ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item);
+      return {
+        ...current,
+        commissionAssignments,
+        commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item),
+      };
+    });
+    setNotice(`${assignment.employeeName} komisijos paskyrimas atšauktas.`);
+  };
+
+  const respondToCommissionInvitation = async (accept) => {
+    const invitation = commissionInvitationTarget;
+    if (!invitation || invitation.status !== 'pending') return;
+    if (accept && (!commissionConsentChecked || !signatureInk)) {
+      setCommissionActionError('Pažymėkite sutikimą ir pasirašykite prieš patvirtindami PIN.');
+      return;
+    }
+    setCommissionActionSubmitting(true);
+    setCommissionActionError('');
+    let uploadedSignature = null;
+    let taskRefreshError = '';
+    try {
+      if (cloudMode && accept) uploadedSignature = await uploadSignatureDataUrl(invitation.organizationId, signatureInk);
+      if (cloudMode) {
+        const { data: response, error } = await supabase.rpc('respond_to_commission_invitation', {
+          input_assignment_id: invitation.id,
+          input_accept: accept,
+          input_pin: accept ? workerSignPin : '',
+          input_signature_path: uploadedSignature?.path ?? null,
+        });
+        if (error || !response) throw new Error(error?.message || 'PIN kodas neteisingas arba per daug kartų bandyta.');
+        setData((current) => ({
+          ...current,
+          commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === invitation.id
+            ? { ...item, ...response, signatureImage: uploadedSignature?.signedUrl }
+            : item),
+        }));
+        if (accept) {
+          try {
+            const { data: tasks, error: taskError } = await supabase.rpc('get_employee_protocol_commission_tasks');
+            if (taskError) throw taskError;
+            const hydratedTasks = await Promise.all((tasks ?? []).map(async (task) => ({
+              ...task,
+              protocolCommissionSignatures: await hydrateSignatureImages(task.protocolCommissionSignatures ?? []),
+            })));
+            const commissionAssignments = [...new Map(hydratedTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id, assignment])).values()];
+            const protocolCommissionSignatures = [...new Map(hydratedTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
+            setData((current) => ({ ...current, commissionTasks: hydratedTasks, commissionAssignments, protocolCommissionSignatures }));
+          } catch (error) {
+            taskRefreshError = error.message || 'Protokolų užduočių atnaujinti nepavyko.';
+          }
+        }
+      } else {
+        if (accept && workerSignPin !== currentEmployee?.pin) throw new Error('PIN kodas neteisingas.');
+        const response = {
+          status: accept ? 'accepted' : 'declined',
+          respondedAt: new Date().toISOString(),
+          consentSignatureMethod: accept ? 'PIN' : null,
+          consentIp: accept ? '127.0.0.1 (demo)' : null,
+          signatureImage: accept ? signatureInk : null,
+        };
+        setData((current) => ({
+          ...current,
+          commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === invitation.id ? { ...item, ...response } : item),
+          commissionAssignments: (current.commissionAssignments ?? []).map((item) => item.id === invitation.id ? { ...item, ...response } : item),
+        }));
+      }
+      setCommissionInvitationTarget(null);
+      setWorkerSignPin('');
+      setSignatureInk('');
+      setCommissionConsentChecked(false);
+      setNotice(taskRefreshError
+        ? `Sutikimas išsaugotas, bet protokolų užduočių atnaujinti nepavyko: ${taskRefreshError}`
+        : accept ? 'Sutikimas tapti komisijos nariu pasirašytas.' : 'Kvietimo atsisakyta.');
+    } catch (error) {
+      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
+      setCommissionActionError(error.message || 'Komisijos kvietimo atsakymo išsaugoti nepavyko.');
+    } finally {
+      setCommissionActionSubmitting(false);
+    }
+  };
+
+  const signProtocolCommissionTask = async (event) => {
+    event.preventDefault();
+    const task = protocolCommissionTaskTarget;
+    if (!task || !signatureInk) {
+      setCommissionActionError('Nupieškite parašą prieš pasirašydami protokolą.');
+      return;
+    }
+    setCommissionActionSubmitting(true);
+    setCommissionActionError('');
+    let uploadedSignature = null;
+    try {
+      if (cloudMode) {
+        uploadedSignature = await uploadSignatureDataUrl(task.organizationId, signatureInk);
+        const { data: signature, error } = await supabase.rpc('record_employee_protocol_commission_signature', {
+          input_assignment_id: task.assignmentId,
+          input_batch_id: task.batchId,
+          input_pin: workerSignPin,
+          input_signature_path: uploadedSignature.path,
+        });
+        if (error || !signature) throw new Error(error?.message || 'PIN kodas neteisingas arba per daug kartų bandyta.');
+        setData((current) => ({
+          ...current,
+          protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), { ...signature, signatureImage: uploadedSignature.signedUrl }],
+          commissionTasks: (current.commissionTasks ?? []).map((item) => item.assignmentId === task.assignmentId && item.batchId === task.batchId
+            ? { ...item, hasSigned: true, protocolCommissionSignatures: [...(item.protocolCommissionSignatures ?? []), { ...signature, signatureImage: uploadedSignature.signedUrl }] }
+            : item),
+        }));
+      } else {
+        if (workerSignPin !== currentEmployee?.pin) throw new Error('PIN kodas neteisingas.');
+        const signature = {
+          id: `protocol-commission-${crypto.randomUUID()}`,
+          orgId: task.organizationId,
+          batchId: task.batchId,
+          assignmentId: task.assignmentId,
+          employeeId: currentEmployee.id,
+          signer: currentEmployee.name,
+          role: task.role,
+          signatureMethod: 'PIN',
+          signedAt: new Date().toISOString(),
+          ip: '127.0.0.1 (demo)',
+          signatureImage: signatureInk,
+        };
+        setData((current) => ({
+          ...current,
+          protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), signature],
+          commissionTasks: (current.commissionTasks ?? []).filter((item) => item.assignmentId !== task.assignmentId || item.batchId !== task.batchId),
+        }));
+      }
+      setProtocolCommissionTaskTarget(null);
+      setWorkerSignPin('');
+      setSignatureInk('');
+      setNotice('Protokolas pasirašytas PIN kodu.');
+    } catch (error) {
+      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
+      setCommissionActionError(error.message || 'Protokolo parašo įrašyti nepavyko.');
+    } finally {
+      setCommissionActionSubmitting(false);
+    }
+  };
 
   const openAapIssueForm = (employee) => {
     if (!employee.resourceIds?.includes('res-aap')) {
@@ -1555,7 +1808,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+  const openResourcePreview = (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
     if (userRole === 'darbuotojas' && resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee)) {
       setActiveTab('aap');
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
@@ -1580,7 +1833,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
     const previewEmployees = [...activeEmployees, ...archivedEmployees].filter((employee) => !employeeId || employee.id === employeeId);
     const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && hasCurrentWorkerSignature(currentEmployee.id, resource.id));
-    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
+    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
     previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, data.signatures), resource.title);
     if (autoPrint) {
       printPdfHtml(previewDocument.printHtml, resource.title)
@@ -2116,6 +2369,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const saveCommissionPin = async (orgId, member, pin) => {
+    if (!cloudMode) {
+      updateOrg(orgId, (org) => ({ ...org, commissionPins: { ...org.commissionPins, [member]: pin } }));
+      setNotice(`Komisijos nario „${member}“ PIN nustatytas.`);
+      return true;
+    }
     const { error } = await supabase.rpc('set_commission_signer_pin', {
       input_organization_id: orgId,
       input_signer_name: member,
@@ -2265,10 +2523,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return resource && ['todo', 'started', 'unsigned', 'expired', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(employee, resource).key);
   }).length, 0) + dssTasks.filter((task) => task.orgId === currentOrg?.id).length;
   const notifications = userRole === 'darbuotojas'
-    ? pendingResourceIds.map((resourceId) => {
+    ? [
+      ...pendingResourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       return { id: resourceId, title: resource?.title ?? 'Priskirta užduotis', description: getTaskStatus(currentEmployee, resource).label, resource, employee: currentEmployee };
-    })
+      }),
+      ...pendingCommissionInvitations.map((invitation) => ({
+        id: `commission-invitation-${invitation.id}`,
+        title: 'Kvietimas į DSS komisiją',
+        description: `${invitation.organizationName} · ${invitation.role}`,
+        commissionInvitation: invitation,
+      })),
+      ...pendingCommissionTasks.map((task) => ({
+        id: `commission-task-${task.assignmentId}-${task.batchId}`,
+        title: `Pasirašyti protokolą · ${task.resourceTitle}`,
+        description: `${task.role} · protokolas Nr. ${task.batchNumber}`,
+        commissionTask: task,
+      })),
+    ]
     : userRole === 'dss'
       ? dssTasks.filter((task) => task.orgId === currentOrg?.id).map((task) => ({
         id: task.id,
@@ -2366,6 +2638,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     setNotice('');
                     if (userRole === 'darbuotojas') {
                       setActiveTab('uzduotys');
+                      if (item.commissionInvitation) {
+                        setCommissionInvitationTarget(item.commissionInvitation);
+                        setCommissionConsentChecked(false);
+                        setSignatureInk('');
+                        setWorkerSignPin('');
+                        setCommissionActionError('');
+                        return;
+                      }
+                      if (item.commissionTask) {
+                        setProtocolCommissionTaskTarget(item.commissionTask);
+                        setSignatureInk('');
+                        setWorkerSignPin('');
+                        setCommissionActionError('');
+                        return;
+                      }
                       setTaskFilter('visos');
                       if (item.resource) openResourcePreview(item.resource);
                     } else if (userRole === 'dss') {
@@ -2403,6 +2690,32 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </header>
         <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
+          {commissionInvitationTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-invitation-title">
+            <section className="my-auto max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4"><div><h2 id="commission-invitation-title" className="text-xl font-bold">Kvietimas į DSS komisiją</h2><p className="mt-1 text-sm text-slate-600">{commissionInvitationTarget.organizationName} · {commissionInvitationTarget.role}</p></div><button type="button" aria-label="Uždaryti kvietimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setCommissionInvitationTarget(null)}><X size={20} /></button></div>
+              <p className="mt-4 text-sm text-slate-700">Įmonė kviečia jus {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'atstovauti kaip DSS komisijos pirmininką' : 'atstovauti kaip DSS komisijos narį'}. Sutikę gausite pranešimus apie jums pasirašyti pateiktus protokolus.</p>
+              <label className="mt-4 flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={commissionConsentChecked} onChange={(event) => setCommissionConsentChecked(event.target.checked)} /><span>Patvirtinu, kad sutinku būti paskirtas(-a) {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'DSS komisijos pirmininku' : 'DSS komisijos nariu'}.</span></label>
+              <label className="mt-4 block text-sm font-medium">Sutikimo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
+              <label className="mt-4 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
+              <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => respondToCommissionInvitation(false)}>Atsisakyti kvietimo</button><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setCommissionInvitationTarget(null)}>Uždaryti</button><button type="button" className={buttonClass} disabled={commissionActionSubmitting || !commissionConsentChecked || !signatureInk || !/^\d{4}$/.test(workerSignPin)} onClick={() => respondToCommissionInvitation(true)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Sutikti ir pasirašyti'} <Check size={16} /></button></div>
+            </section>
+          </div>}
+          {protocolCommissionTaskTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-protocol-title">
+            <form onSubmit={signProtocolCommissionTask} className="my-auto max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4"><div><h2 id="commission-protocol-title" className="text-xl font-bold">Komisijos protokolo parašas</h2><p className="mt-1 text-sm text-slate-600">{protocolCommissionTaskTarget.resourceTitle} · protokolas Nr. {protocolCommissionTaskTarget.batchNumber}</p></div><button type="button" aria-label="Uždaryti pasirašymo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolCommissionTaskTarget(null)}><X size={20} /></button></div>
+              <p className="mt-3 text-sm text-slate-700">Jūsų parašas bus įrašytas vieną kartą visam protokolui jūsų, kaip {protocolCommissionTaskTarget.role.toLocaleLowerCase('lt')}, vardu.</p>
+              {protocolCommissionTaskTarget.employeeNames?.length > 0 && <p className="mt-2 text-sm text-slate-600">Darbuotojai: {protocolCommissionTaskTarget.employeeNames.join(', ')}</p>}
+              {(() => {
+                const resource = data.resources.find((item) => item.id === protocolCommissionTaskTarget.resourceId);
+                return resource && <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline" onClick={() => openResourcePreview(resource, { protocolBatchId: protocolCommissionTaskTarget.batchId, commissionAssignments: protocolCommissionTaskTarget.commissionAssignments, protocolCommissionSignatures: protocolCommissionTaskTarget.protocolCommissionSignatures })}><Eye size={16} />Peržiūrėti visą protokolą</button>;
+              })()}
+              <label className="mt-4 block text-sm font-medium">Protokolo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
+              <label className="mt-4 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
+              <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setProtocolCommissionTaskTarget(null)}>Atšaukti</button><button className={buttonClass} disabled={commissionActionSubmitting || !signatureInk || !/^\d{4}$/.test(workerSignPin)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Pasirašyti protokolą'} <FileSignature size={16} /></button></div>
+            </form>
+          </div>}
 
           {activeTab === 'skydelis' && (
             <section className="mx-auto w-full max-w-[1400px] space-y-6">
@@ -2411,6 +2724,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 : userRole === 'dss' ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div>
                   : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={orgEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => employee.medicalCertificateValidUntil && new Date(employee.medicalCertificateValidUntil).getTime() < validityCheckTime).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
+              {userRole === 'darbuotojas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos veiksmai">
+                <div className="space-y-3">
+                  {pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div><p className="font-semibold">Kvietimas · {invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">{invitation.role === 'Komisijos pirmininkas' ? 'Kviečiama tapti komisijos pirmininku.' : 'Kviečiama tapti DSS komisijos nariu.'}</p></div>
+                    <button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button>
+                  </div>)}
+                  {pendingCommissionTasks.map((task) => {
+                    const resource = data.resources.find((item) => item.id === task.resourceId);
+                    return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+                      <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
+                      <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti protokolą</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                    </div>;
+                  })}
+                  {completedCommissionTasks.map((task) => {
+                    const resource = data.resources.find((item) => item.id === task.resourceId);
+                    return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                      <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
+                      {resource && <button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-900" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti pasirašytą protokolą</button>}
+                    </div>;
+                  })}
+                </div>
+              </Panel>}
               {userRole === 'dss' && <Panel title="Prižiūrimos įmonės">
                 <div className="grid gap-4 md:grid-cols-2">
                   {data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).map((org) => <div className="rounded-md border border-slate-200 p-4" key={org.id}><h2 className="font-semibold">{org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><p className="mt-3 text-sm">{data.employees.filter((employee) => employee.orgId === org.id).length} darbuotojai</p><button className={`${buttonClass} mt-4`} onClick={() => { setSelectedOrgId(org.id); setActiveTab('zurnalai'); }}>Atidaryti įmonę <ArrowRight size={16} /></button></div>)}
@@ -2577,7 +2912,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
                 {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
-              <Panel title="DSS komisija"><p className="mb-3 text-xs text-slate-500">Kiekvienam komisijos nariui nustatykite atskirą PIN. Parašo įrašai bus registruojami nario vardu.</p>{commissionSigningTarget?.orgId === currentOrg?.id && <SignaturePad value={signatureInk} onChange={setSignatureInk} />}<CommissionEditor org={currentOrg} updateOrg={updateOrg} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => { setCommissionSigningTarget(null); setSignatureInk(''); }} /></Panel>
+              <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Pasirinkite įmonės darbuotoją ir paskirkite jį komisijos nariu arba pirmininku. Darbuotojas patvirtina kvietimą savo paskyroje, parašu ir asmeniniu PIN kodu.</p>{commissionSigningTarget?.orgId === currentOrg?.id && <SignaturePad value={signatureInk} onChange={setSignatureInk} />}<CommissionEditor org={currentOrg} employees={orgEmployees} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => { setCommissionSigningTarget(null); setSignatureInk(''); }} /></Panel>
               <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>
               <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>
             </div>
@@ -3104,6 +3439,64 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     });
   }
 
+  if (resource.templateKind === 'knowledge-assessment-protocol') {
+    const assignments = (resource.previewCommissionAssignments ?? [])
+      .filter((assignment) => assignment.status === 'accepted'
+        && (!resource.protocolBatchDate || (assignment.respondedAt && new Date(assignment.respondedAt).toISOString().slice(0, 10) <= resource.protocolBatchDate)))
+      .sort((left, right) => (left.role === 'Komisijos pirmininkas' ? -1 : 1) - (right.role === 'Komisijos pirmininkas' ? -1 : 1));
+    const batchSignatures = (resource.previewProtocolCommissionSignatures ?? [])
+      .filter((signature) => signature.batchId === resource.protocolBatchId);
+    const chair = assignments.find((assignment) => assignment.role === 'Komisijos pirmininkas');
+    const members = assignments.filter((assignment) => assignment.role === 'Komisijos narys');
+    const historicalSigners = batchSignatures
+      .filter((signature) => !assignments.some((assignment) => assignment.id === signature.assignmentId))
+      .map((signature) => ({ id: signature.assignmentId, employeeName: signature.signer, role: signature.role }));
+    const chairSigners = [...(chair ? [chair] : []), ...historicalSigners.filter((signer) => signer.role === 'Komisijos pirmininkas')];
+    const memberSigners = [...members, ...historicalSigners.filter((signer) => signer.role === 'Komisijos narys')];
+    const commissionLines = parsed.querySelectorAll('.commission-row .line');
+    if (commissionLines[0]) commissionLines[0].textContent = chair?.employeeName ?? '';
+    if (commissionLines[1]) commissionLines[1].textContent = members.map((assignment) => assignment.employeeName).join(', ');
+    if (commissionLines[2]) commissionLines[2].closest('.commission-row')?.remove();
+
+    const signatureRows = parsed.querySelectorAll('.signatures-section .sig-row');
+    const renderCommissionSignatures = (container, signers) => {
+      if (!container) return;
+      const content = container.querySelector('.sig-content');
+      if (!content) return;
+      content.replaceChildren();
+      signers.forEach((assignment) => {
+        const signature = batchSignatures.find((item) => item.assignmentId === assignment.id);
+        const pair = parsed.createElement('div');
+        pair.className = 'commission-signature-proof';
+        const name = parsed.createElement('strong');
+        name.textContent = assignment.employeeName;
+        pair.append(name);
+        if (signature?.signatureImage) {
+          const image = parsed.createElement('img');
+          image.src = signature.signatureImage;
+          image.alt = `${assignment.employeeName} parašas`;
+          image.className = 'signature-image';
+          pair.append(image);
+        } else {
+          const pending = parsed.createElement('span');
+          pending.textContent = 'Laukia parašo';
+          pair.append(pending);
+        }
+        if (signature?.signedAt) {
+          const audit = parsed.createElement('small');
+          audit.textContent = `${formatDate(signature.signedAt)} · ${signature.ip ?? 'IP nenurodytas'}`;
+          pair.append(audit);
+        }
+        content.append(pair);
+      });
+    };
+    renderCommissionSignatures(signatureRows[0], chairSigners);
+    renderCommissionSignatures(signatureRows[1], memberSigners);
+    const style = parsed.createElement('style');
+    style.textContent = '.commission-signature-proof{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:3px 0}.commission-signature-proof .signature-image{width:90px;height:30px;object-fit:contain}.commission-signature-proof small{font-size:8px;color:#64748b}';
+    parsed.head.append(style);
+  }
+
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function prepareResourcePrintHtml(html, title) {
@@ -3445,36 +3838,65 @@ function SubscriptionCard({ subscription, onAction }) {
   if (!subscription) return <p className="text-sm text-slate-500">Prenumerata nerasta.</p>;
   return <div><p className="text-lg font-bold">{subscription.plan} · {subscription.price} €/mėn.</p><p className="mt-1 text-sm text-slate-600">Būsena: {subscription.status} · iki {subscription.endsAt}</p><div className="mt-4 flex flex-wrap gap-2">{subscription.status === 'Aktyvi' ? <button className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800" onClick={() => onAction(subscription.id, 'cancel')}><X size={15} className="inline" />Atšaukti</button> : <button className={buttonClass} onClick={() => onAction(subscription.id, 'renew')}><RotateCcw size={15} />Pratęsti prenumeratą</button>}</div></div>;
 }
-function CommissionEditor({ org, updateOrg, cloudMode = false, commissionPinStatus = {}, onSetPin, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
-  const [name, setName] = useState('');
+function CommissionEditor({ org, employees = [], assignments = [], onInvite, onRevoke, cloudMode = false, commissionPinStatus = {}, onSetPin, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
+  const [employeeId, setEmployeeId] = useState('');
+  const [role, setRole] = useState('Komisijos narys');
+  const [error, setError] = useState('');
   const [pins, setPins] = useState({});
   const [confirmPins, setConfirmPins] = useState({});
-  const [error, setError] = useState('');
   if (!org) return null;
-  const savePin = async (event, member) => {
+  const activeAssignments = assignments.filter((assignment) => ['pending', 'accepted'].includes(assignment.status));
+  const visibleAssignments = assignments.filter((assignment) => assignment.status !== 'revoked');
+  const availableEmployees = employees.filter((employee) => !activeAssignments.some((assignment) => assignment.employeeId === employee.id));
+  const invite = async (event) => {
+    event.preventDefault();
+    if (!employeeId) {
+      setError('Pasirinkite darbuotoją.');
+      return;
+    }
+    const invited = await onInvite(employeeId, role);
+    if (invited) {
+      setEmployeeId('');
+      setError('');
+    } else {
+      setError('Kvietimo išsiųsti nepavyko. Patikrinkite pranešimą puslapio viršuje.');
+    }
+  };
+  const saveLegacyPin = async (event, member) => {
     event.preventDefault();
     if (!/^\d{4}$/.test(pins[member] ?? '') || pins[member] !== confirmPins[member]) {
       setError(`„${member}“ PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.`);
       return;
     }
-    if (cloudMode) {
-      const saved = await onSetPin(org.id, member, pins[member]);
-      if (!saved) return;
-    } else {
-      updateOrg(org.id, (current) => ({ ...current, commissionPins: { ...current.commissionPins, [member]: pins[member] } }));
+    if (await onSetPin(org.id, member, pins[member])) {
+      setPins((current) => ({ ...current, [member]: '' }));
+      setConfirmPins((current) => ({ ...current, [member]: '' }));
+      setError('');
     }
-    setPins((current) => ({ ...current, [member]: '' }));
-    setConfirmPins((current) => ({ ...current, [member]: '' }));
-    setError('');
   };
-  const addMember = (event) => {
-    event.preventDefault();
-    const nextName = name.trim();
-    if (!nextName || org.commission.includes(nextName)) return;
-    updateOrg(org.id, (current) => ({ ...current, commission: [...current.commission, nextName] }));
-    setName('');
-  };
-  return <div className="space-y-4">{org.commission.map((member) => <form className="space-y-2 border-b border-slate-100 pb-4" key={member} onSubmit={(event) => savePin(event, member)}><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{member}</span><span className="text-xs text-slate-500">{(cloudMode ? commissionPinStatus[member] : org.commissionPins?.[member]) ? 'PIN nustatytas' : 'PIN nenustatytas'}</span></div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><label className="text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label></div><button className={buttonClass}><LockKeyhole size={15} />Nustatyti PIN</button></form>)}{error && <p className="text-sm text-rose-700">{error}</p>}<form className="flex gap-2" onSubmit={addMember}><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Komisijos nario vardas" /><button className={buttonClass} aria-label="Pridėti komisijos narį"><Plus size={16} /></button></form>{signingTarget?.orgId === org.id && <form onSubmit={onSign} className="rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Komisijos nario parašas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}</div>;
+  const statusLabel = { pending: 'Laukia darbuotojo sutikimo', accepted: 'Aktyvus komisijos narys', declined: 'Kvietimo atsisakė', revoked: 'Paskyrimas atšauktas' };
+  return <div className="space-y-4">
+    <form className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={invite}>
+      <label className="text-sm font-medium">Darbuotojas<select className={`${inputClass} mt-1`} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required><option value="">Pasirinkite darbuotoją</option>{availableEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
+      <label className="text-sm font-medium">Komisijos pareigos<select className={`${inputClass} mt-1`} value={role} onChange={(event) => { setRole(event.target.value); setEmployeeId(''); }}><option value="Komisijos narys">Komisijos narys</option><option value="Komisijos pirmininkas" disabled={activeAssignments.some((assignment) => assignment.role === 'Komisijos pirmininkas')}>Komisijos pirmininkas</option></select></label>
+      <button className={`${buttonClass} self-end`} disabled={!availableEmployees.length}><UserPlus size={16} />Kviesti</button>
+    </form>
+    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+    {visibleAssignments.length ? <div className="divide-y divide-slate-100">{visibleAssignments.map((assignment) => <div key={assignment.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <div><p className="font-semibold">{assignment.employeeName} · {assignment.role}</p><p className={`mt-1 text-sm ${assignment.status === 'accepted' ? 'text-emerald-700' : 'text-amber-700'}`}>{statusLabel[assignment.status]}{assignment.invitedAt ? ` · ${new Date(assignment.invitedAt).toLocaleDateString('lt-LT')}` : ''}</p>{assignment.status === 'accepted' && assignment.consentSignatureMethod && <p className="mt-1 text-xs text-slate-500">Sutikimas pasirašytas PIN kodu{assignment.respondedAt ? ` · ${new Date(assignment.respondedAt).toLocaleString('lt-LT')}` : ''}</p>}{assignment.signatureImage && <img className="mt-2 h-8 w-28 rounded border border-slate-200 bg-white object-contain" src={assignment.signatureImage} alt={`${assignment.employeeName} sutikimo parašas`} />}</div>
+      {['pending', 'accepted'].includes(assignment.status) && <button type="button" className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50" onClick={() => onRevoke(assignment)}>Atšaukti paskyrimą</button>}
+    </div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">DSS komisijos nariai dar nepaskirti.</p>}
+    {!!org.commission?.length && <details className="rounded-lg border border-slate-200 p-4">
+      <summary className="cursor-pointer text-sm font-semibold">Senų dokumentų komisijos parašų PIN</summary>
+      <p className="mt-2 text-xs text-slate-500">Šis PIN valdymas paliktas senesniems dokumentams, kurių parašų eiga dar nėra susieta su darbuotojo komisijos paskyrimu. Naujų protokolų komisijos parašus darbuotojai tvirtina savo paskyrose.</p>
+      <div className="mt-3 space-y-3">{org.commission.map((member) => <form className="grid gap-2 border-b border-slate-100 pb-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" key={member} onSubmit={(event) => saveLegacyPin(event, member)}>
+        <div className="self-center text-sm font-semibold">{member}<small className="block font-normal text-slate-500">{(cloudMode ? commissionPinStatus[member] : org.commissionPins?.[member]) ? 'PIN nustatytas' : 'PIN nenustatytas'}</small></div>
+        <label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label>
+        <div className="flex items-end gap-2"><label className="min-w-0 flex-1 text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><button className={`${buttonClass} shrink-0`} aria-label={`Nustatyti ${member} PIN`}><LockKeyhole size={15} /></button></div>
+      </form>)}</div>
+      {signingTarget?.orgId === org.id && <form onSubmit={onSign} className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Senas komisijos parašo veiksmas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}
+    </details>}
+  </div>;
 }
 
 function getValidityUntil(months) {

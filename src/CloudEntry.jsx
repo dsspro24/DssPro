@@ -33,17 +33,19 @@ async function hydrateResourceAssets(resources = []) {
 
 async function hydrateWorkspaceAssets(workspace) {
   if (!workspace || typeof workspace !== 'object') return workspace;
-  const [resources, signatures, aapIssuances] = await Promise.all([
+  const [resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures] = await Promise.all([
     hydrateResourceAssets(workspace.resources ?? []),
     hydrateSignatureImages(workspace.signatures ?? []),
     hydrateSignatureImages(workspace.aapIssuances ?? []),
+    hydrateSignatureImages(workspace.commissionInvitations ?? []),
+    hydrateSignatureImages(workspace.protocolCommissionSignatures ?? []),
   ]);
   const archivedEmployees = await Promise.all((workspace.archivedEmployees ?? []).map(async (record) => ({
     ...record,
     resources: await hydrateResourceAssets(record.resources ?? []),
     signatures: await hydrateSignatureImages(record.signatures ?? []),
   })));
-  return { ...workspace, resources, signatures, aapIssuances, archivedEmployees };
+  return { ...workspace, resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures, archivedEmployees };
 }
 
 async function loadManagerWorkspace(user) {
@@ -156,6 +158,39 @@ async function loadManagerWorkspace(user) {
       await hydrateWorkspaceAssets(item.data),
     ]));
     const workspaceByOrganization = new Map(hydratedWorkspaces);
+    const commissionDataByOrganization = await Promise.all(organizationIds.map(async (organizationId) => {
+      const [
+        { data: assignments, error: assignmentsError },
+        { data: signatures, error: signaturesError },
+      ] = await Promise.all([
+        supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
+        supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
+      ]);
+      if (assignmentsError) throw assignmentsError;
+      if (signaturesError) throw signaturesError;
+      return [organizationId, assignments ?? [], signatures ?? []];
+    }));
+    const hydratedAssignments = await hydrateSignatureImages(commissionDataByOrganization.flatMap(([, assignments]) => assignments.map((assignment) => ({
+      ...assignment,
+      signaturePath: assignment.consentSignaturePath,
+    }))));
+    const hydratedProtocolSignatures = await hydrateSignatureImages(commissionDataByOrganization.flatMap(([, , signatures]) => signatures));
+    const assignmentsByOrganization = new Map();
+    const signaturesByOrganization = new Map();
+    hydratedAssignments.forEach((assignment) => {
+      const current = assignmentsByOrganization.get(assignment.organizationId) ?? [];
+      current.push(assignment);
+      assignmentsByOrganization.set(assignment.organizationId, current);
+    });
+    hydratedProtocolSignatures.forEach((signature) => {
+      const current = signaturesByOrganization.get(signature.orgId) ?? [];
+      current.push(signature);
+      signaturesByOrganization.set(signature.orgId, current);
+    });
+    for (const [organizationId, workspace] of workspaceByOrganization) {
+      workspace.commissionAssignments = assignmentsByOrganization.get(organizationId) ?? [];
+      workspace.protocolCommissionSignatures = signaturesByOrganization.get(organizationId) ?? [];
+    }
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const resourcesById = new Map();
     const organizations = organizationsResult.data.map((organization) => {
@@ -176,6 +211,8 @@ async function loadManagerWorkspace(user) {
         employees: [...workspaceByOrganization.values()].flatMap((item) => item?.employees ?? []),
         archivedEmployees: [],
         protocolBatches: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolBatches ?? []),
+        commissionAssignments: [...workspaceByOrganization.values()].flatMap((item) => item?.commissionAssignments ?? []),
+        protocolCommissionSignatures: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolCommissionSignatures ?? []),
         specialists: [{ id: user.id, name: managerName, email: user.email ?? '', status: 'Paskyra patvirtinta' }],
         signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
         resources: [...resourcesById.values()],
@@ -188,15 +225,34 @@ async function loadManagerWorkspace(user) {
   if (profile?.account_type === 'employee') {
     const employeeMembership = memberships.find((membership) => membership.role === 'employee');
     if (!employeeMembership) return { requiresEmployee: true, managerName };
-    const [{ data: employeeWorkspace, error: employeeWorkspaceError }, { data: aapIssuances, error: aapIssuancesError }] = await Promise.all([
+    const [
+      { data: employeeWorkspace, error: employeeWorkspaceError },
+      { data: aapIssuances, error: aapIssuancesError },
+      { data: commissionInvitations, error: commissionInvitationsError },
+      { data: commissionTasks, error: commissionTasksError },
+    ] = await Promise.all([
       supabase.rpc('get_employee_workspace'),
       supabase.rpc('get_employee_aap_issuances'),
+      supabase.rpc('get_employee_commission_invitations'),
+      supabase.rpc('get_employee_protocol_commission_tasks'),
     ]);
     if (employeeWorkspaceError) throw employeeWorkspaceError;
     if (aapIssuancesError) throw aapIssuancesError;
+    if (commissionInvitationsError) throw commissionInvitationsError;
+    if (commissionTasksError) throw commissionTasksError;
+    const hydratedCommissionTasks = await Promise.all((commissionTasks ?? []).map(async (task) => ({
+      ...task,
+      protocolCommissionSignatures: await hydrateSignatureImages(task.protocolCommissionSignatures ?? []),
+    })));
+    const employeeCommissionAssignments = [...new Map(hydratedCommissionTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id, assignment])).values()];
+    const employeeProtocolSignatures = [...new Map(hydratedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
     const employeeData = await hydrateWorkspaceAssets({
       ...employeeWorkspace.data,
       aapIssuances: aapIssuances ?? [],
+      commissionInvitations: commissionInvitations ?? [],
+      commissionTasks: hydratedCommissionTasks,
+      commissionAssignments: employeeCommissionAssignments,
+      protocolCommissionSignatures: employeeProtocolSignatures,
     });
     return {
       employee: true,
@@ -233,12 +289,27 @@ async function loadManagerWorkspace(user) {
   if (catalogResult.error) throw catalogResult.error;
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
+  const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
+    supabase.rpc('get_organization_commission_assignments', { input_organization_id: organization.id }),
+    supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organization.id }),
+  ]);
+  if (commissionAssignmentsError) throw commissionAssignmentsError;
+  if (protocolCommissionSignaturesError) throw protocolCommissionSignaturesError;
+  const hydratedCommissionAssignments = await hydrateSignatureImages((commissionAssignments ?? []).map((assignment) => ({
+    ...assignment,
+    signaturePath: assignment.consentSignaturePath,
+  })));
+  const hydratedManagerWorkspace = await hydrateWorkspaceAssets({
+    ...hydratedWorkspace,
+    commissionAssignments: hydratedCommissionAssignments,
+    protocolCommissionSignatures: protocolCommissionSignatures ?? [],
+  });
 
   return {
     organization,
     managerName,
     catalog: hydratedCatalog,
-    data: hydratedWorkspace,
+    data: hydratedManagerWorkspace,
   };
 }
 
