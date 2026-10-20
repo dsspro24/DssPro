@@ -2148,6 +2148,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const inviteEmployee = async (event) => {
     event.preventDefault();
+    const inviteDialog = event.currentTarget?.closest('dialog');
     const name = `${employeeForm.firstName.trim()} ${employeeForm.lastName.trim()}`.trim();
     const email = employeeForm.email.trim().toLowerCase();
     const contractNumber = employeeForm.contractNumber.trim();
@@ -2190,7 +2191,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployeeSearch('');
       setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
       setNotice(cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
-      event.currentTarget.closest('dialog')?.close();
+      inviteDialog?.close();
     } catch (error) {
       setNotice(`Darbuotojo pakviesti nepavyko: ${error.message || 'patikrinkite el. pašto siuntimo nustatymus.'}`);
     } finally {
