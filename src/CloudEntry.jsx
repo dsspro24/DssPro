@@ -230,16 +230,19 @@ async function loadManagerWorkspace(user) {
       { data: aapIssuances, error: aapIssuancesError },
       { data: commissionInvitations, error: commissionInvitationsError },
       { data: commissionTasks, error: commissionTasksError },
+      { data: employeeSequenceNumber, error: employeeSequenceNumberError },
     ] = await Promise.all([
       supabase.rpc('get_employee_workspace'),
       supabase.rpc('get_employee_aap_issuances'),
       supabase.rpc('get_employee_commission_invitations'),
       supabase.rpc('get_employee_protocol_commission_tasks'),
+      supabase.rpc('get_employee_sequence_number'),
     ]);
     if (employeeWorkspaceError) throw employeeWorkspaceError;
     if (aapIssuancesError) throw aapIssuancesError;
     if (commissionInvitationsError) throw commissionInvitationsError;
     if (commissionTasksError) throw commissionTasksError;
+    if (employeeSequenceNumberError) throw employeeSequenceNumberError;
     const hydratedCommissionTasks = await Promise.all((commissionTasks ?? []).map(async (task) => ({
       ...task,
       protocolCommissionSignatures: await hydrateSignatureImages(task.protocolCommissionSignatures ?? []),
@@ -248,6 +251,7 @@ async function loadManagerWorkspace(user) {
     const employeeProtocolSignatures = [...new Map(hydratedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
     const employeeData = await hydrateWorkspaceAssets({
       ...employeeWorkspace.data,
+      employees: employeeWorkspace.data.employees.map((employee) => ({ ...employee, sequenceNumber: employeeSequenceNumber })),
       aapIssuances: aapIssuances ?? [],
       commissionInvitations: commissionInvitations ?? [],
       commissionTasks: hydratedCommissionTasks,
@@ -264,6 +268,7 @@ async function loadManagerWorkspace(user) {
           ...resource,
           questions: (resource.questions ?? []).map((question) => {
             const safeQuestion = { ...question };
+            safeQuestion.multipleAnswers = Array.isArray(question.correctIndices) || question.multipleAnswers === true;
             delete safeQuestion.correctIndex;
             delete safeQuestion.correctIndices;
             return safeQuestion;

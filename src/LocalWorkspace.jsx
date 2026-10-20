@@ -823,6 +823,42 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return () => { active = false; };
   }, [cloudMode, selectedOrgId, userRole]);
 
+  useEffect(() => {
+    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshCommissionAssignments = async () => {
+      if (requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const { data: assignments, error } = await supabase.rpc('get_organization_commission_assignments', {
+          input_organization_id: selectedOrgId,
+        });
+        if (error) throw error;
+        if (active) {
+          setData((current) => ({
+            ...current,
+            commissionAssignments: [
+              ...(current.commissionAssignments ?? []).filter((assignment) => assignment.organizationId !== selectedOrgId),
+              ...(assignments ?? []),
+            ],
+          }));
+        }
+      } catch (error) {
+        if (active) setNotice(`Komisijos pranešimų atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    const intervalId = window.setInterval(refreshCommissionAssignments, 30_000);
+    document.addEventListener('visibilitychange', refreshCommissionAssignments);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshCommissionAssignments);
+    };
+  }, [cloudMode, selectedOrgId, userRole]);
+
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
@@ -1627,9 +1663,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     event.preventDefault();
     if (!resourceForm.title.trim() || resourceSaving || resourceFileUploading) return;
     const existingResource = data.resources.find((item) => item.id === editingResourceId);
-    const questions = draftQuestions.map((question) => ({ ...question, prompt: question.prompt.trim(), options: question.options.map((option) => option.trim()) }));
+    const questions = draftQuestions.map((question) => {
+      const cleanedQuestion = { ...question, prompt: question.prompt.trim(), options: question.options.map((option) => option.trim()) };
+      if (Array.isArray(question.correctIndices)) {
+        delete cleanedQuestion.correctIndex;
+        cleanedQuestion.correctIndices = question.correctIndices;
+      } else {
+        delete cleanedQuestion.correctIndices;
+      }
+      return cleanedQuestion;
+    });
     if (resourceForm.type === 'Testas' && (!questions.length || questions.some((question) => !question.prompt || question.options.some((option) => !option)))) {
       setNotice('Užpildykite kiekvieną testo klausimą ir abu atsakymo variantus.');
+      return;
+    }
+    if (resourceForm.type === 'Testas' && questions.some((question) => Array.isArray(question.correctIndices)
+      ? !question.correctIndices.length || question.correctIndices.some((answerIndex) => !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= question.options.length)
+      : !Number.isInteger(question.correctIndex) || question.correctIndex < 0 || question.correctIndex >= question.options.length)) {
+      setNotice('Pažymėkite bent vieną teisingą atsakymą kiekviename klausime.');
       return;
     }
     setResourceSaving(true);
@@ -1831,7 +1882,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const archivedEmployees = templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
       : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
-    const previewEmployees = [...activeEmployees, ...archivedEmployees].filter((employee) => !employeeId || employee.id === employeeId);
+    const organizationEmployees = [
+      ...data.employees.filter((item) => item.orgId === currentOrg?.id),
+      ...(data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id).map((item) => item.employee),
+    ];
+    const employeeSequenceNumbers = new Map(organizationEmployees.map((item, index) => [item.id, index + 1]));
+    const previewEmployees = [...activeEmployees, ...archivedEmployees]
+      .filter((person) => !employeeId || person.id === employeeId)
+      .map((person) => ({ ...person, sequenceNumber: person.sequenceNumber ?? employeeSequenceNumbers.get(person.id) ?? '' }));
     const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && hasCurrentWorkerSignature(currentEmployee.id, resource.id));
     const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
     previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, data.signatures), resource.title);
@@ -2550,6 +2608,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }))
       : userRole === 'vadovas'
         ? [
+          ...currentCommissionAssignments
+            .filter((assignment) => assignment.status === 'accepted' && assignment.respondedAt)
+            .map((assignment) => ({
+              id: `commission-accepted-${assignment.id}`,
+              title: 'Darbuotojas sutiko prisijungti prie komisijos',
+              description: `${assignment.employeeName} sutiko būti ${assignment.role === 'Komisijos pirmininkas' ? 'komisijos pirmininku' : 'DSS komisijos nariu'}.`,
+              commissionAcceptance: assignment,
+            })),
           ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).map((resourceId) => {
             const resource = data.resources.find((item) => item.id === resourceId);
             return resource && getTaskStatus(employee, resource).key === 'awaitingEmployer'
@@ -2631,7 +2697,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {notifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white">{notifications.length}</span>}
               </button>
               {notificationsOpen && <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><span className="text-xs text-slate-500">{notifications.length} laukia veiksmo</span></div>
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><span className="text-xs text-slate-500">{notifications.length} pranešimų</span></div>
                 {notifications.length ? <ul className="max-h-80 overflow-y-auto">{notifications.map((item) => <li key={item.id} className="border-b border-slate-100 last:border-0">
                   <button type="button" className="w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => {
                     setNotificationsOpen(false);
@@ -2666,6 +2732,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       }
                     } else if (userRole === 'vadovas' && item.employee && item.resource && item.commissionMember) {
                       requestCommissionSign(item.employee, item.resource, item.commissionMember);
+                    } else if (userRole === 'vadovas' && item.commissionAcceptance) {
+                      setActiveTab('imone');
                     } else if (userRole === 'vadovas' && item.employee && item.resource) {
                       requestEmployerSign(item.employee, item.resource);
                     }
@@ -3077,7 +3145,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {resourceForm.image && <img className="h-16 w-28 rounded-md object-cover" src={resourceForm.image} alt="Pasirinktas viršelis" />}
                 {resourceForm.html && <p className="self-center text-xs text-emerald-800">HTML paruoštas · {new DOMParser().parseFromString(resourceForm.html, 'text/html').body.textContent?.trim().slice(0, 90) || 'Tuščias dokumentas'}</p>}
                 <details className="rounded-lg border border-slate-200 p-3 md:col-span-2"><summary className="cursor-pointer text-sm font-semibold">Redaguoti HTML turinį</summary><label className="mt-3 block text-sm font-medium">HTML kodas<textarea className={`${inputClass} mt-1 min-h-64 font-mono text-xs`} spellCheck={false} value={resourceForm.html} onChange={(event) => setResourceForm((current) => ({ ...current, html: event.target.value }))} /></label></details>
-                {resourceForm.type === 'Testas' && <div className="space-y-3 rounded-lg border border-slate-200 p-4 md:col-span-2"><div className="flex items-center justify-between"><h3 className="font-semibold">Testo klausimai</h3><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" onClick={() => setDraftQuestions((current) => [...current, { prompt: '', options: ['', ''], correctIndex: 0 }])}>Pridėti klausimą</button></div>{draftQuestions.map((question, questionIndex) => <fieldset className="space-y-2 rounded-md bg-slate-50 p-3" key={questionIndex}><div className="flex items-center gap-2"><label className="flex-1 text-sm font-medium">Klausimas {questionIndex + 1}<input className={`${inputClass} mt-1`} required value={question.prompt} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, prompt: event.target.value } : item))} /></label>{draftQuestions.length > 1 && <button type="button" className="mt-5 text-sm text-rose-700" onClick={() => setDraftQuestions((current) => current.filter((_, index) => index !== questionIndex))}>Pašalinti</button>}</div><div className="grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <div className="flex items-center gap-2" key={optionIndex}><input type="radio" name={`correct-${questionIndex}`} aria-label={`Pažymėti atsakymą ${optionIndex + 1} kaip teisingą`} checked={question.correctIndex === optionIndex} onChange={() => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, correctIndex: optionIndex } : item))} /><input className={inputClass} required aria-label={`Klausimo ${questionIndex + 1} atsakymo variantas ${optionIndex + 1}`} value={option} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: item.options.map((answer, answerIndex) => answerIndex === optionIndex ? event.target.value : answer) } : item))} placeholder={`Atsakymas ${optionIndex + 1}`} /><span className="whitespace-nowrap text-xs">Teisingas</span></div>)}</div></fieldset>)}</div>}
+                {resourceForm.type === 'Testas' && <div className="space-y-3 rounded-lg border border-slate-200 p-4 md:col-span-2"><div className="flex items-center justify-between"><h3 className="font-semibold">Testo klausimai</h3><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" onClick={() => setDraftQuestions((current) => [...current, { prompt: '', options: ['', ''], correctIndex: 0 }])}>Pridėti klausimą</button></div>{draftQuestions.map((question, questionIndex) => { const multipleAnswers = Array.isArray(question.correctIndices); const correctIndices = multipleAnswers ? question.correctIndices : [question.correctIndex]; return <fieldset className="space-y-2 rounded-md bg-slate-50 p-3" key={questionIndex}><div className="flex items-center gap-2"><label className="flex-1 text-sm font-medium">Klausimas {questionIndex + 1}<input className={`${inputClass} mt-1`} required value={question.prompt} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, prompt: event.target.value } : item))} /></label>{draftQuestions.length > 1 && <button type="button" className="mt-5 text-sm text-rose-700" onClick={() => setDraftQuestions((current) => current.filter((_, index) => index !== questionIndex))}>Pašalinti</button>}</div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={multipleAnswers} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => {
+                  if (index !== questionIndex) return item;
+                  if (event.target.checked) return { ...item, correctIndices: Number.isInteger(item.correctIndex) ? [item.correctIndex] : [], correctIndex: undefined };
+                  const [correctIndex = 0] = item.correctIndices ?? [];
+                  const singleAnswerQuestion = { ...item, correctIndex };
+                  delete singleAnswerQuestion.correctIndices;
+                  return singleAnswerQuestion;
+                }))} />Klausime gali būti keli teisingi atsakymai</label>{multipleAnswers && <p className="text-xs text-slate-600">Pažymėkite visus teisingus variantus.</p>}<div className="grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <div className="flex items-center gap-2" key={optionIndex}><input type={multipleAnswers ? 'checkbox' : 'radio'} name={`correct-${questionIndex}`} aria-label={`Pažymėti atsakymą ${optionIndex + 1} kaip teisingą`} checked={correctIndices.includes(optionIndex)} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => {
+                    if (index !== questionIndex) return item;
+                    if (!multipleAnswers) return { ...item, correctIndex: optionIndex };
+                    const selected = item.correctIndices ?? [];
+                    return { ...item, correctIndices: event.target.checked ? [...new Set([...selected, optionIndex])] : selected.filter((answerIndex) => answerIndex !== optionIndex) };
+                  }))} /><input className={inputClass} required aria-label={`Klausimo ${questionIndex + 1} atsakymo variantas ${optionIndex + 1}`} value={option} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: item.options.map((answer, answerIndex) => answerIndex === optionIndex ? event.target.value : answer) } : item))} placeholder={`Atsakymas ${optionIndex + 1}`} /><span className="whitespace-nowrap text-xs">Teisingas</span></div>)}</div></fieldset>; })}</div>}
                 <div className="flex justify-end gap-2 md:col-span-2">{editingResourceId && <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={resourceSaving} onClick={resetResourceForm}>Atšaukti</button>}<button className={buttonClass} disabled={resourceSaving || resourceFileUploading}>{resourceSaving ? 'Išsaugoma…' : <>{editingResourceId ? <Check size={16} /> : <Plus size={16} />}{editingResourceId ? 'Išsaugoti pakeitimus' : 'Įtraukti į biblioteką'}</>}</button></div>
               </form>
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
@@ -3647,8 +3727,8 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   }).join('');
   const values = {
     '{{COMPANY_NAME}}': escapeHtml(companyName),
-    '{{CARD_NUMBER}}': escapeHtml(documentEmployee?.contractNumber ?? ''),
-    '{{REGISTER_NUMBER}}': escapeHtml(`${org?.companyCode ?? 'AAP'}-${documentEmployee?.contractNumber ?? employee?.id ?? ''}`),
+    '{{CARD_NUMBER}}': escapeHtml(employee?.sequenceNumber ?? ''),
+    '{{REGISTER_NUMBER}}': escapeHtml(`${org?.companyCode ?? 'AAP'}-${employee?.sequenceNumber ?? ''}`),
     '{{EMPLOYEE_FIRST_NAME}}': escapeHtml(employeeFirstName),
     '{{EMPLOYEE_LAST_NAME}}': escapeHtml(employeeLastName),
     '{{EMPLOYEE_NAME}}': escapeHtml(documentEmployee?.name ?? ''),
@@ -3697,10 +3777,10 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
 function buildQuizPreviewHtml(resource) {
-  const multipleAnswersAllowed = resource.questions.some((question) => Array.isArray(question.correctIndices));
+  const multipleAnswersAllowed = resource.questions.some((question) => Array.isArray(question.correctIndices) || question.multipleAnswers === true);
   const questionMarkup = resource.questions.map((question, index) => {
     const options = question.options.map((option) => `<li>${escapeHtml(option)}</li>`).join('');
-    const instruction = Array.isArray(question.correctIndices) ? '<p class="multi-answer">Pažymėkite visus teisingus variantus.</p>' : '';
+    const instruction = Array.isArray(question.correctIndices) || question.multipleAnswers === true ? '<p class="multi-answer">Pažymėkite visus teisingus variantus.</p>' : '';
     return `<section class="question"><h2>${index + 1}. ${escapeHtml(question.prompt)}</h2>${instruction}<ol type="a">${options}</ol></section>`;
   }).join('');
   const answerInstructions = multipleAnswersAllowed ? 'Kai kuriuose klausimuose gali būti keli teisingi variantai.' : 'Kiekviename klausime yra vienas teisingas variantas.';
@@ -3717,7 +3797,7 @@ function buildAapIssuanceHtml(issuance, employee, org) {
 function TestForm({ questions, answers, setAnswers, onSubmit }) {
   const [validationError, setValidationError] = useState('');
   const handleSubmit = (event) => {
-    if (questions.some((question, index) => Array.isArray(question.correctIndices) ? !answers[index]?.length : answers[index] === undefined)) {
+    if (questions.some((question, index) => Array.isArray(question.correctIndices) || question.multipleAnswers === true ? !answers[index]?.length : answers[index] === undefined)) {
       event.preventDefault();
       setValidationError('Pažymėkite atsakymą kiekviename klausime.');
       return;
@@ -3726,7 +3806,7 @@ function TestForm({ questions, answers, setAnswers, onSubmit }) {
     onSubmit(event);
   };
 
-  return <form className="space-y-4 rounded-lg bg-slate-50 p-4" onSubmit={handleSubmit}><div className="border-b border-slate-200 pb-3"><h3 className="font-semibold">Atsakykite į klausimus</h3><p className="mt-1 text-sm text-slate-600">Klausimuose gali būti vienas arba keli teisingi variantai. Išlaikymui reikia surinkti bent 80 %.</p></div>{questions.map((question, index) => { const multiple = Array.isArray(question.correctIndices); return <fieldset className="space-y-2" key={`${question.prompt}-${index}`}><legend className="text-sm font-semibold">{index + 1}. {question.prompt}</legend>{multiple && <p className="text-xs font-medium text-slate-600">Pažymėkite visus teisingus variantus.</p>}{question.options.map((option, optionIndex) => <label className="flex items-start gap-2 text-sm" key={optionIndex}><input type={multiple ? 'checkbox' : 'radio'} name={`answer-${index}`} value={optionIndex} checked={multiple ? (answers[index] ?? []).includes(String(optionIndex)) : answers[index] === String(optionIndex)} onChange={(event) => setAnswers((current) => {
+  return <form className="space-y-4 rounded-lg bg-slate-50 p-4" onSubmit={handleSubmit}><div className="border-b border-slate-200 pb-3"><h3 className="font-semibold">Atsakykite į klausimus</h3><p className="mt-1 text-sm text-slate-600">Klausimuose gali būti vienas arba keli teisingi variantai. Išlaikymui reikia surinkti bent 80 %.</p></div>{questions.map((question, index) => { const multiple = Array.isArray(question.correctIndices) || question.multipleAnswers === true; return <fieldset className="space-y-2" key={`${question.prompt}-${index}`}><legend className="text-sm font-semibold">{index + 1}. {question.prompt}</legend>{multiple && <p className="text-xs font-medium text-slate-600">Pažymėkite visus teisingus variantus.</p>}{question.options.map((option, optionIndex) => <label className="flex items-start gap-2 text-sm" key={optionIndex}><input type={multiple ? 'checkbox' : 'radio'} name={`answer-${index}`} value={optionIndex} checked={multiple ? (answers[index] ?? []).includes(String(optionIndex)) : answers[index] === String(optionIndex)} onChange={(event) => setAnswers((current) => {
       if (!multiple) return { ...current, [index]: event.target.value };
       const selected = current[index] ?? [];
       return { ...current, [index]: event.target.checked ? [...new Set([...selected, event.target.value])] : selected.filter((answer) => answer !== event.target.value) };
