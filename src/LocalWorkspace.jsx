@@ -648,6 +648,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
   const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'] });
   const [resourceFileUploading, setResourceFileUploading] = useState(false);
+  const [resourceSaving, setResourceSaving] = useState(false);
   const [editingResourceId, setEditingResourceId] = useState(null);
   const [protocolSource, setProtocolSource] = useState(null);
   const [protocolTitle, setProtocolTitle] = useState('');
@@ -1371,26 +1372,57 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const addResource = async (event) => {
     event.preventDefault();
-    if (!resourceForm.title.trim()) return;
+    if (!resourceForm.title.trim() || resourceSaving || resourceFileUploading) return;
+    const existingResource = data.resources.find((item) => item.id === editingResourceId);
     const questions = draftQuestions.map((question) => ({ ...question, prompt: question.prompt.trim(), options: question.options.map((option) => option.trim()) }));
     if (resourceForm.type === 'Testas' && (!questions.length || questions.some((question) => !question.prompt || question.options.some((option) => !option)))) {
       setNotice('Užpildykite kiekvieną testo klausimą ir abu atsakymo variantus.');
       return;
     }
-    const resource = { ...data.resources.find((item) => item.id === editingResourceId), ...resourceForm, id: editingResourceId ?? `res-${Date.now()}`, title: resourceForm.title.trim(), category: resourceForm.category.trim() || resourceTypeDisplayNames[resourceForm.type], validityMonths: Number(resourceForm.validityMonths) || 12, questions: resourceForm.type === 'Testas' ? questions : [], signatures: true };
-    if (cloudMode && userRole === 'kurejas') {
-      const { error } = await supabase.rpc('save_creator_resource', {
-        input_resource: resourceForDatabase(resource),
-        input_resource_types: data.resourceTypes,
-      });
-      if (error) {
-        setNotice(`Šablono išsaugoti nepavyko: ${error.message}`);
-        return;
+    setResourceSaving(true);
+    let uploadedHtmlPath = null;
+    try {
+      let htmlUrl = resourceForm.html.trim() ? resourceForm.htmlUrl : '';
+      if (cloudMode && userRole === 'kurejas' && resourceForm.html.trim()
+        && resourceForm.html !== existingResource?.html
+        && htmlUrl === (existingResource?.htmlUrl ?? '')) {
+        const htmlFile = new File([resourceForm.html], `${editingResourceId ?? 'resource'}.html`, { type: 'text/html' });
+        const uploadedHtml = await uploadCreatorAsset(htmlFile);
+        htmlUrl = uploadedHtml.publicUrl;
+        uploadedHtmlPath = uploadedHtml.path;
       }
+      const resource = {
+        ...existingResource,
+        ...resourceForm,
+        htmlUrl,
+        id: editingResourceId ?? `res-${Date.now()}`,
+        title: resourceForm.title.trim(),
+        category: resourceForm.category.trim() || resourceTypeDisplayNames[resourceForm.type],
+        validityMonths: Number(resourceForm.validityMonths) || 12,
+        questions: resourceForm.type === 'Testas' ? questions : [],
+        signatures: true,
+      };
+      if (cloudMode && userRole === 'kurejas') {
+        const { error } = await supabase.rpc('save_creator_resource', {
+          input_resource: resourceForDatabase(resource),
+          input_resource_types: data.resourceTypes,
+        });
+        if (error) throw error;
+      }
+      setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
+      setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');
+      resetResourceForm();
+    } catch (error) {
+      if (uploadedHtmlPath) {
+        const { error: cleanupError } = await supabase.storage.from('dsspro-assets').remove([uploadedHtmlPath]);
+        if (cleanupError) setNotice(`Šablono išsaugoti nepavyko: ${error.message}. Įkeltą failą pašalinti nepavyko: ${cleanupError.message}`);
+        else setNotice(`Šablono išsaugoti nepavyko: ${error.message}`);
+      } else {
+        setNotice(`Šablono išsaugoti nepavyko: ${error.message}`);
+      }
+    } finally {
+      setResourceSaving(false);
     }
-    setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
-    setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');
-    resetResourceForm();
   };
 
   const deleteCreatorResource = async (resource) => {
@@ -2711,7 +2743,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {resourceForm.html && <p className="self-center text-xs text-emerald-800">HTML paruoštas · {new DOMParser().parseFromString(resourceForm.html, 'text/html').body.textContent?.trim().slice(0, 90) || 'Tuščias dokumentas'}</p>}
                 <details className="rounded-lg border border-slate-200 p-3 md:col-span-2"><summary className="cursor-pointer text-sm font-semibold">Redaguoti HTML turinį</summary><label className="mt-3 block text-sm font-medium">HTML kodas<textarea className={`${inputClass} mt-1 min-h-64 font-mono text-xs`} spellCheck={false} value={resourceForm.html} onChange={(event) => setResourceForm((current) => ({ ...current, html: event.target.value }))} /></label></details>
                 {resourceForm.type === 'Testas' && <div className="space-y-3 rounded-lg border border-slate-200 p-4 md:col-span-2"><div className="flex items-center justify-between"><h3 className="font-semibold">Testo klausimai</h3><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" onClick={() => setDraftQuestions((current) => [...current, { prompt: '', options: ['', ''], correctIndex: 0 }])}>Pridėti klausimą</button></div>{draftQuestions.map((question, questionIndex) => <fieldset className="space-y-2 rounded-md bg-slate-50 p-3" key={questionIndex}><div className="flex items-center gap-2"><label className="flex-1 text-sm font-medium">Klausimas {questionIndex + 1}<input className={`${inputClass} mt-1`} required value={question.prompt} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, prompt: event.target.value } : item))} /></label>{draftQuestions.length > 1 && <button type="button" className="mt-5 text-sm text-rose-700" onClick={() => setDraftQuestions((current) => current.filter((_, index) => index !== questionIndex))}>Pašalinti</button>}</div><div className="grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <div className="flex items-center gap-2" key={optionIndex}><input type="radio" name={`correct-${questionIndex}`} aria-label={`Pažymėti atsakymą ${optionIndex + 1} kaip teisingą`} checked={question.correctIndex === optionIndex} onChange={() => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, correctIndex: optionIndex } : item))} /><input className={inputClass} required aria-label={`Klausimo ${questionIndex + 1} atsakymo variantas ${optionIndex + 1}`} value={option} onChange={(event) => setDraftQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: item.options.map((answer, answerIndex) => answerIndex === optionIndex ? event.target.value : answer) } : item))} placeholder={`Atsakymas ${optionIndex + 1}`} /><span className="whitespace-nowrap text-xs">Teisingas</span></div>)}</div></fieldset>)}</div>}
-                <div className="flex justify-end gap-2 md:col-span-2">{editingResourceId && <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={resetResourceForm}>Atšaukti</button>}<button className={buttonClass}>{editingResourceId ? <Check size={16} /> : <Plus size={16} />}{editingResourceId ? 'Išsaugoti pakeitimus' : 'Įtraukti į biblioteką'}</button></div>
+                <div className="flex justify-end gap-2 md:col-span-2">{editingResourceId && <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={resourceSaving} onClick={resetResourceForm}>Atšaukti</button>}<button className={buttonClass} disabled={resourceSaving || resourceFileUploading}>{resourceSaving ? 'Išsaugoma…' : <>{editingResourceId ? <Check size={16} /> : <Plus size={16} />}{editingResourceId ? 'Išsaugoti pakeitimus' : 'Įtraukti į biblioteką'}</>}</button></div>
               </form>
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
             </Panel>
