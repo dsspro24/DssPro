@@ -164,6 +164,13 @@ const hasSavedAapSizes = (employee) => Boolean(employee?.aapCompleted) && hasCom
 const pinSignedStatusLabel = 'Pasirašyta PIN kodu';
 const protocolBatchCapacity = 15;
 const toLocalDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const getMedicalCertificateReminderDate = (validUntil) => {
+  if (!validUntil || !/^\d{4}-\d{2}-\d{2}$/.test(validUntil)) return '';
+  const date = new Date(`${validUntil}T12:00:00`);
+  if (Number.isNaN(date.getTime()) || toLocalDateKey(date) !== validUntil) return '';
+  date.setDate(date.getDate() - 14);
+  return toLocalDateKey(date);
+};
 const formatProtocolDate = (dateKey) => dateKey ? new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${dateKey}T12:00:00`)) : '';
 const isDateExpired = (value, now) => {
   if (!value) return false;
@@ -516,7 +523,7 @@ const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
-  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['paskyros', 'Įmonės ir paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
+  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
 
 function loadData() {
@@ -594,12 +601,31 @@ const signerRoleOptions = [
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], creatorWorkspaces = {}, onCreatorPreview = () => {}, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
-    const workspaceData = initialCloudData
+    const loadedData = initialCloudData
       ? { ...initialData, ...initialCloudData }
       : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData();
+    const workspaceData = {
+      ...loadedData,
+      organizations: (loadedData.organizations ?? []).map((organization) => ({
+        ...initialData.organizations[0],
+        ...organization,
+        commission: organization.commission ?? [],
+        commissionPins: organization.commissionPins ?? {},
+        dss: organization.dss ?? [],
+        dssInvitations: organization.dssInvitations ?? [],
+        employeeAssignmentPresets: organization.employeeAssignmentPresets ?? [],
+        resourceSettings: organization.resourceSettings ?? {},
+        resources: organization.resources ?? [],
+        aapItems: organization.aapItems ?? defaultAapItems,
+      })),
+      employees: loadedData.employees.map((employee) => ({
+        ...employee,
+        medicalCertificateReminderDate: getMedicalCertificateReminderDate(employee.medicalCertificateValidUntil),
+      })),
+    };
     if (!cloudMode || !creatorCatalog) return workspaceData;
 
     const resourcesById = new Map(workspaceData.resources.map((resource) => [resource.id, resource]));
@@ -618,6 +644,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
   const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? 'org-statybu');
+  const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
+  const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const [notice, setNotice] = useState('');
@@ -627,6 +655,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
+  const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
+  const [creatorOrganizationPage, setCreatorOrganizationPage] = useState(1);
+  const [creatorAccountPage, setCreatorAccountPage] = useState(1);
   const [employeeSort, setEmployeeSort] = useState({ key: 'resource-type:Kortelė', direction: 'asc' });
   const [employeePage, setEmployeePage] = useState(1);
   const [employeeDetailsId, setEmployeeDetailsId] = useState(null);
@@ -648,6 +680,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [protocolPage, setProtocolPage] = useState(1);
   const [reportTestTargetId, setReportTestTargetId] = useState(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [employeeAssignmentSaving, setEmployeeAssignmentSaving] = useState(false);
   const [employeeResourceDraft, setEmployeeResourceDraft] = useState([]);
   const [employeeSignerDraft, setEmployeeSignerDraft] = useState({});
   const [taskFilter, setTaskFilter] = useState('atliktinos');
@@ -671,8 +704,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [draftQuestions, setDraftQuestions] = useState([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   const [previewResource, setPreviewResource] = useState(null);
   const creatorSaveQueue = useRef(Promise.resolve());
+  const workspaceAutosaveTimeoutRef = useRef(null);
+  const workspaceAutosaveRequestRef = useRef(Promise.resolve());
+  const skipNextWorkspaceAutosaveRef = useRef(false);
+  const employeeAssignmentRpcInFlightRef = useRef(false);
   const previewFrameRef = useRef(null);
   const archiveDownloadModeRef = useRef(null);
+  const resourceHtmlCacheRef = useRef(new Map());
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [readConfirmed, setReadConfirmed] = useState(false);
@@ -714,9 +752,47 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [previewResource]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setValidityCheckTime(Date.now()), 60_000);
-    return () => window.clearInterval(intervalId);
-  }, []);
+    const now = new Date();
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeoutId = window.setTimeout(() => setValidityCheckTime(Date.now()), nextMidnight.getTime() - now.getTime());
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') setValidityCheckTime(Date.now());
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [validityCheckTime]);
+
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'dss' || !onLoadDssOrganization || !selectedOrgId) return undefined;
+    let active = true;
+    onLoadDssOrganization(selectedOrgId).then(({ organization, data: organizationData }) => {
+      if (!active) return;
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((item) => item.id === selectedOrgId ? organization : item),
+        employees: (organizationData.employees ?? []).map((employee) => ({
+          ...employee,
+          medicalCertificateReminderDate: getMedicalCertificateReminderDate(employee.medicalCertificateValidUntil),
+        })),
+        archivedEmployees: organizationData.archivedEmployees ?? [],
+        protocolBatches: organizationData.protocolBatches ?? [],
+        commissionAssignments: organizationData.commissionAssignments ?? [],
+        protocolCommissionSignatures: organizationData.protocolCommissionSignatures ?? [],
+        signatures: organizationData.signatures ?? [],
+        resources: organizationData.resources ?? current.resources,
+      }));
+      setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'ready', error: '' });
+    }).catch((error) => {
+      if (!active) return;
+      setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'error', error: error.message });
+    });
+    return () => { active = false; };
+  }, [cloudMode, userRole, onLoadDssOrganization, selectedOrgId, dssWorkspaceLoadAttempt]);
 
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
@@ -781,17 +857,48 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const organization = data.organizations.find((item) => item.id === selectedOrgId);
     if (!organization) return undefined;
 
-    const timeout = window.setTimeout(async () => {
-      const { error } = await supabase.from('organization_data').upsert({
-        organization_id: organization.id,
-        data: workspaceForDatabase(data),
-        updated_by: cloudUserId,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'organization_id' });
-      if (error) setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
-    }, 500);
+    if (skipNextWorkspaceAutosaveRef.current) {
+      skipNextWorkspaceAutosaveRef.current = false;
+      return undefined;
+    }
 
-    return () => window.clearTimeout(timeout);
+    const saveWorkspaceSnapshot = async () => {
+      if (employeeAssignmentRpcInFlightRef.current) {
+        workspaceAutosaveTimeoutRef.current = window.setTimeout(saveWorkspaceSnapshot, 500);
+        return;
+      }
+      if (skipNextWorkspaceAutosaveRef.current) {
+        workspaceAutosaveTimeoutRef.current = null;
+        return;
+      }
+      workspaceAutosaveTimeoutRef.current = null;
+      const saveRequest = supabase.from('organization_data').upsert({
+          organization_id: organization.id,
+          data: workspaceForDatabase(data),
+          updated_by: cloudUserId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'organization_id' });
+      workspaceAutosaveRequestRef.current = Promise.resolve(saveRequest)
+        .then(({ error }) => {
+          if (error) {
+            setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
+            return error;
+          }
+          return null;
+        })
+        .catch((error) => {
+          setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
+          return error;
+        });
+      await workspaceAutosaveRequestRef.current;
+    };
+    const timeout = window.setTimeout(saveWorkspaceSnapshot, 500);
+    workspaceAutosaveTimeoutRef.current = timeout;
+
+    return () => {
+      window.clearTimeout(timeout);
+      if (workspaceAutosaveTimeoutRef.current === timeout) workspaceAutosaveTimeoutRef.current = null;
+    };
   }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview]);
 
   useLayoutEffect(() => {
@@ -907,13 +1014,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .filter(Boolean));
   const pendingCommissionTasks = commissionProtocolTasks.filter((task) => !task.hasSigned);
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
-  const currentCommissionAssignments = (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id);
-  const orgEmployees = data.employees.filter((employee) => employee.orgId === currentOrg?.id);
-  const archivedOrgEmployees = (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id);
+  const currentCommissionAssignments = useMemo(() => (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id), [data.commissionAssignments, currentOrg?.id]);
+  const orgEmployees = useMemo(() => data.employees.filter((employee) => employee.orgId === currentOrg?.id), [data.employees, currentOrg?.id]);
+  const archivedOrgEmployees = useMemo(() => (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id), [data.archivedEmployees, currentOrg?.id]);
   const archiveDetailRecord = archivedOrgEmployees.find((record) => record.id === archiveDetailsId);
-  const reportEmployees = [...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)];
-  const selectedOrgResources = data.resources.filter((resource) => currentOrg?.resources.includes(resource.id));
-  const reportSignatures = data.signatures.filter((signature) => signature.orgId === currentOrg?.id && currentOrg?.resources.includes(signature.resourceId) && (reportTypeFilter === 'visos' || data.resources.find((resource) => resource.id === signature.resourceId)?.type === reportTypeFilter));
+  const reportEmployees = useMemo(() => [...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)], [orgEmployees, archivedOrgEmployees]);
+  const selectedOrgResources = useMemo(() => data.resources.filter((resource) => currentOrg?.resources.includes(resource.id)), [data.resources, currentOrg?.resources]);
+  const reportSignatures = useMemo(() => data.signatures.filter((signature) => signature.orgId === currentOrg?.id && currentOrg?.resources.includes(signature.resourceId) && (reportTypeFilter === 'visos' || data.resources.find((resource) => resource.id === signature.resourceId)?.type === reportTypeFilter)), [data.signatures, currentOrg?.id, currentOrg?.resources, reportTypeFilter, data.resources]);
   const reportResourceGroups = ['Žurnalas', 'Kortelė', 'Protokolas']
     .filter((type) => reportTypeFilter === 'visos' || reportTypeFilter === type)
     .map((type) => ({
@@ -926,10 +1033,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const reportJournalGroups = reportResourceGroups.filter((group) => group.type === 'Žurnalas');
   const reportCardGroups = reportResourceGroups.filter((group) => group.type === 'Kortelė');
   const reportAapResource = selectedOrgResources.find((resource) => resource.id === 'res-aap');
-  const reportAapEmployees = reportEmployees.filter((employee) => employee.resourceIds?.includes('res-aap'));
-  const filteredReportAapEmployees = reportAapEmployees
+  const reportAapEmployees = useMemo(() => reportEmployees.filter((employee) => employee.resourceIds?.includes('res-aap')), [reportEmployees]);
+  const filteredReportAapEmployees = useMemo(() => reportAapEmployees
     .filter((employee) => `${employee.name} ${employee.contractNumber ?? ''} ${employee.position ?? ''}`.toLocaleLowerCase('lt').includes(reportAapSearch.trim().toLocaleLowerCase('lt')))
-    .sort((left, right) => left.name.localeCompare(right.name, 'lt'));
+    .sort((left, right) => left.name.localeCompare(right.name, 'lt')), [reportAapEmployees, reportAapSearch]);
   const protocolResources = selectedOrgResources.filter((resource) => resource.templateKind === 'knowledge-assessment-protocol');
   const visibleProtocolBatches = (data.protocolBatches ?? [])
     .filter((batch) => batch.orgId === currentOrg?.id)
@@ -969,9 +1076,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => employee.name).join(', ')}>{listedEmployees.map((employee) => employee.name).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">{signedCount} / {employees.length} pasirašė PIN kodu</small></span>, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
-  const reportTestResults = reportEmployees.flatMap((employee) => (employee.testResults ?? []).map((result) => ({ employee, result, resource: data.resources.find((resource) => resource.id === result.resourceId) })))
+  const reportTestResults = useMemo(() => {
+    if (activeTab !== 'ataskaitos') return [];
+    return reportEmployees.flatMap((employee) => (employee.testResults ?? []).map((result) => ({ employee, result, resource: data.resources.find((resource) => resource.id === result.resourceId) })))
     .filter(({ employee, resource }) => resource?.type === 'Testas' && currentOrg?.resources.includes(resource.id) && employee.resourceIds?.includes(resource.id))
     .sort((left, right) => new Date(right.result.completedAt) - new Date(left.result.completedAt));
+  }, [activeTab, reportEmployees, data.resources, currentOrg?.resources]);
   const reportTestResources = selectedOrgResources.filter((resource) => resource.type === 'Testas' && (reportTypeFilter === 'visos' || reportTypeFilter === 'Testas'));
   const reportTestTarget = reportTestResources.find((resource) => resource.id === reportTestTargetId);
   const selectedTestResults = reportTestResults.filter(({ resource }) => resource.id === reportTestTarget?.id);
@@ -1049,10 +1159,38 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (employee.status === 'Pakviestas') return { label: 'Pakviestas', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     return { label: 'Nepriskirta', cls: 'bg-slate-100 text-slate-600', Icon: CircleAlert };
   };
-  const searchedOrgEmployees = orgEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt')));
-  const filteredOrgEmployees = searchedOrgEmployees;
+  const filteredOrgEmployees = useMemo(() => orgEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'))), [orgEmployees, employeeSearch]);
   const employeePageCount = Math.max(1, Math.ceil(filteredOrgEmployees.length / employeePageSize));
   const currentEmployeePage = Math.min(employeePage, employeePageCount);
+  const creatorMembershipsByOrg = useMemo(() => {
+    const membershipsByOrg = new Map();
+    for (const account of creatorAccounts) {
+      for (const membership of account.organizations ?? []) {
+        const memberships = membershipsByOrg.get(membership.id) ?? [];
+        memberships.push({ ...account, membership });
+        membershipsByOrg.set(membership.id, memberships);
+      }
+    }
+    return membershipsByOrg;
+  }, [creatorAccounts]);
+  const creatorOrganizations = useMemo(() => data.organizations
+    .filter((organization) => `${organization.name} ${organization.companyCode ?? ''}`.toLocaleLowerCase('lt').includes(creatorOrganizationSearch.trim().toLocaleLowerCase('lt')))
+    .map((organization) => {
+      const memberships = creatorMembershipsByOrg.get(organization.id) ?? [];
+      return {
+        organization,
+        managers: memberships.filter((account) => account.membership.role === 'manager'),
+        specialists: memberships.filter((account) => account.membership.role === 'dss_specialist'),
+      };
+    }), [data.organizations, creatorOrganizationSearch, creatorMembershipsByOrg]);
+  const creatorAccountsFiltered = useMemo(() => creatorAccounts
+    .filter((account) => `${account.fullName ?? ''} ${account.email ?? ''} ${account.accountType ?? ''} ${(account.organizations ?? []).map((organization) => organization.name).join(' ')}`.toLocaleLowerCase('lt').includes(creatorAccountSearch.trim().toLocaleLowerCase('lt'))), [creatorAccounts, creatorAccountSearch]);
+  const creatorOrganizationPageSize = 20;
+  const creatorOrganizationPageCount = Math.max(1, Math.ceil(creatorOrganizations.length / creatorOrganizationPageSize));
+  const paginatedCreatorOrganizations = creatorOrganizations.slice((creatorOrganizationPage - 1) * creatorOrganizationPageSize, creatorOrganizationPage * creatorOrganizationPageSize);
+  const creatorAccountPageSize = 20;
+  const creatorAccountPageCount = Math.max(1, Math.ceil(creatorAccountsFiltered.length / creatorAccountPageSize));
+  const paginatedCreatorAccounts = creatorAccountsFiltered.slice((creatorAccountPage - 1) * creatorAccountPageSize, creatorAccountPage * creatorAccountPageSize);
   const getDashboardSortValue = (employee, key) => {
     if (key === 'medical') return employee.medicalCertificateValidUntil ? new Date(employee.medicalCertificateValidUntil).getTime() : null;
     if (key === 'status') return ({ atlikta: 0, vyksta: 1, truksta: 2, nepriskirta: 3 })[getEmployeeStatusFilter(employee)];
@@ -1089,15 +1227,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const matchesSearch = `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(librarySearch.trim().toLocaleLowerCase('lt'));
     return matchesType && matchesSearch;
   });
-  const dssTasks = data.signatures.filter((signature) => {
-    const resource = data.resources.find((item) => item.id === signature.resourceId);
-    const org = data.organizations.find((item) => item.id === signature.orgId);
-    const employee = data.employees.find((item) => item.id === signature.employeeId);
-    const assignedSpecialist = org?.dss.includes(selectedSpecialistId);
-    const requiresDss = resource ? getRequiredSigners(resource, org, employee).includes('DSS specialistas') : false;
-    const hasDssAfterWorker = data.signatures.some((item) => item.employeeId === signature.employeeId && item.resourceId === signature.resourceId && item.role === 'DSS specialistas' && signatureIsCurrent(item) && new Date(item.signedAt) >= new Date(signature.signedAt));
-    return assignedSpecialist && requiresDss && signature.role === 'Darbuotojas' && signatureIsCurrent(signature) && !hasDssAfterWorker;
-  });
+  const dssTasks = useMemo(() => {
+    const latestDssSignatureByTask = new Map();
+    for (const signature of data.signatures) {
+      if (signature.orgId !== currentOrg?.id || signature.role !== 'DSS specialistas' || (signature.validUntil && new Date(signature.validUntil).getTime() < validityCheckTime)) continue;
+      const key = JSON.stringify([signature.employeeId, signature.resourceId]);
+      const signedAt = new Date(signature.signedAt).getTime();
+      latestDssSignatureByTask.set(key, Math.max(latestDssSignatureByTask.get(key) ?? -Infinity, signedAt));
+    }
+    return data.signatures.filter((signature) => {
+      if (signature.orgId !== currentOrg?.id || signature.role !== 'Darbuotojas' || (signature.validUntil && new Date(signature.validUntil).getTime() < validityCheckTime)) return false;
+      const resource = data.resources.find((item) => item.id === signature.resourceId);
+      const employee = data.employees.find((item) => item.id === signature.employeeId);
+      const assignedSpecialist = currentOrg?.dss.includes(selectedSpecialistId);
+      const requiresDss = resource ? getRequiredSigners(resource, currentOrg, employee).includes('DSS specialistas') : false;
+      const latestDssSignedAt = latestDssSignatureByTask.get(JSON.stringify([signature.employeeId, signature.resourceId]));
+      return assignedSpecialist && requiresDss && !(latestDssSignedAt >= new Date(signature.signedAt).getTime());
+    });
+  }, [data.signatures, data.resources, data.employees, currentOrg, selectedSpecialistId, validityCheckTime]);
   const currentDssTasks = dssTasks.filter((task) => task.orgId === currentOrg?.id);
   const filteredSpecialists = useMemo(() => {
     const query = specialistQuery.trim().toLocaleLowerCase('lt');
@@ -1652,7 +1799,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setDraftQuestions([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   };
 
-  const editResource = (resource) => {
+  const getResourceWithHtml = async (resource) => {
+    if (resource.html || !resource.htmlUrl) return resource;
+    const cached = resourceHtmlCacheRef.current.get(resource.id);
+    if (cached) return cached;
+    const request = fetch(resource.htmlUrl).then(async (response) => {
+      if (!response.ok) throw new Error(`Nepavyko įkelti HTML šablono: ${response.status}`);
+      return { ...resource, html: await response.text() };
+    });
+    resourceHtmlCacheRef.current.set(resource.id, request);
+    try {
+      return await request;
+    } catch (error) {
+      resourceHtmlCacheRef.current.delete(resource.id);
+      throw error;
+    }
+  };
+
+  const editResource = async (resource) => {
+    try {
+      resource = await getResourceWithHtml(resource);
+    } catch (error) {
+      setNotice(`HTML šablono įkelti nepavyko: ${error.message}`);
+      return;
+    }
     setEditingResourceId(resource.id);
     setResourceForm({
       title: resource.title ?? '',
@@ -1869,10 +2039,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
     if (userRole === 'darbuotojas' && resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee)) {
       setActiveTab('aap');
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
+      return;
+    }
+    try {
+      resource = await getResourceWithHtml(resource);
+    } catch (error) {
+      setNotice(`HTML šablono įkelti nepavyko: ${error.message}`);
       return;
     }
     const aapCatalogPreview = resource.id === 'res-aap' && userRole === 'vadovas' && activeTab === 'biblioteka';
@@ -1900,9 +2076,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployees = [...activeEmployees, ...archivedEmployees]
       .filter((person) => !employeeId || person.id === employeeId)
       .map((person) => ({ ...person, sequenceNumber: person.sequenceNumber ?? employeeSequenceNumbers.get(person.id) ?? '' }));
+    const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
+    let previewSignatures = [];
+    if (!templateOnly) {
+      previewSignatures = await hydrateSignatureImages(data.signatures.filter((signature) =>
+        signature.resourceId === resource.id && previewEmployeeIds.has(signature.employeeId)));
+    }
     const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && hasCurrentWorkerSignature(currentEmployee.id, resource.id));
     const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
-    previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, data.signatures), resource.title);
+    previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, previewSignatures), resource.title);
     if (autoPrint) {
       printPdfHtml(previewDocument.printHtml, resource.title)
         .catch((error) => setNotice(`PDF atsisiųsti nepavyko: ${error.message}`));
@@ -1974,6 +2156,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const invitedEmployee = {
       id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: 'Pakviestas', inviteCount: 1, invitedAt,
       medicalCertificateValidUntil: employeeForm.medicalCertificateValidUntil || '',
+      medicalCertificateReminderDate: getMedicalCertificateReminderDate(employeeForm.medicalCertificateValidUntil),
       resourceIds: inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)), sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '',
     };
     const { batches, resourceIds } = addEmployeeToProtocolBatches(data, invitedEmployee);
@@ -2137,8 +2320,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setEmployeeSignerDraft({});
   };
 
-  const saveEmployeeAssignments = () => {
-    if (!employeeBeingEdited) return;
+  const saveEmployeeAssignments = async () => {
+    if (!employeeBeingEdited || employeeAssignmentSaving) return;
     const availableResourceIds = new Set(currentOrg.resources);
     const resourceIds = employeeResourceDraft.filter((resourceId) => availableResourceIds.has(resourceId));
     const requiredSignersByResource = Object.fromEntries(resourceIds.map((resourceId) => {
@@ -2147,17 +2330,67 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return [resourceId, [...new Set(['Darbuotojas', ...roles])]];
     }));
     const position = employeePositionDraft.trim() || 'Darbuotojas';
-    setData((current) => {
-      const employee = current.employees.find((item) => item.id === employeeBeingEdited.id);
-      if (!employee) return current;
-      const updatedEmployee = { ...employee, position, resourceIds, requiredSignersByResource };
-      const { batches, resourceIds: protocolResourceIds } = addEmployeeToProtocolBatches(current, updatedEmployee);
-      return {
-        ...current,
-        employees: current.employees.map((item) => item.id === employee.id ? { ...updatedEmployee, resourceIds: protocolResourceIds } : item),
-        protocolBatches: batches,
-      };
+    const employee = data.employees.find((item) => item.id === employeeBeingEdited.id);
+    if (!employee) return;
+    const updatedEmployee = { ...employee, position, resourceIds, requiredSignersByResource };
+    const { batches, resourceIds: protocolResourceIds } = addEmployeeToProtocolBatches(data, updatedEmployee);
+    const currentBatchesById = new Map((data.protocolBatches ?? []).map((batch) => [batch.id, batch]));
+    const changedProtocolBatches = batches.filter((batch) => batch.employeeIds.includes(employee.id)
+      && JSON.stringify(currentBatchesById.get(batch.id)) !== JSON.stringify(batch));
+    const applyAssignmentsToWorkspace = (current) => ({
+      ...current,
+      employees: current.employees.map((item) => item.id === employee.id
+        ? { ...item, position, resourceIds: protocolResourceIds, requiredSignersByResource }
+        : item),
+      protocolBatches: changedProtocolBatches.reduce((currentBatches, changedBatch) => {
+        const existingBatch = currentBatches.find((batch) => batch.id === changedBatch.id);
+        if (!existingBatch) return [...currentBatches, changedBatch];
+        return currentBatches.map((batch) => batch.id === changedBatch.id
+          ? {
+            ...batch,
+            periodEnd: changedBatch.periodEnd,
+            protocolDate: changedBatch.protocolDate,
+            employeeIds: [...new Set([...batch.employeeIds, employee.id])],
+          }
+          : batch);
+      }, current.protocolBatches ?? []),
     });
+
+    if (cloudMode && !creatorReadOnlyPreview) {
+      const hasPendingWorkspaceChanges = workspaceAutosaveTimeoutRef.current !== null;
+      setEmployeeAssignmentSaving(true);
+      employeeAssignmentRpcInFlightRef.current = true;
+      try {
+        const previousAutosaveError = await workspaceAutosaveRequestRef.current;
+        const { error } = await supabase.rpc('save_organization_employee', {
+          input_organization_id: currentOrg.id,
+          input_employee_id: employee.id,
+          input_position: position,
+          input_resource_ids: protocolResourceIds,
+          input_required_signers: requiredSignersByResource,
+          input_protocol_batches: changedProtocolBatches,
+        });
+        if (error) {
+          setNotice(`Darbuotojo priskyrimų išsaugoti nepavyko: ${error.message}`);
+          return;
+        }
+
+        skipNextWorkspaceAutosaveRef.current = !hasPendingWorkspaceChanges;
+        setData(applyAssignmentsToWorkspace);
+        setNotice(previousAutosaveError
+          ? `Darbuotojo priskyrimai išsaugoti, tačiau ankstesnis bendras įmonės išsaugojimas nepavyko: ${previousAutosaveError.message}`
+          : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti.`);
+        closeEmployeeEditor();
+      } catch (error) {
+        setNotice(`Darbuotojo priskyrimų išsaugoti nepavyko: ${error.message}`);
+      } finally {
+        employeeAssignmentRpcInFlightRef.current = false;
+        setEmployeeAssignmentSaving(false);
+      }
+      return;
+    }
+
+    setData(applyAssignmentsToWorkspace);
     setNotice(`${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti.`);
     closeEmployeeEditor();
   };
@@ -2590,6 +2823,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const resource = data.resources.find((item) => item.id === resourceId);
     return resource && ['todo', 'started', 'unsigned', 'expired', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(employee, resource).key);
   }).length, 0) + dssTasks.filter((task) => task.orgId === currentOrg?.id).length;
+  const currentDateKey = toLocalDateKey(new Date(validityCheckTime));
+  const updateMedicalCertificateDate = (employeeId, validUntil) => setData((current) => ({
+    ...current,
+    employees: current.employees.map((employee) => employee.id === employeeId
+      ? {
+        ...employee,
+        medicalCertificateValidUntil: validUntil,
+        medicalCertificateReminderDate: getMedicalCertificateReminderDate(validUntil),
+      }
+      : employee),
+  }));
   const notifications = userRole === 'darbuotojas'
     ? [
       ...pendingResourceIds.map((resourceId) => {
@@ -2645,6 +2889,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               expiredResource: { employee, resource },
             };
           }).filter(Boolean)),
+          ...orgEmployees
+            .filter((employee) => employee.medicalCertificateReminderDate && employee.medicalCertificateReminderDate <= currentDateKey && !isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime))
+            .map((employee) => ({
+              id: `medical-reminder-${employee.id}`,
+              title: 'Netrukus baigsis medicininio pažymėjimo galiojimas',
+              description: `${employee.name} · galioja iki ${new Date(`${employee.medicalCertificateValidUntil}T12:00:00`).toLocaleDateString('lt-LT')}`,
+              medicalCertificateReminder: employee,
+            })),
           ...orgEmployees
             .filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime))
             .map((employee) => ({
@@ -2765,8 +3017,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       requestCommissionSign(item.employee, item.resource, item.commissionMember);
                     } else if (userRole === 'vadovas' && item.commissionAcceptance) {
                       setActiveTab('imone');
-                    } else if (userRole === 'vadovas' && (item.expiredResource || item.expiredMedicalCertificate)) {
-                      const employee = item.expiredResource?.employee ?? item.expiredMedicalCertificate;
+                    } else if (userRole === 'vadovas' && (item.expiredResource || item.expiredMedicalCertificate || item.medicalCertificateReminder)) {
+                      const employee = item.expiredResource?.employee ?? item.expiredMedicalCertificate ?? item.medicalCertificateReminder;
                       setActiveTab('skydelis');
                       window.setTimeout(() => openEmployeeDetails(employee.id), 0);
                     } else if (userRole === 'vadovas' && item.employee && item.resource) {
@@ -2792,6 +3044,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </div>
         </header>
         <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
+          {userRole === 'dss' && onLoadDssOrganization && (dssWorkspaceLoadState.organizationId !== selectedOrgId || dssWorkspaceLoadState.status === 'loading') && <div role="status" className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">Įkeliami pasirinktos įmonės duomenys…</div>}
+          {userRole === 'dss' && onLoadDssOrganization && dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'error' && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950"><span>Įmonės darbo srities įkelti nepavyko: {dssWorkspaceLoadState.error}</span><button type="button" className="rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold hover:bg-rose-100" onClick={() => { setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'loading', error: '' }); setDssWorkspaceLoadAttempt((attempt) => attempt + 1); }}>Bandyti dar kartą</button></div>}
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
           {commissionInvitationTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-invitation-title">
             <section className="my-auto max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
@@ -2851,7 +3105,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </Panel>}
               {userRole === 'dss' && <Panel title="Prižiūrimos įmonės">
                 <div className="grid gap-4 md:grid-cols-2">
-                  {data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).map((org) => <div className="rounded-md border border-slate-200 p-4" key={org.id}><h2 className="font-semibold">{org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><p className="mt-3 text-sm">{data.employees.filter((employee) => employee.orgId === org.id).length} darbuotojai</p><button className={`${buttonClass} mt-4`} onClick={() => { setSelectedOrgId(org.id); setActiveTab('zurnalai'); }}>Atidaryti įmonę <ArrowRight size={16} /></button></div>)}
+                  {data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).map((org) => <div className="rounded-md border border-slate-200 p-4" key={org.id}><h2 className="font-semibold">{org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><p className="mt-3 text-sm">{dssWorkspaceLoadState.organizationId === org.id && dssWorkspaceLoadState.status === 'ready' ? `${data.employees.filter((employee) => employee.orgId === org.id).length} darbuotojai` : 'Duomenys įkeliami tik atidarius įmonę.'}</p><button className={`${buttonClass} mt-4`} onClick={() => { setSelectedOrgId(org.id); setActiveTab('zurnalai'); }}>Atidaryti įmonę <ArrowRight size={16} /></button></div>)}
                   {data.organizations.flatMap((org) => (org.dssInvitations ?? []).filter((invite) => invite.specialistId === selectedSpecialistId).map((invite) => <div className="rounded-md border border-amber-200 bg-amber-50 p-4" key={`${org.id}-${invite.specialistId}`}><h2 className="font-semibold">Kvietimas · {org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><button className={`${buttonClass} mt-4`} onClick={() => acceptSpecialistInvite(org.id, invite.specialistId)}>Priimti kvietimą <Check size={16} /></button></div>))}
                 </div>
                 {!data.organizations.some((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) && <p className="mt-4 text-sm text-slate-500">Prižiūrimų įmonių ar kvietimų nėra.</p>}
@@ -2882,7 +3136,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         return <div className="min-w-0" key={group.key}><p className="text-xs font-medium text-slate-500">{group.label}</p>{summary ? <div className="mt-1"><span title={summary.title} className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={13} className="shrink-0" /></span></div> : <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">Netaikoma<CircleAlert size={13} /></p>}</div>;
                       })}
                       <label className="col-span-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[11px] font-medium text-slate-500">Med. pažymėjimas
-                        <span className="flex items-center gap-1.5"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} className={`w-32 rounded-md border px-1.5 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((item) => item.id === employee.id ? { ...item, medicalCertificateValidUntil: event.target.value } : item) }))} /><MedicalIcon size={15} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} /></span>
+                        <span className="flex items-center gap-1.5"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} className={`w-32 rounded-md border px-1.5 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={15} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} /></span>
                       </label>
                     </div>
                     <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2"><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={17} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={17} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1.5 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={17} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={17} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1.5 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={17} /></button>}</div>
@@ -2911,7 +3165,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         const SummaryIcon = summary?.Icon ?? CircleAlert;
                         return <td className="px-2 py-3 align-middle" key={group.key}>{summary ? <div className="flex justify-center"><span title={summary.title} className={`inline-flex max-w-full items-center justify-center gap-1.5 truncate rounded-full px-2 py-1 text-[13px] font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={14} className="shrink-0" /></span></div> : <span title="Šio tipo dokumentas darbuotojui nepriskirtas" className="flex items-center justify-center gap-1 text-[13px] text-slate-400">Netaikoma<CircleAlert size={14} /></span>}</td>;
                       })}
-                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" className={`w-28 min-w-0 rounded-md border px-1 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((item) => item.id === employee.id ? { ...item, medicalCertificateValidUntil: event.target.value } : item) }))} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
+                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" className={`w-28 min-w-0 rounded-md border px-1 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
                       <td className="px-2 py-3 align-middle">{(() => {
                         const badge = dashboardBadge;
                         const BadgeIcon = badge.Icon;
@@ -2995,7 +3249,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       })} />{label}</label>)}</div></fieldset>}
                     </div>;
                   })}</div>
-                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={closeEmployeeEditor}>Atšaukti</button><button type="button" className={buttonClass} onClick={saveEmployeeAssignments}>Išsaugoti priskyrimus</button></div>
+                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={closeEmployeeEditor} disabled={employeeAssignmentSaving}>Atšaukti</button><button type="button" className={buttonClass} onClick={saveEmployeeAssignments} disabled={employeeAssignmentSaving}>{employeeAssignmentSaving ? 'Išsaugoma…' : 'Išsaugoti priskyrimus'}</button></div>
                 </div>}
               </dialog>}
             </section>
@@ -3149,17 +3403,32 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
+          {activeTab === 'imones' && userRole === 'kurejas' && <section className="space-y-5">
+            <PageTitle title="Įmonės" subtitle="Pasirinkite įmonę, kad įkeltumėte tik jos darbo srities duomenis." />
+            <Panel title="Visos įmonės">
+              <label className="relative mb-4 block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti įmonės</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={creatorOrganizationSearch} onChange={(event) => { setCreatorOrganizationSearch(event.target.value); setCreatorOrganizationPage(1); }} placeholder="Ieškoti pagal įmonės pavadinimą ar kodą" /></label>
+              <DataTable headers={['Įmonė', 'Vadovai', 'DSS specialistai', 'Veiksmai']} rows={paginatedCreatorOrganizations.map(({ organization, managers, specialists }) => [
+                organization.name,
+                managers.map((account) => account.fullName || account.email).join(', ') || 'Nenurodytas',
+                specialists.map((account) => account.fullName || account.email).join(', ') || 'Nepriskirti',
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(organization.id, 'vadovas')}>Peržiūrėti kaip vadovas</button>
+                  <button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(organization.id, 'dss')}>Peržiūrėti kaip DSS</button>
+                  <button type="button" className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100" onClick={() => deleteCreatorOrganization(organization)}>Ištrinti įmonę</button>
+                </div>,
+              ])} empty="Įmonių pagal paiešką nerasta." />
+              {creatorOrganizations.length > 0 && <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Įmonių: {creatorOrganizations.length}</span><nav className="flex items-center gap-2" aria-label="Įmonių puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorOrganizationPage <= 1} onClick={() => setCreatorOrganizationPage((page) => Math.max(1, page - 1))}>Atgal</button><span>{Math.min(creatorOrganizationPage, creatorOrganizationPageCount)} / {creatorOrganizationPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorOrganizationPage >= creatorOrganizationPageCount} onClick={() => setCreatorOrganizationPage((page) => Math.min(creatorOrganizationPageCount, page + 1))}>Toliau</button></nav></div>}
+              <p className="mt-3 text-xs text-slate-500">Darbuotojai, parašai ir dokumentai įkeliami tik atidarius pasirinktos įmonės peržiūrą.</p>
+            </Panel>
+          </section>}
+
           {activeTab === 'paskyros' && userRole === 'kurejas' && <section className="space-y-5">
-            <PageTitle title="Įmonės ir paskyros" subtitle="Peržiūrėkite registruotas paskyras ir atidarykite įmonės darbo vietos peržiūrą." />
-            <Panel title="Įmonės"><DataTable headers={['Įmonė', 'Vadovai', 'DSS specialistai', 'Darbo sritis', 'Peržiūra']} rows={data.organizations.map((org) => {
-              const organizationMemberships = creatorAccounts.flatMap((account) => (account.organizations ?? []).filter((membership) => membership.id === org.id).map((membership) => ({ ...account, membership })));
-              const managers = organizationMemberships.filter((account) => account.membership.role === 'manager').map((account) => account.fullName || account.email);
-              const specialists = organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.fullName || account.email);
-              const workspaceExists = Boolean(creatorWorkspaces[org.id]);
-              const archivedCount = (creatorWorkspaces[org.id]?.archivedEmployees ?? []).length;
-              return [org.name, managers.join(', ') || org.manager || 'Nenurodytas', specialists.join(', ') || 'Nepriskirti', workspaceExists ? 'Paruošta' : 'Tuščia', <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'vadovas')}>Kaip vadovas</button><button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(org.id, 'dss')}>Kaip DSS</button><button type="button" disabled={!archivedCount} className="rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40" onClick={() => deleteCreatorArchivedEmployees(org)}>Trinti archyvą ({archivedCount})</button><button type="button" className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100" onClick={() => deleteCreatorOrganization(org)}>Ištrinti įmonę</button></div>];
-            })} empty="Įmonių dar nėra." /></Panel>
-            <Panel title="Registruoti vadovai ir DSS specialistai"><DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės']} rows={creatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas'])} empty="Vadovų ar DSS specialistų paskyrų dar nėra." /></Panel>
+            <PageTitle title="Paskyros" subtitle="Registruoti įmonių vadovai ir DSS specialistai." />
+            <Panel title="Vadovai ir DSS specialistai">
+              <label className="relative mb-4 block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti paskyros</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={creatorAccountSearch} onChange={(event) => { setCreatorAccountSearch(event.target.value); setCreatorAccountPage(1); }} placeholder="Ieškoti pagal vardą, el. paštą ar įmonę" /></label>
+              <DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės']} rows={paginatedCreatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas'])} empty="Paskyrų pagal paiešką nerasta." />
+              {creatorAccountsFiltered.length > 0 && <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Paskyrų: {creatorAccountsFiltered.length}</span><nav className="flex items-center gap-2" aria-label="Paskyrų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorAccountPage <= 1} onClick={() => setCreatorAccountPage((page) => Math.max(1, page - 1))}>Atgal</button><span>{Math.min(creatorAccountPage, creatorAccountPageCount)} / {creatorAccountPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorAccountPage >= creatorAccountPageCount} onClick={() => setCreatorAccountPage((page) => Math.min(creatorAccountPageCount, page + 1))}>Toliau</button></nav></div>}
+            </Panel>
           </section>}
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5"><PageTitle title="Įmonės prenumerata" subtitle="Demo leidžia peržiūrėti būsenas ir išbandyti pratęsimo bei atšaukimo veiksmus; mokėjimai neprijungti." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel></section>}
