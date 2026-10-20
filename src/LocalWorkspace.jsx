@@ -165,6 +165,11 @@ const pinSignedStatusLabel = 'Pasirašyta PIN kodu';
 const protocolBatchCapacity = 15;
 const toLocalDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const formatProtocolDate = (dateKey) => dateKey ? new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${dateKey}T12:00:00`)) : '';
+const isDateExpired = (value, now) => {
+  if (!value) return false;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T23:59:59.999`) : new Date(value);
+  return !Number.isNaN(date.getTime()) && date.getTime() < now;
+};
 const getProtocolPeriod = (value, cadence) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -587,10 +592,10 @@ const signerRoleOptions = [
   { value: 'Komisijos narys', label: 'Komisijos nariai' },
 ];
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
-const validityCheckTime = Date.now();
 const employeePageSize = 20;
 
 export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], creatorWorkspaces = {}, onCreatorPreview = () => {}, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+  const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const workspaceData = initialCloudData
       ? { ...initialData, ...initialCloudData }
@@ -707,6 +712,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       document.body.style.overflow = previousOverflow;
     };
   }, [previewResource]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setValidityCheckTime(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
@@ -2622,6 +2632,27 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               ? { id: `${employee.id}-${resource.id}`, title: resource.title, description: `${employee.name} · laukia vadovo parašo`, employee, resource }
               : null;
           }).filter(Boolean)),
+          ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).map((resourceId) => {
+            const resource = data.resources.find((item) => item.id === resourceId);
+            if (!resource || getTaskStatus(employee, resource).key !== 'expired') return null;
+            const lastWorkerSignature = data.signatures
+              .filter((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas')
+              .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
+            return {
+              id: `expired-${employee.id}-${resource.id}`,
+              title: 'Dokumento galiojimas pasibaigė',
+              description: `${employee.name} · ${resource.title}${lastWorkerSignature?.validUntil ? ` · galiojo iki ${new Date(lastWorkerSignature.validUntil).toLocaleDateString('lt-LT')}` : ''}`,
+              expiredResource: { employee, resource },
+            };
+          }).filter(Boolean)),
+          ...orgEmployees
+            .filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime))
+            .map((employee) => ({
+              id: `medical-expired-${employee.id}`,
+              title: 'Pasibaigė medicininio pažymėjimo galiojimas',
+              description: `${employee.name} · galiojo iki ${new Date(`${employee.medicalCertificateValidUntil}T12:00:00`).toLocaleDateString('lt-LT')}`,
+              expiredMedicalCertificate: employee,
+            })),
           ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
             const resource = data.resources.find((item) => item.id === resourceId);
             if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
@@ -2734,6 +2765,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       requestCommissionSign(item.employee, item.resource, item.commissionMember);
                     } else if (userRole === 'vadovas' && item.commissionAcceptance) {
                       setActiveTab('imone');
+                    } else if (userRole === 'vadovas' && (item.expiredResource || item.expiredMedicalCertificate)) {
+                      const employee = item.expiredResource?.employee ?? item.expiredMedicalCertificate;
+                      setActiveTab('skydelis');
+                      window.setTimeout(() => openEmployeeDetails(employee.id), 0);
                     } else if (userRole === 'vadovas' && item.employee && item.resource) {
                       requestEmployerSign(item.employee, item.resource);
                     }
@@ -2790,7 +2825,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? 'Įmonių saugos priežiūra' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div></div>
               {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div>
-                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={orgEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => employee.medicalCertificateValidUntil && new Date(employee.medicalCertificateValidUntil).getTime() < validityCheckTime).length} /></div>
+                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={orgEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
               {userRole === 'darbuotojas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos veiksmai">
                 <div className="space-y-3">
@@ -2833,7 +2868,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <div className="space-y-3 lg:hidden">{paginatedOrgEmployees.map((employee) => {
                   const assignedResources = (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
                   const medicalDate = employee.medicalCertificateValidUntil;
-                  const medicalDateExpired = medicalDate && new Date(medicalDate).getTime() < validityCheckTime;
+                  const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                   const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
                   const needsReminder = employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key));
                   const badge = getEmployeeDashboardBadge(employee, assignedResources);
@@ -2865,7 +2900,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <tbody className="divide-y divide-slate-100">{paginatedOrgEmployees.map((employee) => {
                     const assignedResources = (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
                     const medicalDate = employee.medicalCertificateValidUntil;
-                    const medicalDateExpired = medicalDate && new Date(medicalDate).getTime() < validityCheckTime;
+                    const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                     const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
                     const needsReminder = employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key));
                     const dashboardBadge = getEmployeeDashboardBadge(employee, assignedResources);
