@@ -33,16 +33,17 @@ async function hydrateResourceAssets(resources = []) {
 
 async function hydrateWorkspaceAssets(workspace) {
   if (!workspace || typeof workspace !== 'object') return workspace;
-  const [resources, signatures] = await Promise.all([
+  const [resources, signatures, aapIssuances] = await Promise.all([
     hydrateResourceAssets(workspace.resources ?? []),
     hydrateSignatureImages(workspace.signatures ?? []),
+    hydrateSignatureImages(workspace.aapIssuances ?? []),
   ]);
   const archivedEmployees = await Promise.all((workspace.archivedEmployees ?? []).map(async (record) => ({
     ...record,
     resources: await hydrateResourceAssets(record.resources ?? []),
     signatures: await hydrateSignatureImages(record.signatures ?? []),
   })));
-  return { ...workspace, resources, signatures, archivedEmployees };
+  return { ...workspace, resources, signatures, aapIssuances, archivedEmployees };
 }
 
 async function loadManagerWorkspace(user) {
@@ -187,9 +188,16 @@ async function loadManagerWorkspace(user) {
   if (profile?.account_type === 'employee') {
     const employeeMembership = memberships.find((membership) => membership.role === 'employee');
     if (!employeeMembership) return { requiresEmployee: true, managerName };
-    const { data: employeeWorkspace, error: employeeWorkspaceError } = await supabase.rpc('get_employee_workspace');
+    const [{ data: employeeWorkspace, error: employeeWorkspaceError }, { data: aapIssuances, error: aapIssuancesError }] = await Promise.all([
+      supabase.rpc('get_employee_workspace'),
+      supabase.rpc('get_employee_aap_issuances'),
+    ]);
     if (employeeWorkspaceError) throw employeeWorkspaceError;
-    const employeeData = await hydrateWorkspaceAssets(employeeWorkspace.data);
+    if (aapIssuancesError) throw aapIssuancesError;
+    const employeeData = await hydrateWorkspaceAssets({
+      ...employeeWorkspace.data,
+      aapIssuances: aapIssuances ?? [],
+    });
     return {
       employee: true,
       managerName,

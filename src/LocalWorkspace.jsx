@@ -123,10 +123,16 @@ function workspaceForDatabase(workspace) {
     delete databaseSignature.signatureImage;
     return databaseSignature;
   };
+  const cleanAapIssuance = (issuance) => {
+    const databaseIssuance = { ...issuance };
+    delete databaseIssuance.signatureImage;
+    return databaseIssuance;
+  };
   return {
     ...workspace,
     resources: (workspace.resources ?? []).map(resourceForDatabase),
     signatures: (workspace.signatures ?? []).map(cleanSignature),
+    aapIssuances: (workspace.aapIssuances ?? []).map(cleanAapIssuance),
     archivedEmployees: (workspace.archivedEmployees ?? []).map((record) => ({
       ...record,
       resources: (record.resources ?? []).map(resourceForDatabase),
@@ -408,6 +414,7 @@ const initialData = {
   ],
   archivedEmployees: [],
   protocolBatches: [],
+  aapIssuances: [],
   specialists: [
     { id: 'spec-rasa', name: 'Rasa Norkienė', email: 'rasa.norkiene@dss.lt', status: 'Paskyra patvirtinta', pin: '' },
     { id: 'spec-mindaugas', name: 'Mindaugas Valaitis', email: 'mindaugas@dss.lt', status: 'Paskyra patvirtinta', pin: '' },
@@ -609,6 +616,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [employeeSort, setEmployeeSort] = useState({ key: 'resource-type:Kortelė', direction: 'asc' });
   const [employeePage, setEmployeePage] = useState(1);
   const [employeeDetailsId, setEmployeeDetailsId] = useState(null);
+  const [aapIssueEmployeeId, setAapIssueEmployeeId] = useState(null);
+  const [aapIssueSelectedItemIds, setAapIssueSelectedItemIds] = useState([]);
+  const [aapIssueQuantities, setAapIssueQuantities] = useState({});
+  const [aapIssueDate, setAapIssueDate] = useState(new Date().toISOString().slice(0, 10));
+  const [aapIssueIssuer, setAapIssueIssuer] = useState('');
+  const [aapIssueSigningTarget, setAapIssueSigningTarget] = useState(null);
+  const [aapIssueSignError, setAapIssueSignError] = useState('');
+  const [aapIssueSignSubmitting, setAapIssueSignSubmitting] = useState(false);
   const [archiveDetailsId, setArchiveDetailsId] = useState(null);
   const [archivePrintMode, setArchivePrintMode] = useState(null);
   const [reportTypeFilter, setReportTypeFilter] = useState('visos');
@@ -864,6 +879,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const reportTestTarget = reportTestResources.find((resource) => resource.id === reportTestTargetId);
   const selectedTestResults = reportTestResults.filter(({ resource }) => resource.id === reportTestTarget?.id);
   const employeeDetails = data.employees.find((employee) => employee.id === employeeDetailsId);
+  const aapIssueEmployee = data.employees.find((employee) => employee.id === aapIssueEmployeeId);
+  const aapIssueOrganization = data.organizations.find((org) => org.id === aapIssueEmployee?.orgId);
   const employeeBeingEdited = data.employees.find((employee) => employee.id === editingEmployeeId);
   const accessibleOrganizations = userRole === 'dss' ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) : data.organizations;
   const activeNavigation = roleNavigation[userRole] ?? roleNavigation.darbuotojas;
@@ -998,6 +1015,133 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const openAapIssueForm = (employee) => {
+    if (!employee.resourceIds?.includes('res-aap')) {
+      setNotice('Pirmiausia darbuotojui priskirkite AAP kortelę.');
+      return;
+    }
+    setAapIssueEmployeeId(employee.id);
+    setAapIssueSelectedItemIds([]);
+    setAapIssueDate(new Date().toISOString().slice(0, 10));
+    setAapIssueIssuer(cloudMode ? cloudManagerName : data.organizations.find((org) => org.id === employee.orgId)?.manager ?? '');
+    setAapIssueQuantities({});
+    document.getElementById('aap-issuance-dialog')?.showModal();
+  };
+
+  const downloadAapIssuance = (issuance) => {
+    const employee = data.employees.find((item) => item.id === issuance.employeeId);
+    const org = data.organizations.find((item) => item.id === issuance.orgId);
+    if (!employee || !org || issuance.status !== 'signed') {
+      setNotice('Pasirašyto AAP išdavimo dokumento paruošti nepavyko.');
+      return;
+    }
+    printPdfHtml(buildAapIssuanceHtml(issuance, employee, org), `AAP_isdavimas_${employee.name}_${issuance.issuedAt}`)
+      .catch((error) => setNotice(`AAP išdavimo PDF paruošti nepavyko: ${error.message}`));
+  };
+
+  const createAapIssuance = (event) => {
+    event.preventDefault();
+    const employee = data.employees.find((item) => item.id === aapIssueEmployeeId);
+    const org = data.organizations.find((item) => item.id === employee?.orgId);
+    const items = org?.aapItems ?? [];
+    const selectedItems = items.filter((item) => aapIssueSelectedItemIds.includes(item.id));
+    if (!employee || !org || !employee.resourceIds?.includes('res-aap') || !selectedItems.length || !aapIssueDate || !aapIssueIssuer.trim()) {
+      setNotice('Nurodykite išdavėją, pasirinkite bent vieną AAP priemonę ir datą.');
+      return;
+    }
+    const issuance = {
+      id: `aap-issue-${crypto.randomUUID()}`,
+      orgId: org.id,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      issuedAt: aapIssueDate,
+      issuedBy: aapIssueIssuer.trim(),
+      issuedByUserId: cloudMode ? cloudUserId : null,
+      items: selectedItems.map((item) => ({
+        id: item.id,
+        code: item.code ?? '',
+        name: item.name,
+        reason: item.reason ?? '',
+        quantity: Number(aapIssueQuantities[item.id] ?? item.quantity) || 1,
+        unit: item.unit ?? '',
+        validity: item.validity ?? '',
+        unitPrice: Number(item.unitPrice) || 0,
+      })),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    setData((current) => ({ ...current, aapIssuances: [...(current.aapIssuances ?? []), issuance] }));
+    setAapIssueEmployeeId(null);
+    setAapIssueSelectedItemIds([]);
+    setAapIssueQuantities({});
+    document.getElementById('aap-issuance-dialog')?.close();
+    setNotice(`Užregistruotas ${selectedItems.length} AAP priemonių išdavimas. Darbuotojas turi patvirtinti gavimą.`);
+  };
+
+  const confirmAapIssueSign = async (event) => {
+    event.preventDefault();
+    const issuance = (data.aapIssuances ?? []).find((item) => item.id === aapIssueSigningTarget);
+    if (!issuance || issuance.employeeId !== currentEmployee?.id) {
+      setAapIssueSignError('AAP išdavimo įrašo rasti nepavyko.');
+      return;
+    }
+    if (issuance.status === 'signed') {
+      setAapIssueSignError('Šis AAP išdavimas jau patvirtintas.');
+      return;
+    }
+    if (!signatureInk) {
+      setAapIssueSignError('Nupieškite parašą prieš patvirtindami PIN.');
+      return;
+    }
+    setAapIssueSignSubmitting(true);
+    try {
+      if (cloudMode) {
+        const uploadedSignature = await uploadSignatureDataUrl(issuance.orgId, signatureInk);
+        try {
+          const { data: signedIssuance, error } = await supabase.rpc('record_employee_aap_issuance_signature', {
+            input_issuance_id: issuance.id,
+            input_pin: workerSignPin,
+            input_signature_path: uploadedSignature.path,
+          });
+          if (error || !signedIssuance) throw new Error(error?.message || 'PIN kodas neteisingas arba per daug kartų bandyta.');
+          setData((current) => ({
+            ...current,
+            aapIssuances: (current.aapIssuances ?? []).map((item) => item.id === signedIssuance.id
+              ? { ...signedIssuance, signatureImage: uploadedSignature.signedUrl }
+              : item),
+          }));
+        } catch (error) {
+          await removeSignatureAsset(uploadedSignature.path);
+          throw error;
+        }
+      } else {
+        if (workerSignPin !== currentEmployee.pin) throw new Error('PIN kodas neteisingas.');
+        const signedAt = new Date().toISOString();
+        setData((current) => ({
+          ...current,
+          aapIssuances: (current.aapIssuances ?? []).map((item) => item.id === issuance.id ? {
+            ...item,
+            status: 'signed',
+            signer: currentEmployee.name,
+            signedAt,
+            signatureMethod: 'PIN',
+            signatureImage: signatureInk,
+            ip: '127.0.0.1 (demo)',
+          } : item),
+        }));
+      }
+      setAapIssueSigningTarget(null);
+      setWorkerSignPin('');
+      setSignatureInk('');
+      setAapIssueSignError('');
+      setNotice('AAP priemonių gavimas patvirtintas.');
+    } catch (error) {
+      setAapIssueSignError(error.message || 'AAP gavimo patvirtinti nepavyko.');
+    } finally {
+      setAapIssueSignSubmitting(false);
+    }
+  };
 
   const openResourceSettings = (resource) => {
     const defaults = resource.defaultSettings ?? {};
@@ -2343,6 +2487,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {userRole === 'vadovas' && <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeDetails && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{employeeDetails.name}</h2><p className="mt-1 text-sm text-slate-500">Darbuotojo informacija ir dokumentų būklė</p></div><button type="button" aria-label="Uždaryti darbuotojo informaciją" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { document.getElementById('employee-details-dialog')?.close(); setEmployeeDetailsId(null); }}><X size={20} /></button></div>
                   <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">El. paštas</dt><dd className="font-semibold">{employeeDetails.email}</dd></div><div><dt className="text-slate-500">Darbo sutarties Nr.</dt><dd className="font-semibold">{employeeDetails.contractNumber || 'Nenurodytas'}</dd></div><div><dt className="text-slate-500">Pareigos</dt><dd className="font-semibold">{employeeDetails.position || 'Darbuotojas'}</dd></div><div><dt className="text-slate-500">Paskyros būsena</dt><dd className="font-semibold">{employeeDetails.status}</dd></div></dl>
+                  {employeeDetails.resourceIds?.includes('res-aap') && <Panel title="AAP išdavimų istorija">
+                    <div className="mb-3 flex justify-end"><button type="button" className={buttonClass} onClick={() => openAapIssueForm(employeeDetails)}><Plus size={15} />Registruoti naują išdavimą</button></div>
+                    {(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === employeeDetails.id).length
+                      ? <div className="space-y-3">{(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === employeeDetails.id).slice().sort((left, right) => right.issuedAt.localeCompare(left.issuedAt)).map((issuance) => <div className="rounded-md border border-slate-200 p-3" key={issuance.id}>
+                        <div className="flex flex-wrap justify-between gap-2 text-sm"><strong>{formatProtocolDate(issuance.issuedAt)}</strong><span className={issuance.status === 'signed' ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>{issuance.status === 'signed' ? 'Gavimas patvirtintas' : 'Laukia darbuotojo parašo'}</span></div>
+                        <ul className="mt-2 list-inside list-disc text-sm text-slate-700">{issuance.items.map((item) => <li key={item.id}>{item.name} · {item.quantity} {item.unit}{item.reason ? ` · ${item.reason}` : ''}</li>)}</ul>
+                        <p className="mt-2 text-xs text-slate-500">Išdavė: {issuance.issuedBy}{issuance.signedAt ? ` · Pasirašė ${issuance.signer} ${new Date(issuance.signedAt).toLocaleString('lt-LT')} · PIN · IP ${issuance.ip ?? 'Nenurodytas'}` : ''}</p>
+                        {issuance.signatureImage && <img className="mt-2 h-12 max-w-40 object-contain object-left" src={issuance.signatureImage} alt={`AAP gavimo parašas: ${issuance.signer ?? employeeDetails.name}`} />}
+                        {issuance.status === 'signed' && <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:underline" onClick={() => downloadAapIssuance(issuance)}><Download size={15} />PDF patvirtinimas</button>}
+                      </div>)}</div>
+                      : <p className="text-sm text-slate-500">AAP išdavimų įrašų dar nėra.</p>}
+                  </Panel>}
                   <div><h3 className="mb-2 font-semibold">Priskirti dokumentai ir parašai</h3>{(employeeDetails.resourceIds ?? []).length ? <div className="space-y-2">{employeeDetails.resourceIds.map((resourceId) => {
                     const resource = data.resources.find((item) => item.id === resourceId);
                     if (!resource) return null;
@@ -2469,7 +2625,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {visibleEmployeeResources.length ? <section className="space-y-3"><div className="flex items-baseline justify-between border-b border-slate-200 pb-2"><h2 className="font-bold">Priskirtos užduotys</h2><span className="text-xs text-slate-500">{visibleEmployeeResources.length} užduotys</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleEmployeeResources.map((resource) => { const aapSizesMissing = resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee); const workflowStatus = aapSizesMissing ? { key: 'needsSizes', label: 'AAP dydžiai nenustatyti' } : getTaskStatus(currentEmployee, resource); const workerHasSigned = ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(workflowStatus.key); return <ResourceCard key={resource.id} resource={resource} workflowStatus={workflowStatus} onPreview={workerHasSigned ? () => openResourcePreview(resource) : undefined} onComplete={workerHasSigned ? undefined : () => openResourcePreview(resource)} />; })}</div></section> : <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">Pagal pasirinktą filtrą užduočių nerasta.</div>}
           </section>}
 
-          {activeTab === 'aap' && userRole === 'darbuotojas' && <section className="max-w-3xl space-y-5"><PageTitle title="Mano AAP dydžiai" subtitle="Užpildykite dydžius, reikalingus AAP kortelei; juos galėsite pakeisti vėliau." /><Panel title="Asmeninės apsaugos priemonės"><div className="grid gap-4 sm:grid-cols-2">{[['shoes', 'Batų dydis'], ['clothes', 'Drabužių dydis'], ['pants', 'Kelnių dydis'], ['jacket', 'Striukės dydis'], ['height', 'Ūgis (cm)'], ['weight', 'Svoris (kg)'], ['helmet', 'Šalmo dydis']].map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={currentEmployee?.sizes[key] ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, sizes: { ...employee.sizes, [key]: event.target.value } } : employee) }))} /></label>)}</div><button className={`${buttonClass} mt-5`} onClick={() => { const complete = hasCompleteAapSizes(currentEmployee); if (!complete) { setNotice('Užpildykite batų, drabužių, kelnių ir striukės dydžius.'); return; } setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, aapCompleted: true, status: employee.pin ? 'Aktyvus' : 'Pakviestas' } : employee) })); setNotice('AAP dydžiai išsaugoti. Dydžius galėsite atnaujinti vėliau.'); setActiveTab('uzduotys'); }}>Išsaugoti dydžius</button></Panel></section>}
+          {activeTab === 'aap' && userRole === 'darbuotojas' && <section className="max-w-3xl space-y-5">
+            <PageTitle title="Mano AAP dydžiai" subtitle="Užpildykite dydžius, reikalingus AAP kortelei; juos galėsite pakeisti vėliau." />
+            <Panel title="AAP išdavimų istorija">
+              {(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).length
+                ? <div className="space-y-3">{(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).slice().sort((left, right) => right.issuedAt.localeCompare(left.issuedAt)).map((issuance) => <article className="rounded-lg border border-slate-200 p-4" key={issuance.id}>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Išduota {formatProtocolDate(issuance.issuedAt)}</h2><span className={issuance.status === 'signed' ? 'text-sm font-semibold text-emerald-800' : 'text-sm font-semibold text-amber-800'}>{issuance.status === 'signed' ? 'Patvirtinta' : 'Laukia jūsų patvirtinimo'}</span></div>
+                  <ul className="mt-2 list-inside list-disc text-sm text-slate-700">{issuance.items.map((item) => <li key={item.id}>{item.name} · {item.quantity} {item.unit}{item.reason ? ` · ${item.reason}` : ''}{item.validity ? ` · ${item.validity}` : ''}</li>)}</ul>
+                  <p className="mt-2 text-xs text-slate-500">Išdavė: {issuance.issuedBy}</p>
+                  {issuance.status !== 'signed' && <button type="button" className={`${buttonClass} mt-3`} onClick={() => { setAapIssueSigningTarget(issuance.id); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}><FileSignature size={15} />Patvirtinti gavimą</button>}
+                  {issuance.signedAt && <p className="mt-3 text-xs text-slate-500">Pasirašyta {new Date(issuance.signedAt).toLocaleString('lt-LT')} · PIN · IP {issuance.ip ?? 'Nenurodytas'}</p>}
+                  {issuance.signatureImage && <img className="mt-2 h-14 max-w-48 object-contain object-left" src={issuance.signatureImage} alt="Jūsų AAP gavimo parašas" />}
+                  {issuance.status === 'signed' && <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:underline" onClick={() => downloadAapIssuance(issuance)}><Download size={15} />PDF patvirtinimas</button>}
+                </article>)}</div>
+                : <p className="text-sm text-slate-500">Naujų AAP išdavimų dar nėra.</p>}
+            </Panel>
+            <Panel title="Asmeninės apsaugos priemonės"><div className="grid gap-4 sm:grid-cols-2">{[['shoes', 'Batų dydis'], ['clothes', 'Drabužių dydis'], ['pants', 'Kelnių dydis'], ['jacket', 'Striukės dydis'], ['height', 'Ūgis (cm)'], ['weight', 'Svoris (kg)'], ['helmet', 'Šalmo dydis']].map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={currentEmployee?.sizes[key] ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, sizes: { ...employee.sizes, [key]: event.target.value } } : employee) }))} /></label>)}</div><button className={`${buttonClass} mt-5`} onClick={() => { const complete = hasCompleteAapSizes(currentEmployee); if (!complete) { setNotice('Užpildykite batų, drabužių, kelnių ir striukės dydžius.'); return; } setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, aapCompleted: true, status: employee.pin ? 'Aktyvus' : 'Pakviestas' } : employee) })); setNotice('AAP dydžiai išsaugoti. Dydžius galėsite atnaujinti vėliau.'); setActiveTab('uzduotys'); }}>Išsaugoti dydžius</button></Panel>
+          </section>}
 
           {activeTab === 'zurnalai' && userRole === 'dss' && <section className="space-y-5"><PageTitle title="Įmonės žurnalai ir parašai" subtitle="Pasirašykite dokumentus po vieną arba pasirinkite kelis, peržiūrėkite juos ir patvirtinkite vienu PIN." /><Panel title={`${currentOrg?.name} · laukia DSS parašo`}>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={currentDssTasks.length > 0 && currentDssTasks.every((task) => selectedDssTaskIds.includes(task.id))} disabled={!currentDssTasks.length} onChange={(event) => setSelectedDssTaskIds(event.target.checked ? currentDssTasks.map((task) => task.id) : [])} />Pasirinkti visus ({currentDssTasks.length})</label><button type="button" className={buttonClass} disabled={!selectedDssTaskIds.some((id) => currentDssTasks.some((task) => task.id === id))} onClick={() => requestDssSign(currentDssTasks.filter((task) => selectedDssTaskIds.includes(task.id)))}><FileSignature size={16} />Pasirašyti pasirinktus ({currentDssTasks.filter((task) => selectedDssTaskIds.includes(task.id)).length})</button></div>
@@ -2557,6 +2729,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei; vėliau priskyrimą galėsite pakeisti bibliotekoje.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setProtocolSource(null)}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
       {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
+      <dialog id="aap-issuance-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60" onClose={() => { setAapIssueEmployeeId(null); setAapIssueSelectedItemIds([]); }}>
+        {aapIssueEmployee && <form onSubmit={createAapIssuance} className="space-y-5">
+          <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Naujas AAP išdavimas</h2><p className="mt-1 text-sm text-slate-500">{aapIssueEmployee.name} · ankstesni pasirašyti įrašai nekeičiami.</p></div><button type="button" aria-label="Uždaryti AAP išdavimo formą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => document.getElementById('aap-issuance-dialog')?.close()}><X size={20} /></button></div>
+          <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Išdavimo data<input className={`${inputClass} mt-1`} type="date" value={aapIssueDate} onChange={(event) => setAapIssueDate(event.target.value)} required /></label><label className="text-sm font-medium">Išdavė<input className={`${inputClass} mt-1`} value={aapIssueIssuer} onChange={(event) => setAapIssueIssuer(event.target.value)} required /></label></div>
+          <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Šį kartą išduodamos priemonės</legend>{aapIssueOrganization?.aapItems?.length ? aapIssueOrganization.aapItems.map((item) => <div className="grid items-center gap-2 rounded-md border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_8rem]" key={item.id}>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={aapIssueSelectedItemIds.includes(item.id)} onChange={(event) => setAapIssueSelectedItemIds((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} /><span className="font-semibold">{item.name}<small className="block font-normal text-slate-500">{item.reason || 'Pagrindas nenurodytas'} · {item.validity || 'Tinkamumo terminas nenurodytas'}</small></span></label>
+            <label className="text-xs font-medium text-slate-600">Kiekis<input className={`${inputClass} mt-1`} type="number" min="1" step="1" value={aapIssueQuantities[item.id] ?? item.quantity ?? 1} onChange={(event) => setAapIssueQuantities((current) => ({ ...current, [item.id]: event.target.value }))} disabled={!aapIssueSelectedItemIds.includes(item.id)} /></label>
+          </div>) : <p className="text-sm text-slate-500">AAP šablone nėra priemonių. Pirmiausia jas įrašykite įmonės bibliotekoje.</p>}</fieldset>
+          <p className="text-xs text-slate-500">Įrašas bus išsaugotas atskirai. Darbuotojas patvirtins būtent šių priemonių gavimą savo paskyroje.</p>
+          <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => document.getElementById('aap-issuance-dialog')?.close()}>Atšaukti</button><button type="submit" className={buttonClass} disabled={!aapIssueSelectedItemIds.length || !aapIssueOrganization?.aapItems?.length}><Plus size={15} />Registruoti išdavimą</button></div>
+        </form>}
+      </dialog>
+      {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
       {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p><div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
@@ -2725,6 +2910,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     while (rows.length < rowCount) table.tBodies[0].append(rows[0].cloneNode(true));
     rows = [...table.tBodies[0].rows];
   }
+  if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card'].includes(resource.templateKind)) {
+    rows.forEach((row, index) => {
+      if (row.cells[0]) row.cells[0].textContent = String(index + 1);
+    });
+  }
   const dateFormatter = new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const timeFormatter = new Intl.DateTimeFormat('lt-LT', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const formatDate = (value) => {
@@ -2776,9 +2966,9 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const workerDate = formatDate(worker?.signedAt);
 
       if (resource.templateKind === 'familiarization-card') {
-        writeRow(row, [item.contractNumber, workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
+        writeRow(row, [String(index + 1), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
       } else if (resource.templateKind === 'work-rules-journal') {
-        writeRow(row, [item.contractNumber, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
+        writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
       } else if (resource.templateKind === 'intro-dss-journal') {
         writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), instructorNames, instructors.map((entry) => escapeHtml(entry.role)).join('<br>'), workerProof, instructorProofs]);
       } else if (resource.templateKind === 'workplace-dss-journal') {
@@ -2849,7 +3039,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           .filter((testResult) => testResult.resourceId === resource.relatedTestId)
           .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
         const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : resource.relatedTestId ? 'Testo rezultato nėra' : '';
-        writeRow(row, [escapeHtml(item.contractNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
+        writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
         const testResult = (item.testResults ?? [])
           .filter((result) => result.resourceId === resource.relatedTestId)
@@ -2899,6 +3089,67 @@ function prepareResourcePrintHtml(html, title) {
     printStyle.textContent = '@page{size:A4 portrait;margin:12mm}@media print{body{margin:0;background:#fff}}';
     parsed.head.append(printStyle);
   }
+
+  parsed.querySelectorAll('table').forEach((table) => {
+    if (table.parentElement?.classList.contains('mobile-table-scroll')) return;
+    const wrapper = parsed.createElement('div');
+    wrapper.className = 'mobile-table-scroll';
+    wrapper.tabIndex = 0;
+    wrapper.setAttribute('role', 'region');
+    wrapper.setAttribute('aria-label', 'Lentelė; telefone slinkite į šoną, kad matytumėte visus stulpelius');
+    table.before(wrapper);
+    wrapper.append(table);
+  });
+
+  const responsivePreviewStyle = parsed.createElement('style');
+  responsivePreviewStyle.textContent = `
+    .mobile-table-scroll { width: 100%; }
+    @media screen and (max-width: 640px) {
+      body { max-width: 100%; overflow-x: hidden; }
+      .mobile-table-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+      }
+      .mobile-table-scroll::after {
+        content: 'Lentelę slinkite į šoną';
+        display: block;
+        padding: 4px 0;
+        color: #64748b;
+        font: 10px/1.3 Arial, sans-serif;
+      }
+      .mobile-table-scroll table { width: 100%; table-layout: fixed; }
+      .mobile-table-scroll .journal-table { min-width: 760px; }
+      .mobile-table-scroll .protocol-table { min-width: 560px; }
+      .mobile-table-scroll .card-table { min-width: 680px; }
+      .mobile-table-scroll .signature-audit table { min-width: 900px; }
+      .protocol-container, .card-page, .card-container, .journal-page {
+        width: 100%;
+        max-width: 100%;
+        min-height: 0;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 12px;
+      }
+      .signature-grid { grid-template-columns: 1fr; gap: 12px; }
+      .sig-row { gap: 8px; }
+      .sig-title { width: 32%; flex: 0 0 32%; }
+      .sig-pair { gap: 8px; }
+      .mobile-table-scroll .signature-image {
+        width: 100%;
+        max-width: 96px;
+        height: 26px;
+        object-fit: contain;
+      }
+    }
+    @media print {
+      .mobile-table-scroll { width: auto; max-width: none; overflow: visible; }
+      .mobile-table-scroll::after { display: none; }
+    }
+  `;
+  parsed.head.append(responsivePreviewStyle);
 
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
@@ -3032,6 +3283,11 @@ function buildQuizPreviewHtml(resource) {
 }
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+function buildAapIssuanceHtml(issuance, employee, org) {
+  const rows = issuance.items.map((item, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason || '')}</td><td>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td><td>${escapeHtml(item.validity || '')}</td></tr>`).join('');
+  const signedAt = issuance.signedAt ? new Date(issuance.signedAt).toLocaleString('lt-LT') : '';
+  return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.signature-image{display:block;width:220px;height:80px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>Išdavimą patvirtino darbuotojas</strong>${signatureImageHtml(issuance)}<p>${escapeHtml(issuance.signer || employee.name)}</p></section><section><strong>Pasirašyta PIN kodu</strong><p>${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
 }
 function TestForm({ questions, answers, setAnswers, onSubmit }) {
   const [validationError, setValidationError] = useState('');
