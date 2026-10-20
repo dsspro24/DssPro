@@ -161,9 +161,16 @@ const getProtocolPeriod = (value, cadence) => {
   const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + (cadence === 'weekly-sunday' ? 6 : 4));
   return { start: toLocalDateKey(monday), end: toLocalDateKey(end) };
 };
+const hasPassedProtocolTest = (employee, resource) => {
+  if (!resource.relatedTestId) return true;
+  const latestResult = (employee?.testResults ?? [])
+    .filter((result) => result.resourceId === resource.relatedTestId)
+    .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
+  return latestResult?.passed === true;
+};
 const isProtocolBatchReady = (batch, employees, resource) => Boolean(batch.protocolDate)
   && employees.length > 0
-  && (!resource.relatedTestId || employees.every((employee) => employee.testResults?.some((result) => result.resourceId === resource.relatedTestId)));
+  && employees.every((employee) => hasPassedProtocolTest(employee, resource));
 const addEmployeeToProtocolBatches = (data, employee) => {
   const org = data.organizations.find((item) => item.id === employee.orgId);
   if (!org) return { batches: data.protocolBatches ?? [], resourceIds: employee.resourceIds ?? [] };
@@ -175,7 +182,7 @@ const addEmployeeToProtocolBatches = (data, employee) => {
 
   protocols.forEach((resource) => {
     const testResult = employee.testResults?.filter((result) => result.resourceId === resource.relatedTestId).sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
-    if (resource.relatedTestId && testResult) resourceIds.add(resource.id);
+    if (resource.relatedTestId && testResult?.passed === true) resourceIds.add(resource.id);
     if (batches.some((batch) => batch.orgId === org.id && batch.resourceId === resource.id && batch.employeeIds.includes(employee.id))) return;
     const employeeDate = employee.invitedAt ?? employee.createdAt ?? testResult?.completedAt;
     if (!employeeDate) return;
@@ -662,6 +669,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [workerSignError, setWorkerSignError] = useState('');
   const [signatureInk, setSignatureInk] = useState('');
 
+  useEffect(() => {
+    if (!previewResource) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewResource]);
+
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {
       const { error } = await supabase.rpc('save_creator_workspace', {
@@ -898,9 +914,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const getEmployeeDashboardBadge = (employee, resources) => {
     const statuses = resources.map((resource) => getTaskStatus(employee, resource).key);
     if (statuses.length && statuses.every((status) => status === 'signed')) return { label: pinSignedStatusLabel, cls: 'bg-emerald-100 text-emerald-800', Icon: CircleCheck };
+    const awaitingDss = statuses.includes('awaitingDss');
+    const awaitingEmployer = statuses.includes('awaitingEmployer');
+    const awaitingCommission = statuses.includes('awaitingCommission');
+    if (awaitingDss || awaitingEmployer || awaitingCommission) {
+      const waitingFor = [
+        ...(awaitingEmployer ? ['vadovo'] : []),
+        ...(awaitingDss ? ['DSS specialisto'] : []),
+        ...(awaitingCommission ? ['komisijos'] : []),
+      ];
+      const label = waitingFor.length > 1
+        ? `Laukia ${waitingFor.slice(0, -1).join(', ')} ir ${waitingFor.at(-1)} parašų`
+        : `Laukia ${waitingFor[0]} parašo`;
+      return { label, cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
+    }
     if (statuses.includes('unsigned')) return { label: 'Nepasirašyta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     if (statuses.some((status) => ['todo', 'expired'].includes(status))) return { label: 'Neatlikta', cls: 'bg-orange-100 text-orange-800', Icon: CircleX };
-    if (statuses.some((status) => ['awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status))) return { label: 'Laukia parašo', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
+    if (statuses.includes('awaitingSignatures')) return { label: 'Laukia parašų', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     if (statuses.includes('started')) return { label: 'Vyksta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     if (employee.status === 'Pakviestas') return { label: 'Pakviestas', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     return { label: 'Nepriskirta', cls: 'bg-slate-100 text-slate-600', Icon: CircleAlert };
@@ -1036,8 +1066,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const requestWorkerSign = (employee, resource) => {
-    if (resource.templateKind === 'knowledge-assessment-protocol' && resource.relatedTestId && !employee.testResults?.some((result) => result.resourceId === resource.relatedTestId)) {
-      setNotice('Pirmiausia atlikite susijusios mokymo programos testą, tada pasirašykite protokolą.');
+    if (resource.templateKind === 'knowledge-assessment-protocol' && !hasPassedProtocolTest(employee, resource)) {
+      const hasTestAttempt = employee.testResults?.some((result) => result.resourceId === resource.relatedTestId);
+      setNotice(hasTestAttempt
+        ? 'Protokolą galėsite pasirašyti tik išlaikę susijusios mokymo programos testą.'
+        : 'Pirmiausia atlikite ir išlaikykite susijusios mokymo programos testą, tada pasirašykite protokolą.');
       return;
     }
     if (resource.id === 'res-aap' && !hasSavedAapSizes(employee)) {
@@ -1060,9 +1093,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     event.preventDefault();
     const employee = data.employees.find((item) => item.id === workerSigningTarget.employeeId);
     const resource = data.resources.find((item) => item.id === workerSigningTarget.resourceId);
-    if (resource?.templateKind === 'knowledge-assessment-protocol' && resource.relatedTestId && !employee?.testResults?.some((result) => result.resourceId === resource.relatedTestId)) {
+    if (resource?.templateKind === 'knowledge-assessment-protocol' && !hasPassedProtocolTest(employee, resource)) {
       setWorkerSigningTarget(null);
-      setNotice('Pirmiausia atlikite susijusios mokymo programos testą, tada pasirašykite protokolą.');
+      const hasTestAttempt = employee?.testResults?.some((result) => result.resourceId === resource.relatedTestId);
+      setNotice(hasTestAttempt
+        ? 'Protokolą galėsite pasirašyti tik išlaikę susijusios mokymo programos testą.'
+        : 'Pirmiausia atlikite ir išlaikykite susijusios mokymo programos testą, tada pasirašykite protokolą.');
       return;
     }
     if (resource?.id === 'res-aap' && !hasSavedAapSizes(employee)) {

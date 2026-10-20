@@ -4,15 +4,31 @@ import { Eraser } from 'lucide-react';
 export default function SignaturePad({ value, onChange }) {
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
+  const valueRef = useRef(value);
+  const lastRenderedValueRef = useRef(null);
+  const dimensionsRef = useRef({ width: 0, height: 0 });
+  const renderTokenRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
     const context = canvas.getContext('2d');
+    const drawImage = (dataUrl, width, height) => {
+      const renderToken = ++renderTokenRef.current;
+      if (!dataUrl) return;
+      const image = new Image();
+      image.onload = () => {
+        if (renderToken !== renderTokenRef.current || !canvasRef.current) return;
+        context.drawImage(image, 0, 0, width, height);
+      };
+      image.src = dataUrl;
+    };
     const resize = () => {
       const bounds = canvas.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
+      if (dimensionsRef.current.width === bounds.width && dimensionsRef.current.height === bounds.height) return;
+      const previousImage = dimensionsRef.current.width ? canvas.toDataURL('image/png') : valueRef.current;
       const pixelRatio = window.devicePixelRatio || 1;
       canvas.width = Math.round(bounds.width * pixelRatio);
       canvas.height = Math.round(bounds.height * pixelRatio);
@@ -22,18 +38,38 @@ export default function SignaturePad({ value, onChange }) {
       context.lineWidth = 2.4;
       context.lineCap = 'round';
       context.lineJoin = 'round';
-
-      if (value) {
-        const image = new Image();
-        image.onload = () => context.drawImage(image, 0, 0, bounds.width, bounds.height);
-        image.src = value;
-      }
+      dimensionsRef.current = { width: bounds.width, height: bounds.height };
+      lastRenderedValueRef.current = previousImage;
+      drawImage(previousImage, bounds.width, bounds.height);
     };
 
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     resize();
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    valueRef.current = value;
+    if (value === lastRenderedValueRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    const { width, height } = dimensionsRef.current;
+    context.clearRect(0, 0, width, height);
+    if (!value) {
+      lastRenderedValueRef.current = '';
+      renderTokenRef.current += 1;
+      return;
+    }
+    const renderToken = ++renderTokenRef.current;
+    const image = new Image();
+    image.onload = () => {
+      if (renderToken !== renderTokenRef.current || !canvasRef.current) return;
+      context.drawImage(image, 0, 0, width, height);
+      lastRenderedValueRef.current = value;
+    };
+    image.src = value;
   }, [value]);
 
   const getPoint = (event) => {
@@ -42,6 +78,7 @@ export default function SignaturePad({ value, onChange }) {
   };
 
   const startDrawing = (event) => {
+    if (event.button !== 0) return;
     event.preventDefault();
     const canvas = canvasRef.current;
     canvas.setPointerCapture(event.pointerId);
@@ -66,14 +103,21 @@ export default function SignaturePad({ value, onChange }) {
   const stopDrawing = (event) => {
     if (!drawingRef.current) return;
     drawingRef.current = false;
-    if (canvasRef.current.hasPointerCapture(event.pointerId)) canvasRef.current.releasePointerCapture(event.pointerId);
-    onChange(canvasRef.current.toDataURL('image/png'));
+    const canvas = canvasRef.current;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    const image = canvas.toDataURL('image/png');
+    valueRef.current = image;
+    lastRenderedValueRef.current = image;
+    onChange(image);
   };
 
   const clear = () => {
     const canvas = canvasRef.current;
     const bounds = canvas.getBoundingClientRect();
     canvas.getContext('2d').clearRect(0, 0, bounds.width, bounds.height);
+    valueRef.current = '';
+    lastRenderedValueRef.current = '';
+    renderTokenRef.current += 1;
     onChange('');
   };
 
