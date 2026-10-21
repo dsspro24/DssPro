@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
-import LocalWorkspace from './LocalWorkspace.jsx';
 import { supabase } from './lib/supabase.js';
 import { hydrateSignatureImages } from './lib/storageAssets.js';
+
+const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
+
+function WorkspaceLoading() {
+  return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliama darbo sritis…</p></main>;
+}
 
 function getWorkspaceStatus(workspace) {
   if (workspace?.requiresEmployeePassword) return 'employee-password-needed';
@@ -22,20 +27,15 @@ async function hydrateResourceAssets(resources = []) {
       hydrated.imageUrl = imageUrl;
       hydrated.image = imageUrl;
     }
-    if (!hydrated.html && hydrated.htmlUrl) {
-      const result = await fetch(hydrated.htmlUrl);
-      if (!result.ok) throw new Error(`Nepavyko įkelti HTML šablono: ${result.status}`);
-      hydrated.html = await result.text();
-    }
     return hydrated;
   }));
 }
 
-async function hydrateWorkspaceAssets(workspace) {
+async function hydrateWorkspaceAssets(workspace, { hydrateSignatures = false } = {}) {
   if (!workspace || typeof workspace !== 'object') return workspace;
   const [resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures] = await Promise.all([
     hydrateResourceAssets(workspace.resources ?? []),
-    hydrateSignatureImages(workspace.signatures ?? []),
+    hydrateSignatures ? hydrateSignatureImages(workspace.signatures ?? []) : Promise.resolve(workspace.signatures ?? []),
     hydrateSignatureImages(workspace.aapIssuances ?? []),
     hydrateSignatureImages(workspace.commissionInvitations ?? []),
     hydrateSignatureImages(workspace.protocolCommissionSignatures ?? []),
@@ -43,7 +43,7 @@ async function hydrateWorkspaceAssets(workspace) {
   const archivedEmployees = await Promise.all((workspace.archivedEmployees ?? []).map(async (record) => ({
     ...record,
     resources: await hydrateResourceAssets(record.resources ?? []),
-    signatures: await hydrateSignatureImages(record.signatures ?? []),
+    signatures: hydrateSignatures ? await hydrateSignatureImages(record.signatures ?? []) : record.signatures ?? [],
   })));
   return { ...workspace, resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures, archivedEmployees };
 }
@@ -66,65 +66,42 @@ async function loadManagerWorkspace(user) {
   }
 
   if (isCreator) {
-    const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: {} });
+    const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: { catalogOnly: true } });
     if (assetMigrationError) throw new Error(`Nepavyko perkelti senų failų į Storage: ${assetMigrationError.message}`);
 
-    const [organizationsResult, workspacesResult, catalogResult, accountsResult] = await Promise.all([
+    const [organizationsResult, catalogResult, accountsResult, subscriptionsResult] = await Promise.all([
       supabase.from('organizations').select('id, name, company_code').order('name'),
-      supabase.from('organization_data').select('organization_id, data'),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
+      supabase.from('organization_data').select('organization_id, subscriptions:data->subscriptions'),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
-    if (workspacesResult.error) throw workspacesResult.error;
     if (catalogResult.error) throw catalogResult.error;
     if (accountsResult.error) throw accountsResult.error;
-
-    const hydratedWorkspaces = await Promise.all(workspacesResult.data.map(async (workspace) => [
-      workspace.organization_id,
-      await hydrateWorkspaceAssets(workspace.data),
-    ]));
-    const workspaceByOrganization = new Map(hydratedWorkspaces);
+    if (subscriptionsResult.error) throw subscriptionsResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
-    const resourcesById = new Map();
-    const subscriptionsById = new Map();
-    for (const workspaceData of workspaceByOrganization.values()) {
-      for (const resource of workspaceData?.resources ?? []) {
-        if (!resource.organizationId) resourcesById.set(resource.id, resource);
-      }
-      for (const subscription of workspaceData?.subscriptions ?? []) subscriptionsById.set(subscription.id, subscription);
-    }
-    for (const resource of hydratedCatalog?.resources ?? []) {
-      if (!resource.organizationId) resourcesById.set(resource.id, resource);
-    }
-
-    const organizations = organizationsResult.data.map((organization) => {
-      const workspaceData = workspaceByOrganization.get(organization.id);
-      const savedOrganization = workspaceData?.organizations?.find((item) => item.id === organization.id);
-      return {
-        ...savedOrganization,
-        id: organization.id,
-        name: organization.name,
-        companyCode: organization.company_code ?? '',
-      };
-    });
+    const organizations = organizationsResult.data.map((organization) => ({
+      id: organization.id,
+      name: organization.name,
+      companyCode: organization.company_code ?? '',
+    }));
+    const subscriptions = subscriptionsResult.data.flatMap((workspace) => workspace.subscriptions ?? []);
 
     return {
       creator: true,
       managerName,
       catalog: hydratedCatalog,
       creatorAccounts: accountsResult.data ?? [],
-      creatorWorkspaces: Object.fromEntries(workspaceByOrganization),
       data: {
         organizations,
-        employees: [...workspaceByOrganization.values()].flatMap((item) => item?.employees ?? []),
-        archivedEmployees: [...workspaceByOrganization.values()].flatMap((item) => item?.archivedEmployees ?? []),
-        protocolBatches: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolBatches ?? []),
-        specialists: [...workspaceByOrganization.values()].flatMap((item) => item?.specialists ?? []),
-        signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
-        ...(resourcesById.size ? { resources: [...resourcesById.values()] } : {}),
+        employees: [],
+        archivedEmployees: [],
+        protocolBatches: [],
+        specialists: [],
+        signatures: [],
+        resources: hydratedCatalog?.resources ?? [],
         resourceTypes: hydratedCatalog?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
-        subscriptions: [...subscriptionsById.values()],
+        subscriptions,
       },
     };
   }
@@ -142,80 +119,40 @@ async function loadManagerWorkspace(user) {
 
   if (profile?.account_type === 'dss_specialist') {
     const dssMemberships = memberships.filter((membership) => membership.role === 'dss_specialist');
-    if (!dssMemberships.length) return { requiresDssSpecialist: true, managerName };
     const organizationIds = dssMemberships.map((membership) => membership.organization_id);
-    const [organizationsResult, workspacesResult, catalogResult] = await Promise.all([
-      supabase.from('organizations').select('id, name, company_code').in('id', organizationIds),
-      supabase.from('organization_data').select('organization_id, data').in('organization_id', organizationIds),
+    const [organizationsResult, catalogResult, invitationsResult] = await Promise.all([
+      organizationIds.length
+        ? supabase.from('organizations').select('id, name, company_code').in('id', organizationIds)
+        : Promise.resolve({ data: [], error: null }),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+      supabase.from('dss_specialist_invitations')
+        .select('id, organization_id, organization_name, invited_email, invited_name, created_at')
+        .eq('specialist_user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true }),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
-    if (workspacesResult.error) throw workspacesResult.error;
     if (catalogResult.error) throw catalogResult.error;
-
-    const hydratedWorkspaces = await Promise.all(workspacesResult.data.map(async (item) => [
-      item.organization_id,
-      await hydrateWorkspaceAssets(item.data),
-    ]));
-    const workspaceByOrganization = new Map(hydratedWorkspaces);
-    const commissionDataByOrganization = await Promise.all(organizationIds.map(async (organizationId) => {
-      const [
-        { data: assignments, error: assignmentsError },
-        { data: signatures, error: signaturesError },
-      ] = await Promise.all([
-        supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
-        supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
-      ]);
-      if (assignmentsError) throw assignmentsError;
-      if (signaturesError) throw signaturesError;
-      return [organizationId, assignments ?? [], signatures ?? []];
-    }));
-    const hydratedAssignments = await hydrateSignatureImages(commissionDataByOrganization.flatMap(([, assignments]) => assignments.map((assignment) => ({
-      ...assignment,
-      signaturePath: assignment.consentSignaturePath,
-    }))));
-    const hydratedProtocolSignatures = await hydrateSignatureImages(commissionDataByOrganization.flatMap(([, , signatures]) => signatures));
-    const assignmentsByOrganization = new Map();
-    const signaturesByOrganization = new Map();
-    hydratedAssignments.forEach((assignment) => {
-      const current = assignmentsByOrganization.get(assignment.organizationId) ?? [];
-      current.push(assignment);
-      assignmentsByOrganization.set(assignment.organizationId, current);
-    });
-    hydratedProtocolSignatures.forEach((signature) => {
-      const current = signaturesByOrganization.get(signature.orgId) ?? [];
-      current.push(signature);
-      signaturesByOrganization.set(signature.orgId, current);
-    });
-    for (const [organizationId, workspace] of workspaceByOrganization) {
-      workspace.commissionAssignments = assignmentsByOrganization.get(organizationId) ?? [];
-      workspace.protocolCommissionSignatures = signaturesByOrganization.get(organizationId) ?? [];
-    }
+    if (invitationsResult.error) throw invitationsResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
-    const resourcesById = new Map();
-    const organizations = organizationsResult.data.map((organization) => {
-      const workspaceData = workspaceByOrganization.get(organization.id);
-      const savedOrganization = workspaceData?.organizations?.find((item) => item.id === organization.id) ?? {};
-      for (const resource of workspaceData?.resources ?? []) resourcesById.set(resource.id, resource);
-      return { ...savedOrganization, id: organization.id, name: organization.name, companyCode: organization.company_code ?? '', dss: [...new Set([...(savedOrganization.dss ?? []), user.id])] };
+    const organizations = (organizationsResult.data ?? []).map((organization) => {
+      return { id: organization.id, name: organization.name, companyCode: organization.company_code ?? '', dss: [user.id], resources: [] };
     });
-    for (const resource of hydratedCatalog?.resources ?? []) {
-      if (!resource.organizationId) resourcesById.set(resource.id, resource);
-    }
 
     return {
       dss: true,
       managerName,
       data: {
         organizations,
-        employees: [...workspaceByOrganization.values()].flatMap((item) => item?.employees ?? []),
+        dssInvitations: invitationsResult.data ?? [],
+        employees: [],
         archivedEmployees: [],
-        protocolBatches: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolBatches ?? []),
-        commissionAssignments: [...workspaceByOrganization.values()].flatMap((item) => item?.commissionAssignments ?? []),
-        protocolCommissionSignatures: [...workspaceByOrganization.values()].flatMap((item) => item?.protocolCommissionSignatures ?? []),
+        protocolBatches: [],
+        commissionAssignments: [],
+        protocolCommissionSignatures: [],
         specialists: [{ id: user.id, name: managerName, email: user.email ?? '', status: 'Paskyra patvirtinta' }],
-        signatures: [...workspaceByOrganization.values()].flatMap((item) => item?.signatures ?? []),
-        resources: [...resourcesById.values()],
+        signatures: [],
+        resources: (hydratedCatalog?.resources ?? []).filter((resource) => !resource.organizationId),
         resourceTypes: hydratedCatalog?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
         subscriptions: [],
       },
@@ -257,7 +194,7 @@ async function loadManagerWorkspace(user) {
       commissionTasks: hydratedCommissionTasks,
       commissionAssignments: employeeCommissionAssignments,
       protocolCommissionSignatures: employeeProtocolSignatures,
-    });
+    }, { hydrateSignatures: true });
     return {
       employee: true,
       managerName,
@@ -292,7 +229,14 @@ async function loadManagerWorkspace(user) {
   const { data: savedWorkspace, error: workspaceError } = workspaceResult;
   if (workspaceError) throw workspaceError;
   if (catalogResult.error) throw catalogResult.error;
-  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
+  const { data: dssInvitations, error: dssInvitationsError } = await supabase
+    .from('dss_specialist_invitations')
+    .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
+    .eq('organization_id', organization.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (dssInvitationsError) throw dssInvitationsError;
+  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null, { hydrateSignatures: true });
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
   const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
     supabase.rpc('get_organization_commission_assignments', { input_organization_id: organization.id }),
@@ -314,7 +258,7 @@ async function loadManagerWorkspace(user) {
     organization,
     managerName,
     catalog: hydratedCatalog,
-    data: hydratedManagerWorkspace,
+    data: { ...hydratedManagerWorkspace, dssInvitations: dssInvitations ?? [] },
   };
 }
 
@@ -325,6 +269,7 @@ export default function CloudEntry() {
   const [signupRole, setSignupRole] = useState('manager');
   const [workspace, setWorkspace] = useState(null);
   const [creatorPreview, setCreatorPreview] = useState(null);
+  const [creatorPreviewLoading, setCreatorPreviewLoading] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
   const [notice, setNotice] = useState('');
@@ -392,8 +337,10 @@ export default function CloudEntry() {
             data: {
               full_name: form.fullName.trim(),
               account_type: signupRole,
-              company_name: form.companyName.trim(),
-              company_code: form.companyCode.trim(),
+              ...(signupRole === 'manager' ? {
+                company_name: form.companyName.trim(),
+                company_code: form.companyCode.trim(),
+              } : {}),
               signing_pin: form.signingPin,
             },
             emailRedirectTo: window.location.origin,
@@ -521,15 +468,116 @@ export default function CloudEntry() {
     if (exitPreview) setCreatorPreview(null);
   };
 
+  const refreshSignedInWorkspace = async () => {
+    if (!session?.user) return null;
+    const loadedWorkspace = await loadManagerWorkspace(session.user);
+    setWorkspace(loadedWorkspace);
+    setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
+    return loadedWorkspace;
+  };
+
+  const openCreatorPreview = async (organizationId, role) => {
+    setErrorMessage('');
+    setCreatorPreviewLoading(true);
+    try {
+      const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', {
+        body: { organizationId },
+      });
+      if (assetMigrationError) throw new Error(`Nepavyko paruošti įmonės failų: ${assetMigrationError.message}`);
+      const { data: savedWorkspace, error } = await supabase
+        .from('organization_data')
+        .select('data')
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      if (error) throw error;
+      const data = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null, { hydrateSignatures: true });
+      setCreatorPreview({ organizationId, role, data });
+    } catch (error) {
+      setErrorMessage(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
+      window.alert(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
+    } finally {
+      setCreatorPreviewLoading(false);
+    }
+  };
+
+  const loadDssOrganization = useCallback(async (organizationId) => {
+    const organizationSummary = workspace?.data.organizations.find((item) => item.id === organizationId);
+    if (!organizationSummary || !organizationSummary.dss?.includes(session?.user.id)) {
+      throw new Error('Neturite prieigos prie šios įmonės.');
+    }
+
+    const [
+      { data: savedWorkspace, error: workspaceError },
+      { data: assignments, error: assignmentsError },
+      { data: protocolSignatures, error: protocolSignaturesError },
+    ] = await Promise.all([
+      supabase.from('organization_data').select('data').eq('organization_id', organizationId).maybeSingle(),
+      supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
+      supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
+    ]);
+    if (workspaceError) throw workspaceError;
+    if (assignmentsError) throw assignmentsError;
+    if (protocolSignaturesError) throw protocolSignaturesError;
+    if (!savedWorkspace?.data) throw new Error('Įmonės darbo sritis dar nesukurta.');
+
+    const storedWorkspace = savedWorkspace.data;
+    const savedOrganization = storedWorkspace.organizations?.find((item) => item.id === organizationId);
+    if (!savedOrganization) throw new Error('Įmonės nustatymai nerasti.');
+    const [hydratedWorkspace, hydratedAssignments, hydratedProtocolSignatures] = await Promise.all([
+      hydrateWorkspaceAssets(storedWorkspace, { hydrateSignatures: true }),
+      hydrateSignatureImages((assignments ?? []).map((assignment) => ({
+        ...assignment,
+        signaturePath: assignment.consentSignaturePath,
+      }))),
+      hydrateSignatureImages(protocolSignatures ?? []),
+    ]);
+    const organization = {
+      ...organizationSummary,
+      ...savedOrganization,
+      id: organizationId,
+      name: organizationSummary.name,
+      companyCode: organizationSummary.companyCode,
+      dss: [...new Set([...(savedOrganization.dss ?? []), session.user.id])],
+    };
+    const globalResources = workspace.catalog?.resources?.filter((resource) => !resource.organizationId) ?? [];
+    const resourcesById = new Map(globalResources.map((resource) => [resource.id, resource]));
+    for (const resource of hydratedWorkspace.resources ?? []) resourcesById.set(resource.id, resource);
+
+    return {
+      organization,
+      data: {
+        employees: hydratedWorkspace.employees ?? [],
+        archivedEmployees: [],
+        protocolBatches: hydratedWorkspace.protocolBatches ?? [],
+        commissionAssignments: hydratedAssignments,
+        protocolCommissionSignatures: hydratedProtocolSignatures,
+        signatures: hydratedWorkspace.signatures ?? [],
+        resources: [...resourcesById.values()],
+      },
+    };
+  }, [session, workspace]);
+
   if (!authReady || (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading'))) {
     return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Jungiama prie DSS Pro…</p></main>;
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
+    if (workspace.creator && creatorPreviewLoading) {
+      return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliama pasirinktos įmonės darbo vieta…</p></main>;
+    }
     if (workspace.creator && creatorPreview) {
-      const sourceData = workspace.creatorWorkspaces?.[creatorPreview.organizationId];
-      const sourceOrganization = sourceData?.organizations?.find((item) => item.id === creatorPreview.organizationId)
-        ?? workspace.data.organizations.find((item) => item.id === creatorPreview.organizationId);
+      const sourceData = creatorPreview.data;
+      const listedOrganization = workspace.data.organizations.find((item) => item.id === creatorPreview.organizationId);
+      const organizationMemberships = workspace.creatorAccounts.flatMap((account) => (account.organizations ?? [])
+        .filter((membership) => membership.id === creatorPreview.organizationId)
+        .map((membership) => ({ ...account, membership })));
+      const savedOrganization = sourceData?.organizations?.find((item) => item.id === creatorPreview.organizationId);
+      const sourceOrganization = listedOrganization && {
+        ...savedOrganization,
+        ...listedOrganization,
+        manager: organizationMemberships.find((account) => account.membership.role === 'manager')?.fullName ?? savedOrganization?.manager ?? '',
+        dss: organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.id),
+      };
       if (sourceOrganization) {
         const dssId = sourceOrganization.dss?.[0] ?? `creator-preview-${sourceOrganization.id}`;
         const dssSpecialist = sourceData?.specialists?.find((specialist) => specialist.id === dssId)
@@ -549,7 +597,7 @@ export default function CloudEntry() {
           resourceTypes: sourceData?.resourceTypes ?? workspace.data.resourceTypes,
           subscriptions: (sourceData?.subscriptions ?? []).filter((subscription) => subscription.orgId === creatorPreview.organizationId),
         };
-        return <LocalWorkspace
+        return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
           userRole={creatorPreview.role}
           onRoleChange={() => {}}
           onExit={signOut}
@@ -562,37 +610,38 @@ export default function CloudEntry() {
           onExitCreatorPreview={() => setCreatorPreview(null)}
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
-        />;
+        /></Suspense>;
       }
     }
-    return <LocalWorkspace
+    return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
       userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'}
       onRoleChange={() => {}}
       onExit={signOut}
       initialCloudData={workspace.data}
       creatorCatalog={workspace.catalog}
       creatorAccounts={workspace.creatorAccounts}
-      creatorWorkspaces={workspace.creatorWorkspaces}
-      onCreatorPreview={(organizationId, role) => setCreatorPreview({ organizationId, role })}
+      onCreatorPreview={openCreatorPreview}
       onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
       onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
       cloudOrganization={workspace.organization}
       cloudManagerName={workspace.managerName}
+      onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
+      onRefreshWorkspace={refreshSignedInWorkspace}
       cloudMode
       cloudUserId={session.user.id}
-    />;
+    /></Suspense>;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
     <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3"><span className="grid size-11 place-items-center rounded-md bg-emerald-950 text-emerald-200"><Building2 size={21} /></span><div><p className="text-lg font-bold">DSS Pro</p><p className="text-sm text-slate-500">Prisijungimas prie paskyros</p></div></div>
       {session && workspaceStatus === 'employee-password-needed' ? <>
-        <h1 className="text-xl font-bold">Susikurkite slaptažodį</h1><p className="mt-1 text-sm text-slate-600">Kvietimas patvirtintas. Susikurkite slaptažodį, o kitame žingsnyje nustatykite PIN dokumentams pasirašyti.</p>
+        <h1 className="text-xl font-bold">Susikurkite slaptažodį</h1><p className="mt-1 text-sm text-slate-600">Kvietimo nuoroda patvirtinta. Susikurkite slaptažodį, o kitame žingsnyje nustatykite PIN dokumentams pasirašyti.</p>
         <form onSubmit={finishEmployeePasswordSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">Naujas slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete="new-password" minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite slaptažodį<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete="new-password" minLength={8} value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Sukurti slaptažodį'}</button></form>
       </> : session && workspaceStatus === 'employee-account' ? <>
         <h1 className="text-xl font-bold">Darbuotojo paskyra</h1><p className="mt-1 text-sm text-slate-600">Prisijungėte kaip darbuotojas. Įmonės DSS dokumentai atsiras, kai vadovas jus pakvies ir priskirs įmonei.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
       </> : session && workspaceStatus === 'dss-specialist' ? <>
-        <h1 className="text-xl font-bold">DSS specialisto paskyra</h1><p className="mt-1 text-sm text-slate-600">Jūs prisijungėte kaip DSS specialistas. Kad matytumėte įmonės dokumentus, įmonės vadovas turi jus pakviesti šiuo el. paštu: <strong>{session.user.email}</strong>.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
+        <h1 className="text-xl font-bold">DSS specialisto paskyra</h1><p className="mt-1 text-sm text-slate-600">Jūsų paskyra aktyvi. Šiuo metu neturite prižiūrimų įmonių; galėsite peržiūrėti ir priimti vadovų kvietimus prisijungę šiuo el. paštu: <strong>{session.user.email}</strong>.</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold" onClick={signOut}>Atsijungti</button>
       </> : session && workspaceStatus === 'pin-needed' ? <>
         <h1 className="text-xl font-bold">Nustatykite pasirašymo PIN</h1><p className="mt-1 text-sm text-slate-600">PIN bus naudojamas dokumentams pasirašyti. Jis saugomas užšifruotu hash’u ir niekada nerodomas nustatymuose.</p>
         <form onSubmit={finishSigningPinSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">4 skaitmenų PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Nustatyti PIN'}</button></form>
@@ -600,9 +649,9 @@ export default function CloudEntry() {
         <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų.</p>
         <form onSubmit={createOrganization} className="mt-5 space-y-4"><label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label><label className="block text-sm font-medium">Įmonės kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><Building2 size={16} />{submitting ? 'Kuriama…' : 'Sukurti įmonę'}</button></form>
       </> : session && workspaceStatus === 'error' ? <><h1 className="text-xl font-bold">Nepavyko atidaryti įmonės</h1><p className="mt-2 text-sm text-rose-700">{errorMessage}</p><button type="button" className="mt-5 w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold" onClick={signOut}>Atsijungti</button></> : <>
-        <h1 className="text-xl font-bold">{authMode === 'signup' ? signupRole === 'manager' ? 'Sukurkite vadovo paskyrą' : 'Sukurkite DSS specialisto paskyrą' : 'Prisijunkite'}</h1>{authMode === 'signup' && <p className="mt-1 text-sm text-slate-600">{signupRole === 'manager' ? 'Patvirtinus el. paštą galėsite sukurti įmonės paskyrą.' : 'DSS specialisto paskyra registruojama atskirai; įmonės vadovas jus pakvies į savo DSS aplinką.'}</p>}
+        <h1 className="text-xl font-bold">{authMode === 'signup' ? signupRole === 'manager' ? 'Sukurkite vadovo paskyrą' : 'Sukurkite DSS specialisto paskyrą' : 'Prisijunkite'}</h1>{authMode === 'signup' && <p className="mt-1 text-sm text-slate-600">{signupRole === 'manager' ? 'Patvirtinus el. paštą galėsite sukurti įmonės paskyrą.' : 'Patvirtinę el. paštą iškart galėsite naudotis DSS specialisto paskyra. Įmonės duomenų įvesti nereikia; vadovų kvietimus priimsite prisijungę.'}</p>}
         {authMode === 'signup' && <div className="mt-4 grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1 text-xs font-semibold"><button type="button" className={`rounded px-2 py-2 ${signupRole === 'manager' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} onClick={() => setSignupRole('manager')}>Vadovo paskyra</button><button type="button" className={`rounded px-2 py-2 ${signupRole === 'dss_specialist' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} onClick={() => setSignupRole('dss_specialist')}>DSS specialisto paskyra</button></div>}
-        <form onSubmit={handleAuth} className="mt-5 space-y-4">{authMode === 'signup' && <><label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label></>}<label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>{authMode === 'signup' && <><label className="block text-sm font-medium">Pasirašymo PIN (4 skaitmenys)<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite pasirašymo PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label></>}<button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button></form>
+        <form onSubmit={handleAuth} className="mt-5 space-y-4">{authMode === 'signup' && <><label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label></>}<label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>{authMode === 'signup' && <>{signupRole === 'manager' && <><label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="organization" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label><label className="block text-sm font-medium">Įmonės kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label></>}<label className="block text-sm font-medium">Pasirašymo PIN (4 skaitmenys)<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite pasirašymo PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label></>}<button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button></form>
         <button type="button" className="mt-4 w-full text-sm font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); setErrorMessage(''); setNotice(''); }}>{authMode === 'signup' ? 'Jau turite paskyrą? Prisijunkite' : 'Neturite paskyros? Registruokitės'}</button>
       </>}
       {notice && <p role="status" className="mt-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}

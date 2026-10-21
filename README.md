@@ -33,11 +33,14 @@ Supabase migracijoms:
 npx supabase login
 npx supabase link --project-ref wickbchyltkpmudopnwc
 npx supabase db push --linked
+npx supabase functions deploy invite-dss-specialist --project-ref wickbchyltkpmudopnwc
 ```
 
 Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir `development` aplinkoms. GitHub `main` pushai automatiškai paleidžia Vercel deploy.
 
-Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Darbuotojo profilio tipas taip pat atpažįstamas prisijungus. Vadovas gali sukurti įmonę ir saugoti jos darbo būseną. DSS specialisto paskyra prisijungus laukia įmonės vadovo pakvietimo; cloud kvietimų siuntimas, specialistų dokumentų prieiga ir jų atskiras pasirašymo PIN dar nėra prijungti. Darbuotojų paskyrų kūrimas, kvietimai, jų dokumentų cloud prieiga ir realaus elektroninio parašo patvirtinimas taip pat dar nėra prijungti.
+Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Registruojantis DSS specialistui įmonės duomenų nereikia: patvirtinęs el. paštą jis patenka į savo darbo sritį, kur gali naudotis paskyros ir bendromis sistemos funkcijomis, kol neturi prižiūrimų įmonių. Vadovas gali pakviesti DSS specialistą el. paštu; kvietimas nesuteikia prieigos, kol specialistas neprisijungęs jo nepriima. Specialistas gali kvietimo atsisakyti. Vadovas gali patvirtinęs pašalinti specialistą iš įmonės; panaikinama tik jo prieiga prie tos įmonės, o jo paskyra ir ankstesni parašai išsaugomi.
+
+Darbuotojo profilio tipas atpažįstamas prisijungus. Darbuotojų paskyrų kūrimas, kvietimai, jų dokumentų cloud prieiga ir realaus elektroninio parašo patvirtinimas taip pat dar nėra prijungti.
 
 ## Vietiniai duomenys
 

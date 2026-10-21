@@ -99,6 +99,23 @@ Deno.serve(async (request) => {
     invited = true;
   }
 
+  const { data: existingMembership, error: membershipLookupError } = await adminClient
+    .from('organization_memberships')
+    .select('role')
+    .eq('organization_id', organizationId)
+    .eq('user_id', specialistUser.id)
+    .maybeSingle();
+  if (membershipLookupError) {
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(500, { error: `Could not check the existing organization membership: ${membershipLookupError.message}` });
+  }
+  if (existingMembership) {
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(409, { error: existingMembership.role === 'dss_specialist'
+      ? 'This DSS specialist is already assigned to this organization'
+      : 'This account already has a different role in this organization' });
+  }
+
   const fullName = String(specialistUser.user_metadata?.full_name ?? email);
   const organization = workspace.data.organizations?.find((item: Record<string, unknown>) => item.id === organizationId);
   if (!organization) {
@@ -106,33 +123,43 @@ Deno.serve(async (request) => {
     return response(404, { error: 'Organization workspace was not found' });
   }
 
-  const nextOrganizations = workspace.data.organizations.map((item: Record<string, unknown>) => item.id === organizationId
-    ? { ...item, dss: [...new Set([...(Array.isArray(item.dss) ? item.dss : []), specialistUser.id])], dssInvitations: (item.dssInvitations ?? []).filter((invite: Record<string, unknown>) => invite.specialistId !== specialistUser?.id) }
-    : item);
-  const nextSpecialists = [...(workspace.data.specialists ?? []).filter((item: Record<string, unknown>) => item.id !== specialistUser?.id), {
-    id: specialistUser.id,
-    name: fullName,
-    email,
-    status: 'Paskyra patvirtinta',
-  }];
-  const { error: updateError } = await adminClient.from('organization_data').update({
-    data: { ...workspace.data, organizations: nextOrganizations, specialists: nextSpecialists },
-  }).eq('organization_id', organizationId);
-  if (updateError) {
+  const { data: existingInvitation, error: existingInvitationError } = await adminClient
+    .from('dss_specialist_invitations')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('specialist_user_id', specialistUser.id)
+    .in('status', ['pending', 'accepted'])
+    .maybeSingle();
+  if (existingInvitationError) {
     if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(500, { error: `Could not save DSS assignment: ${updateError.message}` });
+    return response(500, { error: `Could not check the existing DSS invitation: ${existingInvitationError.message}` });
+  }
+  if (existingInvitation) {
+    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
+    return response(409, { error: 'This DSS specialist is already invited to or assigned to this organization' });
   }
 
-  const { error: membershipError } = await adminClient.from('organization_memberships').upsert({
+  const { data: invitation, error: invitationError } = await adminClient.from('dss_specialist_invitations').insert({
     organization_id: organizationId,
-    user_id: specialistUser.id,
-    role: 'dss_specialist',
-  }, { onConflict: 'organization_id,user_id' });
-  if (membershipError) {
-    await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+    organization_name: String(organization.name ?? ''),
+    specialist_user_id: specialistUser.id,
+    invited_email: email,
+    invited_name: fullName,
+    invited_by: manager.id,
+    status: 'pending',
+  }).select('id').single();
+  if (invitationError) {
     if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(500, { error: `Could not link DSS account: ${membershipError.message}` });
+    return response(500, { error: `Could not save DSS invitation: ${invitationError.message}` });
   }
 
-  return response(200, { userId: specialistUser.id, fullName, email, invited });
+  return response(200, {
+    invitationId: invitation.id,
+    userId: specialistUser.id,
+    fullName,
+    email,
+    organizationName: String(organization.name ?? ''),
+    invited,
+    status: 'pending',
+  });
 });

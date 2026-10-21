@@ -201,6 +201,15 @@ Deno.serve(async (request) => {
   if (userError || !user) return response(401, { error: 'Session is invalid or expired' });
   const { data: isCreator, error: creatorError } = await userClient.rpc('is_creator');
   if (creatorError) return response(403, { error: 'Could not verify workspace access' });
+  const body = await request.json().catch(() => ({}));
+  const requestBody = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+  const requestedOrganizationId = typeof requestBody.organizationId === 'string' ? requestBody.organizationId : '';
+  const catalogOnly = requestBody.catalogOnly === true;
+  if ((requestedOrganizationId || catalogOnly) && !isCreator) return response(403, { error: 'Creator access required' });
+  if (catalogOnly && requestedOrganizationId) return response(400, { error: 'Choose either catalog-only or one organization' });
+  if (requestedOrganizationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedOrganizationId)) {
+    return response(400, { error: 'Invalid organization ID' });
+  }
 
   let organizationIds: string[] = [];
   if (!isCreator) {
@@ -212,20 +221,31 @@ Deno.serve(async (request) => {
     organizationIds = [...new Set((memberships ?? []).map((membership) => membership.organization_id))];
     if (!organizationIds.length) organizationIds = ['00000000-0000-0000-0000-000000000001'];
   }
+  const creatorCatalogKey = 'base64-assets-v1:creator-catalog';
   const migrationKey = isCreator
-    ? 'base64-assets-v1:all'
+    ? requestedOrganizationId
+      ? `base64-assets-v1:creator-organization:${requestedOrganizationId}`
+      : catalogOnly ? creatorCatalogKey : 'base64-assets-v1:all'
     : `base64-assets-v1:organizations:${[...organizationIds].sort().join(',')}`;
-  const migrationKeys = isCreator ? [migrationKey] : ['base64-assets-v1:all', migrationKey];
+  const migrationKeys = isCreator
+    ? ['base64-assets-v1:all', migrationKey, creatorCatalogKey]
+    : ['base64-assets-v1:all', migrationKey];
   const { data: migrationState, error: migrationStateError } = await adminClient
     .from('storage_migration_state')
     .select('migration_key')
     .in('migration_key', migrationKeys);
   if (migrationStateError) return response(500, { error: migrationStateError.message });
-  if (migrationState?.length) return response(200, { migrated: true, alreadyMigrated: true });
+  const completedKeys = new Set((migrationState ?? []).map((row) => row.migration_key));
+  if (completedKeys.has('base64-assets-v1:all')
+    || (!isCreator && completedKeys.has(migrationKey))
+    || (isCreator && catalogOnly && completedKeys.has(creatorCatalogKey))
+    || (isCreator && requestedOrganizationId && completedKeys.has(migrationKey) && completedKeys.has(creatorCatalogKey))) {
+    return response(200, { migrated: true, alreadyMigrated: true });
+  }
 
   const counters = { images: 0, documents: 0, signatures: 0, workspaces: 0 };
   const urlCache = new Map<string, string>();
-  if (isCreator) {
+  if (isCreator && !completedKeys.has(creatorCatalogKey) && !completedKeys.has('base64-assets-v1:all')) {
     const { data: catalog, error: catalogError } = await adminClient
       .from('creator_workspace_data')
       .select('data, updated_by, updated_at')
@@ -246,67 +266,76 @@ Deno.serve(async (request) => {
     }
   }
 
-  const pageSize = 100;
-  for (let offset = 0; ; offset += pageSize) {
-    let workspaceQuery = adminClient
-      .from('organization_data')
-      .select('organization_id, data, updated_by, updated_at');
-    if (!isCreator) workspaceQuery = workspaceQuery.in('organization_id', organizationIds);
-    const { data: workspaces, error } = await workspaceQuery
-      .order('organization_id')
-      .range(offset, offset + pageSize - 1);
-    if (error) return response(500, { error: error.message });
-    if (!workspaces?.length) break;
+  if (!catalogOnly) {
+    const pageSize = 100;
+    for (let offset = 0; ; offset += pageSize) {
+      let workspaceQuery = adminClient
+        .from('organization_data')
+        .select('organization_id, data, updated_by, updated_at');
+      if (!isCreator) workspaceQuery = workspaceQuery.in('organization_id', organizationIds);
+      if (requestedOrganizationId) workspaceQuery = workspaceQuery.eq('organization_id', requestedOrganizationId);
+      const { data: workspaces, error } = await workspaceQuery
+        .order('organization_id')
+        .range(offset, offset + pageSize - 1);
+      if (error) return response(500, { error: error.message });
+      if (!workspaces?.length) break;
 
-    for (const workspace of workspaces) {
-      const result = await migrateWorkspace(adminClient, workspace.organization_id, workspace.data ?? {}, counters, urlCache);
-      if (!result.changed) continue;
-      const { error: updateError } = await adminClient.from('organization_data').update({
-        data: result.data,
-        updated_by: workspace.updated_by,
-        updated_at: new Date().toISOString(),
-      }).eq('organization_id', workspace.organization_id).eq('updated_at', workspace.updated_at);
-      if (updateError) return response(500, { error: `Could not update organization ${workspace.organization_id}: ${updateError.message}` });
-      counters.workspaces += 1;
+      for (const workspace of workspaces) {
+        const result = await migrateWorkspace(adminClient, workspace.organization_id, workspace.data ?? {}, counters, urlCache);
+        if (!result.changed) continue;
+        const { error: updateError } = await adminClient.from('organization_data').update({
+          data: result.data,
+          updated_by: workspace.updated_by,
+          updated_at: new Date().toISOString(),
+        }).eq('organization_id', workspace.organization_id).eq('updated_at', workspace.updated_at);
+        if (updateError) return response(500, { error: `Could not update organization ${workspace.organization_id}: ${updateError.message}` });
+        counters.workspaces += 1;
+      }
+
+      if (workspaces.length < pageSize) break;
     }
-
-    if (workspaces.length < pageSize) break;
   }
 
-  const documentsPageSize = 100;
-  for (let offset = 0; ; offset += documentsPageSize) {
-    let documentQuery = adminClient
-      .from('organization_documents')
-      .select('document_id, payload, updated_at')
-      .not('payload', 'is', null);
-    if (!isCreator) {
-      documentQuery = organizationIds.length
-        ? documentQuery.or(`organization_id.is.null,organization_id.in.(${organizationIds.join(',')})`)
-        : documentQuery.is('organization_id', null);
-    }
-    const { data: documents, error } = await documentQuery
-      .order('document_id')
-      .range(offset, offset + documentsPageSize - 1);
-    if (error) return response(500, { error: error.message });
-    if (!documents?.length) break;
+  if (!catalogOnly) {
+    const documentsPageSize = 100;
+    for (let offset = 0; ; offset += documentsPageSize) {
+      let documentQuery = adminClient
+        .from('organization_documents')
+        .select('document_id, payload, updated_at')
+        .not('payload', 'is', null);
+      if (!isCreator) {
+        documentQuery = organizationIds.length
+          ? documentQuery.or(`organization_id.is.null,organization_id.in.(${organizationIds.join(',')})`)
+          : documentQuery.is('organization_id', null);
+      }
+      if (requestedOrganizationId) documentQuery = documentQuery.eq('organization_id', requestedOrganizationId);
+      const { data: documents, error } = await documentQuery
+        .order('document_id')
+        .range(offset, offset + documentsPageSize - 1);
+      if (error) return response(500, { error: error.message });
+      if (!documents?.length) break;
 
-    for (const document of documents) {
-      const result = await migrateResourceAssets(adminClient, [document.payload], counters, urlCache);
-      if (!result.changed) continue;
-      const { error: updateError } = await adminClient.from('organization_documents').update({
-        payload: result.resources[0],
-        updated_at: new Date().toISOString(),
-      }).eq('document_id', document.document_id).eq('updated_at', document.updated_at);
-      if (updateError) return response(500, { error: `Could not update document ${document.document_id}: ${updateError.message}` });
-    }
+      for (const document of documents) {
+        const result = await migrateResourceAssets(adminClient, [document.payload], counters, urlCache);
+        if (!result.changed) continue;
+        const { error: updateError } = await adminClient.from('organization_documents').update({
+          payload: result.resources[0],
+          updated_at: new Date().toISOString(),
+        }).eq('document_id', document.document_id).eq('updated_at', document.updated_at);
+        if (updateError) return response(500, { error: `Could not update document ${document.document_id}: ${updateError.message}` });
+      }
 
-    if (documents.length < documentsPageSize) break;
+      if (documents.length < documentsPageSize) break;
+    }
   }
 
-  const { error: stateError } = await adminClient.from('storage_migration_state').upsert({
-    migration_key: migrationKey,
+  const keysToSave = isCreator && requestedOrganizationId
+    ? [creatorCatalogKey, migrationKey]
+    : [migrationKey];
+  const { error: stateError } = await adminClient.from('storage_migration_state').upsert(keysToSave.map((key) => ({
+    migration_key: key,
     completed_at: new Date().toISOString(),
-  });
+  })));
   if (stateError) return response(500, { error: `Assets migrated, but the migration marker could not be saved: ${stateError.message}` });
 
   return response(200, { migrated: true, ...counters });

@@ -123,6 +123,7 @@ function workspaceForDatabase(workspace) {
   delete databaseWorkspace.protocolCommissionSignatures;
   delete databaseWorkspace.commissionInvitations;
   delete databaseWorkspace.commissionTasks;
+  delete databaseWorkspace.dssInvitations;
   const cleanSignature = (signature) => {
     const databaseSignature = { ...signature };
     delete databaseSignature.signatureImage;
@@ -601,7 +602,7 @@ const signerRoleOptions = [
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
 const employeePageSize = 20;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const loadedData = initialCloudData
@@ -643,7 +644,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
-  const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? 'org-statybu');
+  const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
@@ -688,6 +689,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [specialistQuery, setSpecialistQuery] = useState('');
   const [employeeForm, setEmployeeForm] = useState({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [dssInvitationActionId, setDssInvitationActionId] = useState('');
+  const [dssRevokeSubmittingId, setDssRevokeSubmittingId] = useState('');
+  const [dssRefreshSubmitting, setDssRefreshSubmitting] = useState(false);
   const [employeePositionDraft, setEmployeePositionDraft] = useState('');
   const [inviteResourceIds, setInviteResourceIds] = useState(['res-fire', 'res-height', 'res-aap']);
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
@@ -2410,16 +2414,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setNotice(`DSS specialisto pakviesti nepavyko: ${message}`);
         return;
       }
-      const invitedSpecialist = { id: invitation.userId, name: invitation.fullName, email: invitation.email, status: 'Paskyra patvirtinta' };
       setData((current) => ({
         ...current,
-        specialists: [...current.specialists.filter((item) => item.id !== invitedSpecialist.id), invitedSpecialist],
-        organizations: current.organizations.map((org) => org.id === currentOrg.id
-          ? { ...org, dss: [...new Set([...org.dss, invitedSpecialist.id])] }
-          : org),
+        dssInvitations: [
+          ...(current.dssInvitations ?? []).filter((item) => item.id !== invitation.invitationId),
+          {
+            id: invitation.invitationId,
+            organization_id: currentOrg.id,
+            organization_name: invitation.organizationName,
+            specialist_user_id: invitation.userId,
+            invited_email: invitation.email,
+            invited_name: invitation.fullName,
+            created_at: new Date().toISOString(),
+          },
+        ],
       }));
       setSpecialistQuery('');
-      setNotice(invitation.invited ? `Kvietimo nuoroda išsiųsta ${invitation.email}.` : `DSS specialistas ${invitation.email} pridėtas prie įmonės.`);
+      setNotice(invitation.invited
+        ? `Kvietimo nuoroda išsiųsta ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`
+        : `Kvietimas pateiktas ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`);
       return;
     }
     if (currentOrg.dss.includes(specialist.id) || currentOrg.dssInvitations?.some((invite) => invite.specialistId === specialist.id)) {
@@ -2438,6 +2451,67 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       dssInvitations: (org.dssInvitations ?? []).filter((invite) => invite.specialistId !== specialistId),
     }));
     setNotice('DSS specialisto kvietimas priimtas. Įmonė atsirado jo prižiūrimų įmonių sąraše.');
+  };
+
+  const respondToDssInvitation = async (invitation, accept) => {
+    setDssInvitationActionId(invitation.id);
+    try {
+      const { error } = await supabase.rpc('respond_dss_specialist_invitation', {
+        input_invitation_id: invitation.id,
+        input_accept: accept,
+      });
+      if (error) throw error;
+      const refreshedWorkspace = await onRefreshWorkspace();
+      if (refreshedWorkspace?.dss && refreshedWorkspace.data) {
+        setData((current) => ({ ...current, ...refreshedWorkspace.data }));
+        if (accept) setSelectedOrgId(invitation.organization_id);
+        setDssWorkspaceLoadState({ organizationId: '', status: 'idle', error: '' });
+      }
+      setNotice(accept
+        ? `Sutikote prižiūrėti įmonę „${invitation.organization_name}“. Ji pridėta prie jūsų darbo sričių.`
+        : `Kvietimo prižiūrėti įmonę „${invitation.organization_name}“ atsisakyta.`);
+    } catch (error) {
+      setNotice(`Kvietimo atnaujinti nepavyko: ${error.message}`);
+    } finally {
+      setDssInvitationActionId('');
+    }
+  };
+
+  const revokeDssSpecialist = async (specialist) => {
+    if (!window.confirm(`Ar tikrai pašalinti ${specialist.name} iš įmonės „${currentOrg?.name}“?\n\nSpecialisto prieiga prie šios įmonės bus panaikinta. Jau pasirašyti dokumentai ir parašų istorija liks išsaugoti. Specialisto paskyra nebus ištrinta.`)) return;
+    setDssRevokeSubmittingId(specialist.id);
+    try {
+      const { error } = await supabase.rpc('revoke_dss_specialist', {
+        input_organization_id: currentOrg.id,
+        input_specialist_user_id: specialist.id,
+      });
+      if (error) throw error;
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((organization) => organization.id === currentOrg.id
+          ? { ...organization, dss: organization.dss.filter((id) => id !== specialist.id) }
+          : organization),
+      }));
+      setNotice(`${specialist.name} pašalintas iš įmonės. Paskyra ir visi ankstesni parašai išsaugoti.`);
+    } catch (error) {
+      setNotice(`DSS specialisto pašalinti nepavyko: ${error.message}`);
+    } finally {
+      setDssRevokeSubmittingId('');
+    }
+  };
+
+  const refreshDssAssignments = async () => {
+    setDssRefreshSubmitting(true);
+    try {
+      const refreshedWorkspace = await onRefreshWorkspace();
+      if (!refreshedWorkspace?.data) throw new Error('Įmonės duomenys negrąžinti.');
+      setData((current) => ({ ...current, ...refreshedWorkspace.data }));
+      setNotice('DSS specialistų ir laukiančių kvietimų sąrašas atnaujintas.');
+    } catch (error) {
+      setNotice(`DSS specialistų sąrašo atnaujinti nepavyko: ${error.message}`);
+    } finally {
+      setDssRefreshSubmitting(false);
+    }
   };
 
   const requestDssSign = (tasks) => {
@@ -3105,11 +3179,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>
               </Panel>}
               {userRole === 'dss' && <Panel title="Prižiūrimos įmonės">
+                {!data.organizations.some((org) => org.dss.includes(selectedSpecialistId)) && <p className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">Jūsų DSS specialisto paskyra aktyvi ir galite naudotis bendromis sistemos bei paskyros funkcijomis. Šiuo metu neturite prižiūrimų įmonių; gavę kvietimą galėsite jį priimti čia.</p>}
                 <div className="grid gap-4 md:grid-cols-2">
                   {data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).map((org) => <div className="rounded-md border border-slate-200 p-4" key={org.id}><h2 className="font-semibold">{org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><p className="mt-3 text-sm">{dssWorkspaceLoadState.organizationId === org.id && dssWorkspaceLoadState.status === 'ready' ? `${data.employees.filter((employee) => employee.orgId === org.id).length} darbuotojai` : 'Duomenys įkeliami tik atidarius įmonę.'}</p><button className={`${buttonClass} mt-4`} onClick={() => { setSelectedOrgId(org.id); setActiveTab('zurnalai'); }}>Atidaryti įmonę <ArrowRight size={16} /></button></div>)}
-                  {data.organizations.flatMap((org) => (org.dssInvitations ?? []).filter((invite) => invite.specialistId === selectedSpecialistId).map((invite) => <div className="rounded-md border border-amber-200 bg-amber-50 p-4" key={`${org.id}-${invite.specialistId}`}><h2 className="font-semibold">Kvietimas · {org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><button className={`${buttonClass} mt-4`} onClick={() => acceptSpecialistInvite(org.id, invite.specialistId)}>Priimti kvietimą <Check size={16} /></button></div>))}
+                  {(data.dssInvitations ?? []).map((invitation) => <div className="rounded-md border border-amber-200 bg-amber-50 p-4" key={invitation.id}>
+                    <h2 className="font-semibold">Kvietimas · {invitation.organization_name}</h2>
+                    <p className="mt-1 text-sm text-slate-600">Įmonė kviečia jus tapti jos DSS specialistu. Prieigą gausite tik sutikę.</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" className={buttonClass} disabled={dssInvitationActionId === invitation.id} onClick={() => respondToDssInvitation(invitation, true)}>{dssInvitationActionId === invitation.id ? 'Vykdoma…' : 'Sutikti'} <Check size={16} /></button>
+                      <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" disabled={dssInvitationActionId === invitation.id} onClick={() => respondToDssInvitation(invitation, false)}>Atsisakyti</button>
+                    </div>
+                  </div>)}
+                  {!cloudMode && data.organizations.flatMap((org) => (org.dssInvitations ?? []).filter((invite) => invite.specialistId === selectedSpecialistId).map((invite) => <div className="rounded-md border border-amber-200 bg-amber-50 p-4" key={`${org.id}-${invite.specialistId}`}><h2 className="font-semibold">Kvietimas · {org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><button className={`${buttonClass} mt-4`} onClick={() => acceptSpecialistInvite(org.id, invite.specialistId)}>Priimti kvietimą <Check size={16} /></button></div>))}
                 </div>
-                {!data.organizations.some((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) && <p className="mt-4 text-sm text-slate-500">Prižiūrimų įmonių ar kvietimų nėra.</p>}
               </Panel>}
               {userRole === 'vadovas' && <Panel title="">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -3261,12 +3343,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <div className="grid gap-4 md:grid-cols-2">
               <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p></Panel>
               <Panel title="DSS specialistai">
-                <div className="space-y-2">{currentOrg?.dss.map((id) => data.specialists.find((person) => person.id === id)).filter(Boolean).map((person) => <div className="border-b border-slate-100 py-2 text-sm" key={person.id}><span>{person.name}<small className="block text-slate-500">{person.email}</small></span></div>)}</div>
-                {(currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
+                {cloudMode && <div className="mb-3 flex justify-end"><button type="button" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={dssRefreshSubmitting} onClick={refreshDssAssignments}>{dssRefreshSubmitting ? 'Atnaujinama…' : 'Atnaujinti sąrašą'}</button></div>}
+                <div className="space-y-2">{currentOrg?.dss.map((id) => data.specialists.find((person) => person.id === id)).filter(Boolean).map((person) => <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm" key={person.id}><span>{person.name}<small className="block text-slate-500">{person.email}</small></span>{cloudMode && <button type="button" className="shrink-0 rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssRevokeSubmittingId === person.id} onClick={() => revokeDssSpecialist(person)}>{dssRevokeSubmittingId === person.id ? 'Šalinama…' : 'Pašalinti'}</button>}</div>)}</div>
+                {(data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
+                {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
                 <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
                 </label>
-                <p className="mt-2 text-xs text-slate-500">Tapatybę patikrinkite pagal el. paštą. Vien vardas ir pavardė nėra pakankamas sutapimas; kvietimas priskiria specialistą tik po jo patvirtinimo.</p>
+                <p className="mt-2 text-xs text-slate-500">Patikrinkite el. paštą. Kvietimas nesuteikia prieigos iš karto — specialistas turi jį priimti prisijungęs. Pašalinant specialistą bus parodytas patvirtinimo klausimas; ankstesni jo parašai liks išsaugoti.</p>
                 {cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
                 {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>

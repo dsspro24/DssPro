@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import LocalWorkspace from './LocalWorkspace.jsx';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import CloudEntry from './CloudEntry.jsx';
 import { isSupabaseConfigured, supabase } from './lib/supabase.js';
 import { 
@@ -22,6 +21,8 @@ import {
   CreditCard,
   FileBarChart
 } from 'lucide-react';
+
+const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
 export default function App() {
   return isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
@@ -207,8 +208,7 @@ function DemoApp({ cloudMode = false }) {
           data: {
             full_name: fullName,
             account_type: registerRole === 'dss' ? 'dss_specialist' : 'manager',
-            company_name: companyName,
-            company_code: companyCode,
+            ...(registerRole === 'vadovas' ? { company_name: companyName, company_code: companyCode } : {}),
             signing_pin: signingPin,
           },
           emailRedirectTo: window.location.origin,
@@ -216,7 +216,9 @@ function DemoApp({ cloudMode = false }) {
       });
       if (error) throw error;
       if (data.session) setCurrentPage('app');
-      else setCloudSignupFeedback('Paskyra sukurta. Patvirtinkite el. paštą; PIN ir įmonės duomenys bus paruošti prisijungus.');
+      else setCloudSignupFeedback(registerRole === 'dss'
+        ? 'DSS specialisto paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite. Įmonės vadovo kvietimą galėsite priimti sistemoje.'
+        : 'Vadovo paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite, kad užbaigtumėte įmonės nustatymą.');
     } catch (error) {
       setCloudSignupFeedback(error.message || 'Nepavyko sukurti paskyros. Patikrinkite duomenis.');
     }
@@ -427,6 +429,11 @@ function DemoApp({ cloudMode = false }) {
                 {cloudMode ? 'DSS specialisto paskyra' : 'DSS specialistas'}
               </button>
             </div>
+            {cloudMode && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-950">
+              {registerRole === 'vadovas'
+                ? 'Sukurkite vadovo paskyrą, patvirtinkite el. paštą ir įveskite įmonės duomenis. DSS specialistą galėsite pakviesti įmonės nustatymuose.'
+                : 'Sukurkite atskirą DSS specialisto paskyrą ir patvirtinkite el. paštą. Įmonės duomenų įvesti nereikia; vadovo kvietimą priimsite prisijungę.'}
+            </p>}
 
             <form onSubmit={cloudMode ? handleCloudSignup : (e) => { e.preventDefault(); setCurrentPage('app'); setUserRole(registerRole); setActiveTab('skydelis'); }} className="space-y-3 text-xs">
               <div>
@@ -441,16 +448,16 @@ function DemoApp({ cloudMode = false }) {
 
               {cloudMode && <div><label className="block text-slate-500 mb-1">Slaptažodis</label><input name="password" type="password" minLength={8} autoComplete="new-password" required placeholder="Bent 8 simboliai" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" /></div>}
 
-              <div className="grid grid-cols-2 gap-3">
+              {(!cloudMode || registerRole === 'vadovas') && <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-500 mb-1">Įmonės pavadinimas{cloudMode && registerRole === 'dss' ? ' (neprivaloma)' : ''}</label>
+                  <label className="block text-slate-500 mb-1">Įmonės pavadinimas</label>
                   <input name="companyName" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
                 <div>
-                  <label className="block text-slate-500 mb-1">Įmonės kodas{cloudMode && registerRole === 'dss' ? ' (neprivaloma)' : ''}</label>
+                  <label className="block text-slate-500 mb-1">Įmonės kodas</label>
                   <input name="companyCode" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
-              </div>
+              </div>}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -485,7 +492,7 @@ function DemoApp({ cloudMode = false }) {
   // ==========================================
   if (currentPage === 'app') {
     if (cloudMode) return <CloudEntry onExit={() => setCurrentPage('landing')} />;
-    return <LocalWorkspace userRole={userRole} onRoleChange={handleRoleChange} onExit={() => setCurrentPage('landing')} />;
+    return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliama darbo sritis…</p></main>}><LocalWorkspace userRole={userRole} onRoleChange={handleRoleChange} onExit={() => setCurrentPage('landing')} /></Suspense>;
   }
 
   return (
