@@ -553,7 +553,7 @@ export default function CloudEntry() {
       { data: assignments, error: assignmentsError },
       { data: protocolSignatures, error: protocolSignaturesError },
     ] = await Promise.all([
-      loadOrganizationWorkspace(organizationId, workspace.catalog?.resources ?? []),
+      loadOrganizationWorkspace(organizationId, workspace.data.resources ?? []),
       supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
       supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
     ]);
