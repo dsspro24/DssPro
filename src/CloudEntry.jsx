@@ -49,6 +49,52 @@ async function hydrateWorkspaceAssets(workspace) {
   };
 }
 
+async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
+  const [
+    { data: workspace, error: workspaceError },
+    { data: organizationDocuments, error: documentsError },
+  ] = await Promise.all([
+    supabase.rpc('get_organization_workspace_metadata', { input_organization_id: organizationId }),
+    supabase.from('organization_documents')
+      .select('document_id, payload')
+      .eq('organization_id', organizationId)
+      .eq('active', true),
+  ]);
+  if (workspaceError) throw workspaceError;
+  if (documentsError) throw documentsError;
+
+  const mapDocuments = (documents, resourceOrganizationId = '') => documents.map((document) => {
+    if (!document.payload || typeof document.payload !== 'object' || Array.isArray(document.payload)) {
+      throw new Error(`Dokumento ${document.document_id} duomenys netinkami.`);
+    }
+    return {
+      ...document.payload,
+      id: document.document_id,
+      ...(resourceOrganizationId ? { organizationId: resourceOrganizationId } : {}),
+    };
+  });
+  const catalogResources = sharedResources.filter((resource) => resource && !resource.organizationId);
+  let sharedCatalogResources = catalogResources;
+  if (!catalogResources.length) {
+    const { data: sharedDocuments, error: sharedDocumentsError } = await supabase.from('organization_documents')
+      .select('document_id, payload')
+      .is('organization_id', null)
+      .eq('active', true);
+    if (sharedDocumentsError) throw sharedDocumentsError;
+    sharedCatalogResources = mapDocuments(sharedDocuments ?? []);
+  }
+
+  return workspace
+    ? {
+      ...workspace,
+      resources: [
+        ...sharedCatalogResources,
+        ...mapDocuments(organizationDocuments ?? [], organizationId),
+      ],
+    }
+    : null;
+}
+
 async function loadManagerWorkspace(user) {
   const [{ data: isCreator, error: creatorError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.rpc('is_creator'),
@@ -219,22 +265,21 @@ async function loadManagerWorkspace(user) {
     .from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single();
   if (organizationError) throw organizationError;
 
-  const [workspaceResult, catalogResult] = await Promise.all([
-    supabase.from('organization_data').select('data').eq('organization_id', organization.id).maybeSingle(),
-    supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+  const { data: catalogData, error: catalogError } = await supabase
+    .from('creator_workspace_data').select('data').eq('id', true).maybeSingle();
+  if (catalogError) throw catalogError;
+  const [savedWorkspace, invitationsResult] = await Promise.all([
+    loadOrganizationWorkspace(organization.id, catalogData?.data?.resources ?? []),
+    supabase.from('dss_specialist_invitations')
+      .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
+      .eq('organization_id', organization.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
   ]);
-  const { data: savedWorkspace, error: workspaceError } = workspaceResult;
-  if (workspaceError) throw workspaceError;
-  if (catalogResult.error) throw catalogResult.error;
-  const { data: dssInvitations, error: dssInvitationsError } = await supabase
-    .from('dss_specialist_invitations')
-    .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
-    .eq('organization_id', organization.id)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true });
+  const { data: dssInvitations, error: dssInvitationsError } = invitationsResult;
   if (dssInvitationsError) throw dssInvitationsError;
-  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
-  const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
+  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
+  const hydratedCatalog = await hydrateWorkspaceAssets(catalogData?.data ?? null);
   const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
     supabase.rpc('get_organization_commission_assignments', { input_organization_id: organization.id }),
     supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organization.id }),
@@ -504,20 +549,19 @@ export default function CloudEntry() {
     }
 
     const [
-      { data: savedWorkspace, error: workspaceError },
+      savedWorkspace,
       { data: assignments, error: assignmentsError },
       { data: protocolSignatures, error: protocolSignaturesError },
     ] = await Promise.all([
-      supabase.from('organization_data').select('data').eq('organization_id', organizationId).maybeSingle(),
+      loadOrganizationWorkspace(organizationId, workspace.catalog?.resources ?? []),
       supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
       supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
     ]);
-    if (workspaceError) throw workspaceError;
     if (assignmentsError) throw assignmentsError;
     if (protocolSignaturesError) throw protocolSignaturesError;
-    if (!savedWorkspace?.data) throw new Error('Įmonės darbo sritis dar nesukurta.');
+    if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
 
-    const storedWorkspace = savedWorkspace.data;
+    const storedWorkspace = savedWorkspace;
     const savedOrganization = storedWorkspace.organizations?.find((item) => item.id === organizationId);
     if (!savedOrganization) throw new Error('Įmonės nustatymai nerasti.');
     const hydratedWorkspace = await hydrateWorkspaceAssets(storedWorkspace);
