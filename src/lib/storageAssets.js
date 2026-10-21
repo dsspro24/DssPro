@@ -28,13 +28,7 @@ export async function uploadSignatureDataUrl(organizationId, dataUrl) {
     upsert: false,
   });
   if (uploadError) throw uploadError;
-
-  const { data, error } = await supabase.storage.from(signatureBucket).createSignedUrl(path, 60 * 60 * 24 * 7);
-  if (error) {
-    await supabase.storage.from(signatureBucket).remove([path]);
-    throw error;
-  }
-  return { path, signedUrl: data.signedUrl };
+  return { path };
 }
 
 export async function removeSignatureAsset(path) {

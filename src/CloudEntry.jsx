@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
-import { hydrateSignatureImages } from './lib/storageAssets.js';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
@@ -31,21 +30,23 @@ async function hydrateResourceAssets(resources = []) {
   }));
 }
 
-async function hydrateWorkspaceAssets(workspace, { hydrateSignatures = false } = {}) {
+async function hydrateWorkspaceAssets(workspace) {
   if (!workspace || typeof workspace !== 'object') return workspace;
-  const [resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures] = await Promise.all([
-    hydrateResourceAssets(workspace.resources ?? []),
-    hydrateSignatures ? hydrateSignatureImages(workspace.signatures ?? []) : Promise.resolve(workspace.signatures ?? []),
-    hydrateSignatureImages(workspace.aapIssuances ?? []),
-    hydrateSignatureImages(workspace.commissionInvitations ?? []),
-    hydrateSignatureImages(workspace.protocolCommissionSignatures ?? []),
-  ]);
+  const resources = await hydrateResourceAssets(workspace.resources ?? []);
   const archivedEmployees = await Promise.all((workspace.archivedEmployees ?? []).map(async (record) => ({
     ...record,
     resources: await hydrateResourceAssets(record.resources ?? []),
-    signatures: hydrateSignatures ? await hydrateSignatureImages(record.signatures ?? []) : record.signatures ?? [],
+    signatures: record.signatures ?? [],
   })));
-  return { ...workspace, resources, signatures, aapIssuances, commissionInvitations, protocolCommissionSignatures, archivedEmployees };
+  return {
+    ...workspace,
+    resources,
+    signatures: workspace.signatures ?? [],
+    aapIssuances: workspace.aapIssuances ?? [],
+    commissionInvitations: workspace.commissionInvitations ?? [],
+    protocolCommissionSignatures: workspace.protocolCommissionSignatures ?? [],
+    archivedEmployees,
+  };
 }
 
 async function loadManagerWorkspace(user) {
@@ -180,21 +181,17 @@ async function loadManagerWorkspace(user) {
     if (commissionInvitationsError) throw commissionInvitationsError;
     if (commissionTasksError) throw commissionTasksError;
     if (employeeSequenceNumberError) throw employeeSequenceNumberError;
-    const hydratedCommissionTasks = await Promise.all((commissionTasks ?? []).map(async (task) => ({
-      ...task,
-      protocolCommissionSignatures: await hydrateSignatureImages(task.protocolCommissionSignatures ?? []),
-    })));
-    const employeeCommissionAssignments = [...new Map(hydratedCommissionTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id, assignment])).values()];
-    const employeeProtocolSignatures = [...new Map(hydratedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
+    const employeeCommissionAssignments = [...new Map((commissionTasks ?? []).flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id, assignment])).values()];
+    const employeeProtocolSignatures = [...new Map((commissionTasks ?? []).flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
     const employeeData = await hydrateWorkspaceAssets({
       ...employeeWorkspace.data,
       employees: employeeWorkspace.data.employees.map((employee) => ({ ...employee, sequenceNumber: employeeSequenceNumber })),
       aapIssuances: aapIssuances ?? [],
       commissionInvitations: commissionInvitations ?? [],
-      commissionTasks: hydratedCommissionTasks,
+      commissionTasks: commissionTasks ?? [],
       commissionAssignments: employeeCommissionAssignments,
       protocolCommissionSignatures: employeeProtocolSignatures,
-    }, { hydrateSignatures: true });
+    });
     return {
       employee: true,
       managerName,
@@ -236,7 +233,7 @@ async function loadManagerWorkspace(user) {
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
   if (dssInvitationsError) throw dssInvitationsError;
-  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null, { hydrateSignatures: true });
+  const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
   const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
     supabase.rpc('get_organization_commission_assignments', { input_organization_id: organization.id }),
@@ -244,13 +241,13 @@ async function loadManagerWorkspace(user) {
   ]);
   if (commissionAssignmentsError) throw commissionAssignmentsError;
   if (protocolCommissionSignaturesError) throw protocolCommissionSignaturesError;
-  const hydratedCommissionAssignments = await hydrateSignatureImages((commissionAssignments ?? []).map((assignment) => ({
+  const managerCommissionAssignments = (commissionAssignments ?? []).map((assignment) => ({
     ...assignment,
     signaturePath: assignment.consentSignaturePath,
-  })));
+  }));
   const hydratedManagerWorkspace = await hydrateWorkspaceAssets({
     ...hydratedWorkspace,
-    commissionAssignments: hydratedCommissionAssignments,
+    commissionAssignments: managerCommissionAssignments,
     protocolCommissionSignatures: protocolCommissionSignatures ?? [],
   });
 
@@ -490,7 +487,7 @@ export default function CloudEntry() {
         .eq('organization_id', organizationId)
         .maybeSingle();
       if (error) throw error;
-      const data = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null, { hydrateSignatures: true });
+      const data = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
       setCreatorPreview({ organizationId, role, data });
     } catch (error) {
       setErrorMessage(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
@@ -523,14 +520,12 @@ export default function CloudEntry() {
     const storedWorkspace = savedWorkspace.data;
     const savedOrganization = storedWorkspace.organizations?.find((item) => item.id === organizationId);
     if (!savedOrganization) throw new Error('Įmonės nustatymai nerasti.');
-    const [hydratedWorkspace, hydratedAssignments, hydratedProtocolSignatures] = await Promise.all([
-      hydrateWorkspaceAssets(storedWorkspace, { hydrateSignatures: true }),
-      hydrateSignatureImages((assignments ?? []).map((assignment) => ({
-        ...assignment,
-        signaturePath: assignment.consentSignaturePath,
-      }))),
-      hydrateSignatureImages(protocolSignatures ?? []),
-    ]);
+    const hydratedWorkspace = await hydrateWorkspaceAssets(storedWorkspace);
+    const hydratedAssignments = (assignments ?? []).map((assignment) => ({
+      ...assignment,
+      signaturePath: assignment.consentSignaturePath,
+    }));
+    const hydratedProtocolSignatures = protocolSignatures ?? [];
     const organization = {
       ...organizationSummary,
       ...savedOrganization,

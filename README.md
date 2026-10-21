@@ -40,6 +40,12 @@ Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir
 
 Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Registruojantis DSS specialistui įmonės duomenų nereikia: patvirtinęs el. paštą jis patenka į savo darbo sritį, kur gali naudotis paskyros ir bendromis sistemos funkcijomis, kol neturi prižiūrimų įmonių. Vadovas gali pakviesti DSS specialistą el. paštu; kvietimas nesuteikia prieigos, kol specialistas neprisijungęs jo nepriima. Specialistas gali kvietimo atsisakyti. Vadovas gali patvirtinęs pašalinti specialistą iš įmonės; panaikinama tik jo prieiga prie tos įmonės, o jo paskyra ir ankstesni parašai išsaugomi.
 
+Cloud parašų istorija kraunama iš normalizuotos `document_signatures` lentelės puslapiais po 25 įrašus. Ekrane pirmiausia rodomi parašo metaduomenys, o saugyklos URL ir vaizdas įkeliami tik paspaudus „Peržiūrėti parašą“. Darbo eigos būsenos ir kitos funkcijos kol kas tebenaudoja darbo srities `signatures` metaduomenis.
+
+`organization_data` JSON darbo sritis paliekama dabartiniams nustatymams ir suderinamumui su dar neperkeltomis funkcijomis. Didesnės istorijos ir sąrašai gali būti palaipsniui perkeliami į normalizuotas lenteles atskirais, suderinamais žingsniais; vienu pakeitimu visos darbo srities schema nekeičiama. Šiuo metu parašų istorijos skaitymas jau naudoja normalizuotą lentelę, tačiau kitos parašų darbo eigos dalys dar remiasi JSON metaduomenimis.
+
+Parašų istorijos puslapiavimą palaiko indeksai pagal įmonę ir datą, įmonę bei darbuotoją ir įmonę bei pasirašiusį naudotoją. Protokolo dalyvių paieškai pagal įmonę ir darbuotoją taip pat yra atskiras indeksas. Šios lentelės turi įjungtą tenant-scoped RLS; narių tikrinimą aptarnauja `organization_memberships` pirminis raktas ir darbuotojo dalinis unikalus indeksas. Dabartinė duomenų bazė maža, todėl `EXPLAIN` gali pagrįstai rinktis nuoseklų lentelės skenavimą; tai nėra apkrovos bandymas ar įrodymas, kaip veiks planas prie SaaS masto.
+
 Darbuotojo profilio tipas atpažįstamas prisijungus. Darbuotojų paskyrų kūrimas, kvietimai, jų dokumentų cloud prieiga ir realaus elektroninio parašo patvirtinimas taip pat dar nėra prijungti.
 
 ## Vietiniai duomenys
