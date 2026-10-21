@@ -153,13 +153,18 @@ async function loadManagerWorkspace(user) {
     };
   }
 
-  const { data: signingPinConfigured, error: pinError } = await supabase.rpc('has_signing_pin');
+  const [
+    { data: signingPinConfigured, error: pinError },
+    membershipsResult,
+  ] = await Promise.all([
+    supabase.rpc('has_signing_pin'),
+    supabase.from('organization_memberships')
+      .select('organization_id, role, employee_id')
+      .eq('user_id', user.id),
+  ]);
   if (pinError) throw pinError;
   if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
-  const { data: memberships, error: membershipError } = await supabase
-    .from('organization_memberships')
-    .select('organization_id, role, employee_id')
-    .eq('user_id', user.id);
+  const { data: memberships, error: membershipError } = membershipsResult;
   if (membershipError) throw membershipError;
   const { error: memberAssetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: {} });
   if (memberAssetMigrationError) throw new Error(`Nepavyko perkelti įmonės failų į Storage: ${memberAssetMigrationError.message}`);
