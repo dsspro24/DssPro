@@ -407,6 +407,12 @@ const normalizeResourceType = (resource) => {
     Mokymas: 'Protokolas', Mokymai: 'Protokolas',
   })[resource.type?.trim()] ?? 'Protokolas';
 };
+const getResourcePreviewActionLabel = (resource) => ({
+  Testas: 'Peržiūrėti testą',
+  Žurnalas: 'Peržiūrėti žurnalą',
+  Kortelė: 'Peržiūrėti kortelę',
+  Protokolas: 'Peržiūrėti protokolą',
+})[normalizeResourceType(resource)];
 
 const initialData = {
   resourceTypes: defaultResourceTypes,
@@ -3897,17 +3903,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 resource?.title ?? 'Dokumentas',
                 new Date(task.signedAt).toLocaleString('lt-LT'),
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={15} />Peržiūrėti žurnalą</button>
+                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={15} />{resource ? getResourcePreviewActionLabel(resource) : 'Peržiūrėti dokumentą'}</button>
                   <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => requestDssSign([task])}>Pasirašyti</button>
                 </div>,
               ];
             })} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
             {currentDssTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentDssTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentDssTaskPage * dssTaskPageSize, currentDssTasks.length)} iš {currentDssTasks.length} · pasirinkta {selectedCurrentDssTasks.length}</p><nav className="flex items-center gap-2" aria-label="DSS pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage <= 1} onClick={() => setDssTaskPage(Math.max(1, currentDssTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentDssTaskPage} / {dssTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage >= dssTaskPageCount} onClick={() => setDssTaskPage(Math.min(dssTaskPageCount, currentDssTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
           </Panel>}
-          {dssJournalView === 'history' && <Panel title="DSS parašų istorija"><PaginatedSignatureHistory
+          {dssJournalView === 'history' && <Panel title="DSS specialisto pasirašyti dokumentai"><PaginatedSignatureHistory
             key={`${currentOrg?.id ?? ''}:organization-history`}
             organizationId={currentOrg?.id}
-            signatures={data.signatures.filter((signature) => signature.orgId === currentOrg?.id)}
+            signerUserId={cloudMode ? cloudUserId : undefined}
+            signerRole="DSS specialistas"
+            signatures={data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'DSS specialistas' && (cloudMode ? signature.signerUserId === cloudUserId : signature.signer === currentSpecialist?.name))}
             resources={data.resources}
             employees={[...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)]}
             archivedEmployees={archivedOrgEmployees}
@@ -4143,7 +4151,7 @@ function SignatureImagePreview({ signature, emptyLabel = null }) {
     {error && <p role="alert" className="mt-1 max-w-48 text-xs text-rose-700">{error}</p>}
   </div>;
 }
-function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize }) {
+function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize }) {
   const [page, setPage] = useState(1);
   const [historyResult, setHistoryResult] = useState({ key: '', records: [], totalCount: 0, error: '' });
   const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
@@ -4152,7 +4160,7 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
     return timeDifference || String(right.id).localeCompare(String(left.id));
   }), [signatures]);
   const localPageCount = Math.max(1, Math.ceil(localRecords.length / pageSize));
-  const requestKey = JSON.stringify([organizationId, employeeId, signerUserId, page, pageSize]);
+  const requestKey = JSON.stringify([organizationId, employeeId, signerUserId, signerRole, page, pageSize]);
   const resultIsCurrent = historyResult.key === requestKey;
   const cloudCount = resultIsCurrent ? historyResult.totalCount : 0;
   const loading = cloudMode && Boolean(organizationId) && !resultIsCurrent;
@@ -4174,6 +4182,7 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
       .eq('organization_id', organizationId);
     if (employeeId) query = query.eq('employee_id', employeeId);
     if (signerUserId) query = query.eq('signer_user_id', signerUserId);
+    if (signerRole) query = query.eq('signer_role', signerRole);
     query
       .order('signed_at', { ascending: false })
       .order('signature_id', { ascending: false })
@@ -4211,14 +4220,14 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
         setHistoryResult({ key: requestKey, records: [], totalCount: 0, error: `Parašų istorijos įkelti nepavyko: ${queryError.message}` });
       });
     return () => { active = false; };
-  }, [cloudMode, employeeById, employeeId, organizationId, page, pageSize, requestKey, signerUserId]);
+  }, [cloudMode, employeeById, employeeId, organizationId, page, pageSize, requestKey, signerRole, signerUserId]);
 
   return <div className="space-y-3">
     {visibleError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{visibleError}</p>}
     {loading && <p role="status" className="text-sm text-slate-500">Įkeliama parašų istorija…</p>}
     {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} />}
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-slate-500">{visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
+      <p className="text-xs text-slate-500">{loading ? 'Įkeliama parašų istorija…' : visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
       <div className="flex gap-2">
         <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Ankstesnis</button>
         <span className="self-center text-xs text-slate-500">{page} / {pageCount}</span>
