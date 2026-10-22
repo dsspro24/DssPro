@@ -62,6 +62,7 @@ function DemoApp({ cloudMode = false }) {
   const [registerPlan, setRegisterPlan] = useState('standard');
   const [cloudSignupFeedback, setCloudSignupFeedback] = useState('');
   const [signupConfirmationEmail, setSignupConfirmationEmail] = useState('');
+  const [signupSubmitting, setSignupSubmitting] = useState(false);
 
   const scrollToSignup = () => {
     const signupSection = document.getElementById('pricing-signup');
@@ -211,6 +212,9 @@ function DemoApp({ cloudMode = false }) {
       return;
     }
 
+    setSignupConfirmationEmail(email);
+    setSignupSubmitting(true);
+    document.getElementById('signup-confirmation-dialog')?.showModal();
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -227,12 +231,14 @@ function DemoApp({ cloudMode = false }) {
         },
       });
       if (error) throw error;
-      if (data.session) setCurrentPage('app');
-      else {
-        setSignupConfirmationEmail(email);
-        document.getElementById('signup-confirmation-dialog')?.showModal();
+      if (data.session) {
+        document.getElementById('signup-confirmation-dialog')?.close();
+        setCurrentPage('app');
       }
+      setSignupSubmitting(false);
     } catch (error) {
+      document.getElementById('signup-confirmation-dialog')?.close();
+      setSignupSubmitting(false);
       const cooldown = error.message?.match(/only request this after\s+(\d+)\s+seconds?/i);
       setCloudSignupFeedback(cooldown
         ? `Dėl saugumo registracijos nuorodos galima prašyti dar kartą po ${cooldown[1]} sek.`
@@ -503,10 +509,16 @@ function DemoApp({ cloudMode = false }) {
         </footer>
 
         {cloudMode && <dialog id="signup-confirmation-dialog" className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-950/60">
-          <h2 className="text-lg font-bold">Patvirtinkite el. paštą</h2>
-          <p className="mt-2 text-sm text-slate-600">Registracijos nuorodą išsiuntėme adresu <strong className="break-all text-slate-900">{signupConfirmationEmail}</strong>.</p>
-          <p className="mt-2 text-sm text-slate-600">Atidarykite laiške esančią nuorodą, tada grįžkite čia ir prisijunkite. Jei laiško nematote, patikrinkite brukalo aplanką.</p>
-          <button type="button" className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => { document.getElementById('signup-confirmation-dialog')?.close(); setCloudSignupFeedback(''); setCurrentPage('app'); setActiveTab('skydelis'); }}>Supratau</button>
+          {signupSubmitting ? <>
+            <div className="flex items-center gap-3"><span className="size-5 animate-spin rounded-full border-2 border-emerald-700 border-t-transparent" aria-hidden="true" /><h2 className="text-lg font-bold">Registruojame paskyrą…</h2></div>
+            <p className="mt-2 text-sm text-slate-600">Siunčiame patvirtinimo nuorodą adresu <strong className="break-all text-slate-900">{signupConfirmationEmail}</strong>.</p>
+            <p className="mt-2 text-xs text-slate-500">Tai gali užtrukti kelias sekundes.</p>
+          </> : <>
+            <h2 className="text-lg font-bold">Patikrinkite el. paštą</h2>
+            <p className="mt-2 text-sm text-slate-600">Patvirtinimo nuorodą išsiuntėme adresu <strong className="break-all text-slate-900">{signupConfirmationEmail}</strong>.</p>
+            <p className="mt-2 text-sm text-slate-600">Atidarykite laiške esančią nuorodą, tada prisijunkite. Jei laiško nematote, patikrinkite brukalo aplanką.</p>
+            <button type="button" className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => { document.getElementById('signup-confirmation-dialog')?.close(); setCloudSignupFeedback(''); setCurrentPage('app'); setActiveTab('skydelis'); }}>Supratau</button>
+          </>}
         </dialog>}
 
       </div>
