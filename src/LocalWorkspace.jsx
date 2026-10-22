@@ -136,6 +136,11 @@ function workspaceForDatabase(workspace) {
   };
   return {
     ...databaseWorkspace,
+    organizations: (workspace.organizations ?? []).map((organization) => {
+      const databaseOrganization = { ...organization };
+      delete databaseOrganization.canManageWorkspace;
+      return databaseOrganization;
+    }),
     resources: (workspace.resources ?? []).map(resourceForDatabase),
     signatures: (workspace.signatures ?? []).map(cleanSignature),
     aapIssuances: (workspace.aapIssuances ?? []).map(cleanAapIssuance),
@@ -721,6 +726,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssInvitationActionId, setDssInvitationActionId] = useState('');
   const [dssRevokeSubmittingId, setDssRevokeSubmittingId] = useState('');
   const [dssRefreshSubmitting, setDssRefreshSubmitting] = useState(false);
+  const [dssManagementAccess, setDssManagementAccess] = useState([]);
+  const [dssManagementOrganizationId, setDssManagementOrganizationId] = useState('');
+  const [dssManagementSavingId, setDssManagementSavingId] = useState('');
   const [employeePositionDraft, setEmployeePositionDraft] = useState('');
   const [inviteResourceIds, setInviteResourceIds] = useState(['res-fire', 'res-height', 'res-aap']);
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
@@ -771,6 +779,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssSigningError, setDssSigningError] = useState('');
   const [dssReviewConfirmed, setDssReviewConfirmed] = useState(false);
   const [selectedDssTaskIds, setSelectedDssTaskIds] = useState([]);
+  const canManageSelectedWorkspace = userRole === 'vadovas' || (userRole === 'dss'
+    && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerAapBothPagesConfirmed, setWorkerAapBothPagesConfirmed] = useState(false);
   const [workerSignPin, setWorkerSignPin] = useState('');
@@ -887,7 +897,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return () => window.clearTimeout(timeout);
     }
 
-    if (userRole === 'dss') return undefined;
+    if (userRole === 'dss' && !canManageSelectedWorkspace) return undefined;
 
     const organization = data.organizations.find((item) => item.id === selectedOrgId);
     if (!organization) return undefined;
@@ -934,7 +944,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.clearTimeout(timeout);
       if (workspaceAutosaveTimeoutRef.current === timeout) workspaceAutosaveTimeoutRef.current = null;
     };
-  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview]);
+  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview, canManageSelectedWorkspace]);
 
   useLayoutEffect(() => {
     const frame = previewFrameRef.current;
@@ -964,7 +974,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [archivePrintMode]);
 
   useEffect(() => {
-    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    if (!cloudMode || !selectedOrgId || !canManageSelectedWorkspace) return undefined;
     let active = true;
     supabase.rpc('get_commission_signer_status', { input_organization_id: selectedOrgId })
       .then(({ data, error }) => {
@@ -973,10 +983,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         else setCommissionPinStatus({ organizationId: selectedOrgId, members: data ?? {} });
       });
     return () => { active = false; };
-  }, [cloudMode, selectedOrgId, userRole]);
+  }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   useEffect(() => {
-    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    if (!cloudMode || !selectedOrgId || !canManageSelectedWorkspace) return undefined;
     let active = true;
     supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: selectedOrgId })
       .then(({ data: signatures, error }) => {
@@ -997,10 +1007,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         if (active) setNotice(`Komisijos protokolo parašų įkelti nepavyko: ${error.message}`);
       });
     return () => { active = false; };
-  }, [cloudMode, selectedOrgId, userRole]);
+  }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   useEffect(() => {
-    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    if (!cloudMode || !selectedOrgId || !canManageSelectedWorkspace) return undefined;
     let active = true;
     let requestInFlight = false;
     const refreshCommissionAssignments = async () => {
@@ -1034,11 +1044,31 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', refreshCommissionAssignments);
     };
-  }, [cloudMode, selectedOrgId, userRole]);
+  }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'vadovas' || !selectedOrgId) {
+      return undefined;
+    }
+    let active = true;
+    supabase.rpc('get_dss_management_access', { input_organization_id: selectedOrgId })
+      .then(({ data: access, error }) => {
+        if (!active) return;
+        if (error) {
+          setNotice(`DSS specialistų teisių įkelti nepavyko: ${error.message}`);
+          return;
+        }
+        setDssManagementAccess(access ?? []);
+        setDssManagementOrganizationId(selectedOrgId);
+      })
+      .catch((error) => {
+        if (active) setNotice(`DSS specialistų teisių įkelti nepavyko: ${error.message}`);
+      });
+    return () => { active = false; };
+  }, [cloudMode, selectedOrgId, userRole]);
   const pendingCommissionInvitations = (data.commissionInvitations ?? []).filter((invitation) => invitation.status === 'pending' && (!currentEmployee || invitation.employeeId === currentEmployee.id));
   const commissionProtocolTasks = cloudMode
     ? (data.commissionTasks ?? []).filter((task) => !currentEmployee || task.employeeId === currentEmployee.id)
@@ -1161,7 +1191,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const aapIssueOrganization = data.organizations.find((org) => org.id === aapIssueEmployee?.orgId);
   const employeeBeingEdited = data.employees.find((employee) => employee.id === editingEmployeeId);
   const accessibleOrganizations = userRole === 'dss' ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) : data.organizations;
-  const activeNavigation = roleNavigation[userRole] ?? roleNavigation.darbuotojas;
+  const activeNavigation = userRole === 'dss' && canManageSelectedWorkspace
+    ? [
+      ...roleNavigation.dss,
+      ['komanda', 'Darbuotojai', Users],
+      ...roleNavigation.vadovas.filter(([id]) => id !== 'skydelis'),
+    ]
+    : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
   const signatureIsCurrent = (signature) => !signature.validUntil || new Date(signature.validUntil).getTime() >= validityCheckTime;
   const hasCurrentWorkerSignature = (employeeId, resourceId) => data.signatures.some((signature) => signature.employeeId === employeeId && signature.resourceId === resourceId && signature.role === 'Darbuotojas' && signatureIsCurrent(signature));
   const hasEmployeeSignatures = (employeeId) => data.signatures.some((signature) => signature.employeeId === employeeId);
@@ -1312,7 +1348,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const matchesFilter = taskFilter === 'visos' || (taskFilter === 'atliktinos' && !['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status)) || (taskFilter === 'baigtos' && ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status));
     return matchesFilter && `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(taskSearch.trim().toLocaleLowerCase('lt'));
   });
-  const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId || (userRole === 'vadovas' && resource.organizationId === currentOrg?.id));
+  const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId || (canManageSelectedWorkspace && resource.organizationId === currentOrg?.id));
   const filteredLibraryResources = visibleLibraryResources.filter((resource) => {
     const matchesType = libraryTypeFilter === 'visos' || resource.type === libraryTypeFilter;
     const matchesSearch = `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(librarySearch.trim().toLocaleLowerCase('lt'));
@@ -1350,6 +1386,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const setDssManagementPermission = async (specialistId, canManage) => {
+    if (!cloudMode || userRole !== 'vadovas' || !currentOrg) return;
+    setDssManagementSavingId(specialistId);
+    try {
+      const { data: updated, error } = await supabase.rpc('set_dss_management_access', {
+        input_organization_id: currentOrg.id,
+        input_specialist_user_id: specialistId,
+        input_can_manage: canManage,
+      });
+      if (error) throw error;
+      if (!updated) throw new Error('Specialistas nebepriskirtas šiai įmonei.');
+      setDssManagementAccess((current) => current.map((access) => access.userId === specialistId
+        ? { ...access, canManageWorkspace: canManage }
+        : access));
+      setNotice(canManage
+        ? 'DSS specialistui suteikta teisė tvarkyti įmonės darbo sritį.'
+        : 'DSS specialisto darbo srities tvarkymo teisė atšaukta.');
+    } catch (error) {
+      setNotice(`DSS specialisto teisės pakeisti nepavyko: ${error.message}`);
+    } finally {
+      setDssManagementSavingId('');
+    }
+  };
 
   const inviteEmployeeToCommission = async (employeeId, role) => {
     const employee = data.employees.find((item) => item.id === employeeId && item.orgId === currentOrg?.id);
@@ -3374,7 +3434,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   {!cloudMode && data.organizations.flatMap((org) => (org.dssInvitations ?? []).filter((invite) => invite.specialistId === selectedSpecialistId).map((invite) => <div className="rounded-md border border-amber-200 bg-amber-50 p-4" key={`${org.id}-${invite.specialistId}`}><h2 className="font-semibold">Kvietimas · {org.name}</h2><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {org.companyCode}</p><button className={`${buttonClass} mt-4`} onClick={() => acceptSpecialistInvite(org.id, invite.specialistId)}>Priimti kvietimą <Check size={16} /></button></div>))}
                 </div>
               </Panel>}
-              {userRole === 'vadovas' && <Panel title="">
+              {canManageSelectedWorkspace && <Panel title="">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
@@ -3450,7 +3510,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>
                 </div>
               </Panel>}
-              {userRole === 'vadovas' && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+              {canManageSelectedWorkspace && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 <form onSubmit={inviteEmployee} className="space-y-5">
                   <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -3466,13 +3526,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
                 </form>
               </dialog>}
-              {userRole === 'vadovas' && <dialog id="assignment-presets-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+              {canManageSelectedWorkspace && <dialog id="assignment-presets-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Darbuotojų priskyrimų ruošiniai</h2><p className="mt-1 text-sm text-slate-500">Išsaugokite dažnai naudojamus kursų ir dokumentų rinkinius šiai įmonei.</p></div><button type="button" aria-label="Uždaryti ruošinių langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] }); document.getElementById('assignment-presets-dialog')?.close(); }}><X size={20} /></button></div>
                   <form onSubmit={saveAssignmentPreset} className="space-y-4 rounded-lg border border-slate-200 p-4"><label className="block text-sm font-medium">Ruošinio pavadinimas<input className={`${inputClass} mt-1`} value={assignmentPresetDraft.name} onChange={(event) => setAssignmentPresetDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pvz., Sandėlio darbuotojas" required /></label><fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami kursai ir dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id)).map((resource) => <label className="flex items-start gap-2 text-sm" key={resource.id}><input type="checkbox" checked={assignmentPresetDraft.resourceIds.includes(resource.id)} onChange={(event) => setAssignmentPresetDraft((current) => ({ ...current, resourceIds: event.target.checked ? [...new Set([...current.resourceIds, resource.id])] : current.resourceIds.filter((id) => id !== resource.id) }))} /><span>{resource.title}<small className="block text-slate-500">{resource.type}</small></span></label>)}</div>{!currentOrg?.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</fieldset><div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={() => setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] })}>Išvalyti formą</button><button type="submit" className={buttonClass} disabled={!assignmentPresetDraft.name.trim() || !assignmentPresetDraft.resourceIds.length}><Check size={16} />{assignmentPresetDraft.id ? 'Išsaugoti pakeitimus' : 'Išsaugoti ruošinį'}</button></div></form>
                   <div><h3 className="mb-2 font-semibold">Išsaugoti ruošiniai</h3>{(currentOrg?.employeeAssignmentPresets ?? []).length ? <div className="divide-y divide-slate-100">{currentOrg.employeeAssignmentPresets.map((preset) => <div key={preset.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-40 flex-1"><p className="font-semibold">{preset.name}</p><p className="mt-0.5 text-sm text-slate-500">{preset.resourceIds.map((id) => data.resources.find((resource) => resource.id === id)?.title).filter(Boolean).join(' · ') || 'Dokumentų nėra'}</p></div><div className="flex gap-2"><button type="button" title={`Redaguoti ruošinį ${preset.name}`} aria-label={`Redaguoti ruošinį ${preset.name}`} className="rounded-md border border-slate-300 p-2 text-slate-600 hover:bg-slate-50" onClick={() => setAssignmentPresetDraft({ ...preset, resourceIds: [...preset.resourceIds] })}><Pencil size={16} /></button><button type="button" title={`Pašalinti ruošinį ${preset.name}`} aria-label={`Pašalinti ruošinį ${preset.name}`} className="rounded-md border border-rose-300 p-2 text-rose-700 hover:bg-rose-50" onClick={() => deleteAssignmentPreset(preset)}><Trash2 size={16} /></button></div></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">Ruošinių dar nėra. Pasirinkite dokumentus ir išsaugokite pirmą ruošinį.</p>}</div>
                 </div>
               </dialog>}
-              {userRole === 'vadovas' && <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+              {canManageSelectedWorkspace && <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeDetails && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{employeeDetails.name}</h2><p className="mt-1 text-sm text-slate-500">Darbuotojo informacija ir dokumentų būklė</p></div><button type="button" aria-label="Uždaryti darbuotojo informaciją" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { document.getElementById('employee-details-dialog')?.close(); setEmployeeDetailsId(null); }}><X size={20} /></button></div>
                   <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">El. paštas</dt><dd className="font-semibold">{employeeDetails.email}</dd></div><div><dt className="text-slate-500">Darbo sutarties Nr.</dt><dd className="font-semibold">{employeeDetails.contractNumber || 'Nenurodytas'}</dd></div><div><dt className="text-slate-500">Pareigos</dt><dd className="font-semibold">{employeeDetails.position || 'Darbuotojas'}</dd></div><div><dt className="text-slate-500">Paskyros būsena</dt><dd className="font-semibold">{employeeDetails.status}</dd></div></dl>
                   {employeeDetails.resourceIds?.includes('res-aap') && <Panel title="AAP išdavimų istorija">
@@ -3496,7 +3556,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   })}</div> : <p className="text-sm text-slate-500">Darbuotojui dokumentai nepriskirti.</p>}</div>
                 </div>}
               </dialog>}
-              {userRole === 'vadovas' && <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+              {canManageSelectedWorkspace && <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
                   <label className="block text-sm font-medium">Darbuotojo pareigos<input className={`${inputClass} mt-1`} value={employeePositionDraft} onChange={(event) => setEmployeePositionDraft(event.target.value)} placeholder="Darbuotojas" /></label>
                   <div className="space-y-3">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => {
@@ -3519,29 +3579,42 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </section>
           )}
 
-          {activeTab === 'imone' && userRole === 'vadovas' && <section className="space-y-5">
+          {activeTab === 'imone' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Įmonės nustatymai" subtitle="Vadovas, DSS specialistai ir darbuotojų saugos komisija." />
             <div className="grid gap-4 md:grid-cols-2">
               <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p></Panel>
               <Panel title="DSS specialistai">
                 {cloudMode && <div className="mb-3 flex justify-end"><button type="button" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={dssRefreshSubmitting} onClick={refreshDssAssignments}>{dssRefreshSubmitting ? 'Atnaujinama…' : 'Atnaujinti sąrašą'}</button></div>}
-                <div className="space-y-2">{currentOrg?.dss.map((id) => data.specialists.find((person) => person.id === id)).filter(Boolean).map((person) => <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm" key={person.id}><span>{person.name}<small className="block text-slate-500">{person.email}</small></span>{cloudMode && <button type="button" className="shrink-0 rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssRevokeSubmittingId === person.id} onClick={() => revokeDssSpecialist(person)}>{dssRevokeSubmittingId === person.id ? 'Šalinama…' : 'Pašalinti'}</button>}</div>)}</div>
-                {(data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
+                {userRole === 'vadovas' && <p className="mb-3 text-xs text-slate-600">Suteikus tvarkymo teisę DSS specialistas galės valdyti darbuotojus, dokumentus ir komisiją, bet negalės pasirašyti vadovo vardu. Teisę galite bet kada atšaukti.</p>}
+                <div className="space-y-2">{currentOrg?.dss.map((id) => data.specialists.find((person) => person.id === id)).filter(Boolean).map((person) => {
+                  const management = dssManagementOrganizationId === currentOrg?.id
+                    ? dssManagementAccess.find((access) => access.userId === person.id)
+                    : null;
+                  return <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm" key={person.id}>
+                    <span>{person.name}<small className="block text-slate-500">{person.email}</small></span>
+                    {userRole === 'vadovas' && cloudMode && <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                      <input type="checkbox" checked={management?.canManageWorkspace === true} disabled={dssManagementOrganizationId !== currentOrg?.id || dssManagementSavingId === person.id} onChange={(event) => setDssManagementPermission(person.id, event.target.checked)} />
+                      Gali tvarkyti įmonės darbo sritį
+                    </label>}
+                    {userRole === 'vadovas' && cloudMode && <button type="button" className="shrink-0 rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssRevokeSubmittingId === person.id} onClick={() => revokeDssSpecialist(person)}>{dssRevokeSubmittingId === person.id ? 'Šalinama…' : 'Pašalinti'}</button>}
+                  </div>;
+                })}</div>
+                {userRole === 'vadovas' && (data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
                 {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
-                <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
+                {userRole === 'vadovas' && <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
-                </label>
-                <p className="mt-2 text-xs text-slate-500">Patikrinkite el. paštą. Kvietimas nesuteikia prieigos iš karto — specialistas turi jį priimti prisijungęs. Pašalinant specialistą bus parodytas patvirtinimo klausimas; ankstesni jo parašai liks išsaugoti.</p>
-                {cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
-                {filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
+                </label>}
+                {userRole === 'vadovas' && <p className="mt-2 text-xs text-slate-500">Patikrinkite el. paštą. Kvietimas nesuteikia prieigos iš karto — specialistas turi jį priimti prisijungęs. Pašalinant specialistą bus parodytas patvirtinimo klausimas; ankstesni jo parašai liks išsaugoti.</p>}
+                {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
+                {userRole === 'vadovas' && filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Pasirinkite įmonės darbuotoją ir paskirkite jį komisijos nariu arba pirmininku. Darbuotojas patvirtina kvietimą savo paskyroje, parašu ir asmeniniu PIN kodu.</p>{commissionSigningTarget?.orgId === currentOrg?.id && <SignaturePad value={signatureInk} onChange={setSignatureInk} />}<CommissionEditor org={currentOrg} employees={orgEmployees} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => { setCommissionSigningTarget(null); setSignatureInk(''); }} /></Panel>
-              <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>
-              <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>
+              {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
+              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>}
             </div>
           </section>}
 
-          {activeTab === 'komanda' && userRole === 'vadovas' && <section className="space-y-5">
+          {activeTab === 'komanda' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Darbuotojai" subtitle="Priskirti darbai, jų atlikimas ir parašai vienoje vietoje." />
             <div className="flex justify-end"><button type="button" className={buttonClass} onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pakviesti darbuotoją</button></div>
             <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
@@ -3593,7 +3666,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </dialog>
           </section>}
 
-          {activeTab === 'biblioteka' && userRole === 'vadovas' && <section className="space-y-5"><PageTitle title="Įmonės biblioteka" subtitle="Pasirinkite šablonus, kurie reikalingi šiai įmonei. Darbuotojams priskirkite juos skiltyje Darbuotojai." />
+          {activeTab === 'biblioteka' && canManageSelectedWorkspace && <section className="space-y-5"><PageTitle title="Įmonės biblioteka" subtitle="Pasirinkite šablonus, kurie reikalingi šiai įmonei. Darbuotojams priskirkite juos skiltyje Darbuotojai." />
             {currentOrg?.resources.includes('res-aap') && <Panel title="AAP išdavimo kortelės pozicijos"><form onSubmit={saveAapItems} className="space-y-4"><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-2 py-2">Priemonė</th><th className="px-2 py-2">Pagrindas išduoti</th><th className="px-2 py-2">Kiekis</th><th className="px-2 py-2">Mato vnt.</th><th className="px-2 py-2">Tinkamumo terminas</th><th className="px-2 py-2">Kaina / vnt., Eur</th><th className="px-2 py-2">Suma, Eur</th><th className="px-2 py-2"><span className="sr-only">Šalinti</span></th></tr></thead><tbody>{aapDraft.map((item) => <tr className="border-b border-slate-100" key={item.id}><td className="p-2"><input className={inputClass} value={item.name} onChange={(event) => updateAapItem(item.id, 'name', event.target.value)} required /></td><td className="p-2"><input className={inputClass} value={item.reason} onChange={(event) => updateAapItem(item.id, 'reason', event.target.value)} placeholder="Darbo pobūdis" /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateAapItem(item.id, 'quantity', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.unit} onChange={(event) => updateAapItem(item.id, 'unit', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.validity} onChange={(event) => updateAapItem(item.id, 'validity', event.target.value)} /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateAapItem(item.id, 'unitPrice', event.target.value)} /></td><td className="px-2 text-right tabular-nums">{formatAmount(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</td><td className="p-2"><button type="button" className="text-rose-700" aria-label={`Pašalinti ${item.name}`} onClick={() => setAapDraft((items) => items.filter((row) => row.id !== item.id))}><X size={16} /></button></td></tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Bendra suma: {formatAmount(aapDraft.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0))} Eur</p><div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setAapDraft((items) => [...items, { id: `aap-${Date.now()}`, name: '', reason: '', quantity: 1, unit: 'Vnt.', validity: '', unitPrice: '' }])}><Plus size={15} />Pridėti priemonę</button><button className={buttonClass}>Išsaugoti AAP šabloną</button></div></div><p className="text-xs text-slate-500">Pakeitimai taikomi būsimiems parašams. Jau darbuotojo pasirašytas dokumentas išsaugo savo fiksuotą versiją.</p></form></Panel>}
             <LibraryFilters resources={visibleLibraryResources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
             {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div className="flex h-full flex-col gap-2" key={resource.id}><ResourceCard resource={resource} selected={currentOrg?.resources.includes(resource.id)} onToggle={(checked) => updateOrg(currentOrg.id, (org) => ({ ...org, resources: checked ? [...new Set([...org.resources, resource.id])] : org.resources.filter((id) => id !== resource.id) }))} onDelete={resource.organizationId === currentOrg?.id ? () => deleteCompanyProtocol(resource) : undefined} onSettings={resource.id === 'res-aap' ? undefined : () => openResourceSettings(resource)} onPreview={() => openResourcePreview(resource)} />{resource.type === 'Protokolas' && !resource.organizationId && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openCompanyProtocolForm(resource)}><Plus size={15} />Kurti atskirą protokolą</button>}</div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}</section>}
@@ -3657,7 +3730,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             cloudMode={cloudMode}
           /></Panel></section>}
 
-          {activeTab === 'ataskaitos' && userRole === 'vadovas' && <section className="space-y-5">
+          {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3"><PageTitle title="Ataskaitos" subtitle="Dokumentų eiga, darbuotojų testų rezultatai ir užfiksuoti parašai." /><div className="flex flex-wrap items-end gap-3"><label className="text-sm font-medium">Turinio tipas<select className={`${inputClass} mt-1 min-w-48`} value={reportTypeFilter} onChange={(event) => { setReportTypeFilter(event.target.value); setReportTestTargetId(null); }}><option value="visos">Visi turinio tipai</option>{data.resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeDisplayNames[type] ?? type}</option>)}</select></label><button className={`${buttonClass} print:hidden`} onClick={() => window.print()}><FileText size={16} />Spausdinti ataskaitą</button></div></div>
             {reportTestTarget ? <section className="space-y-3"><button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => setReportTestTargetId(null)}><ChevronLeft size={17} />Grįžti į testus</button><Panel title={reportTestTarget.title}><DataTable headers={['Vardas', 'Pavardė', 'Rezultatas', 'Išlaikė', 'Data ir laikas', 'IP adresas']} rows={selectedTestResults.map(({ employee, result }) => { const [firstName, ...lastNameParts] = employee.name.trim().split(/\s+/); return [firstName ?? '', lastNameParts.join(' '), `${result.score}%`, result.passed ? 'Taip' : 'Ne', new Date(result.completedAt).toLocaleString('lt-LT'), result.ip ?? 'Nenurodytas']; })} empty="Darbuotojai šio testo dar nesprendė." /></Panel></section> : <>
               {reportTypeFilter !== 'Testas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
@@ -3675,7 +3748,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {!reportTestTarget && protocolRegistryPanel}
           </section>}
 
-          {activeTab === 'archyvas' && userRole === 'vadovas' && <section className="archive-page space-y-5">
+          {activeTab === 'archyvas' && canManageSelectedWorkspace && <section className="archive-page space-y-5">
             <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." /><div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!archivedOrgEmployees.length} onClick={() => setArchivePrintMode('all')}><Download size={16} />Atsisiųsti visą archyvą</button>{creatorReadOnlyPreview && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40" disabled={!archivedOrgEmployees.length} onClick={() => deleteCreatorArchivedEmployees(currentOrg)}><Trash2 size={16} />Ištrinti visą archyvą</button>}</div></div>
             <p className="archive-print-controls text-sm text-slate-500">Archyvo įrašai skirti tik peržiūrai: pasirašymo datos ir kiti duomenys nekoreguojami.</p>
             {archivedOrgEmployees.length ? <div className="archive-print-controls grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{archivedOrgEmployees.map((record) => <button key={record.id} type="button" className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-emerald-700 hover:bg-emerald-50/40" onClick={() => setArchiveDetailsId(record.id)}><span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{record.employee.name}</span><span className="mt-1 block text-xs text-slate-500">Sutartis: {record.employee.contractNumber || 'Nenurodyta'} · {record.signatures.length} parašų</span></span><ChevronRight size={18} className="shrink-0 text-slate-400" /></button>)}</div> : <p className="archive-print-controls rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Šios įmonės archyve darbuotojų dar nėra.</p>}

@@ -181,7 +181,7 @@ async function loadManagerWorkspace(user) {
   ] = await Promise.all([
     supabase.rpc('has_signing_pin'),
     supabase.from('organization_memberships')
-      .select('organization_id, role, employee_id')
+      .select('organization_id, role, employee_id, can_manage_workspace')
       .eq('user_id', user.id),
   ]);
   if (pinError) throw pinError;
@@ -207,7 +207,15 @@ async function loadManagerWorkspace(user) {
     if (invitationsResult.error) throw invitationsResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const organizations = (organizationsResult.data ?? []).map((organization) => {
-      return { id: organization.id, name: organization.name, companyCode: organization.company_code ?? '', dss: [user.id], resources: [] };
+      const membership = dssMemberships.find((item) => item.organization_id === organization.id);
+      return {
+        id: organization.id,
+        name: organization.name,
+        companyCode: organization.company_code ?? '',
+        dss: [user.id],
+        resources: [],
+        canManageWorkspace: membership?.can_manage_workspace === true,
+      };
     });
 
     return {
@@ -600,14 +608,23 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     }
 
     const [
+      { data: currentMembership, error: currentMembershipError },
       savedWorkspace,
       { data: assignments, error: assignmentsError },
       { data: protocolSignatures, error: protocolSignaturesError },
     ] = await Promise.all([
+      supabase.from('organization_memberships')
+        .select('can_manage_workspace')
+        .eq('organization_id', organizationId)
+        .eq('user_id', session.user.id)
+        .eq('role', 'dss_specialist')
+        .maybeSingle(),
       loadOrganizationWorkspace(organizationId, workspace.data.resources ?? []),
       supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
       supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
     ]);
+    if (currentMembershipError) throw currentMembershipError;
+    if (!currentMembership) throw new Error('Neturite prieigos prie šios įmonės.');
     if (assignmentsError) throw assignmentsError;
     if (protocolSignaturesError) throw protocolSignaturesError;
     if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
@@ -628,6 +645,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       name: organizationSummary.name,
       companyCode: organizationSummary.companyCode,
       dss: [...new Set([...(savedOrganization.dss ?? []), session.user.id])],
+      canManageWorkspace: currentMembership.can_manage_workspace === true,
     };
     const globalResources = workspace.catalog?.resources?.filter((resource) => !resource.organizationId) ?? [];
     const resourcesById = new Map(globalResources.map((resource) => [resource.id, resource]));

@@ -64,7 +64,7 @@ values
   ('91000000-0000-4000-8000-000000000101', '91000000-0000-4000-8000-000000000010', 'Accepted invitation company', '91000000-0000-4000-8000-000000000002', 'dss-specialist-test@example.test', 'Test Specialist', '91000000-0000-4000-8000-000000000001'),
   ('91000000-0000-4000-8000-000000000102', '91000000-0000-4000-8000-000000000020', 'Declined invitation company', '91000000-0000-4000-8000-000000000002', 'dss-specialist-test@example.test', 'Test Specialist', '91000000-0000-4000-8000-000000000001');
 
-select plan(16);
+select plan(22);
 
 select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);
 select is(
@@ -91,6 +91,45 @@ select ok(
   'acceptance adds the specialist to the organization workspace'
 );
 
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000001', true);
+select is(
+  public.set_dss_management_access('91000000-0000-4000-8000-000000000010', '91000000-0000-4000-8000-000000000002', true),
+  true,
+  'the manager can grant workspace management access'
+);
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);
+select ok(
+  public.can_manage_organization('91000000-0000-4000-8000-000000000010'),
+  'delegated workspace managers pass the management permission check'
+);
+
+insert into public.organization_employees (employee_id, organization_id, full_name, email)
+values ('dss-signing-permission-employee', '91000000-0000-4000-8000-000000000010', 'Signing Test Employee', 'signing-employee@example.test');
+
+select throws_ok(
+  $$select public.record_manager_signature('dss-signing-permission-employee', 'dss-history-test-document', '1234')$$,
+  'P0001',
+  'Organization manager access required',
+  'delegated DSS managers cannot sign as the organization manager'
+);
+select throws_ok(
+  $$select public.set_dss_management_access('91000000-0000-4000-8000-000000000010', '91000000-0000-4000-8000-000000000002', false)$$,
+  'P0001',
+  'Organization manager access required',
+  'delegated DSS managers cannot grant or revoke management permissions'
+);
+
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000001', true);
+select is(
+  public.set_dss_management_access('91000000-0000-4000-8000-000000000010', '91000000-0000-4000-8000-000000000002', false),
+  true,
+  'the manager can revoke workspace management access'
+);
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);
+select ok(
+  not public.can_manage_organization('91000000-0000-4000-8000-000000000010'),
+  'revoked workspace management access no longer passes the permission check'
+);
 select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000001', true);
 select lives_ok(
   $$select public.revoke_dss_specialist('91000000-0000-4000-8000-000000000010', '91000000-0000-4000-8000-000000000002')$$,

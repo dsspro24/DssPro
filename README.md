@@ -33,12 +33,15 @@ Supabase migracijoms:
 npx supabase login
 npx supabase link --project-ref wickbchyltkpmudopnwc
 npx supabase db push --linked
+npx supabase functions deploy invite-employee --project-ref wickbchyltkpmudopnwc
 npx supabase functions deploy invite-dss-specialist --project-ref wickbchyltkpmudopnwc
 ```
 
 Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir `development` aplinkoms. GitHub `main` pushai automatiškai paleidžia Vercel deploy.
 
 Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Registruojantis DSS specialistui įmonės duomenų nereikia: patvirtinęs el. paštą jis patenka į savo darbo sritį, kur gali naudotis paskyros ir bendromis sistemos funkcijomis, kol neturi prižiūrimų įmonių. Vadovas gali pakviesti DSS specialistą el. paštu; kvietimas nesuteikia prieigos, kol specialistas neprisijungęs jo nepriima. Specialistas gali kvietimo atsisakyti. Vadovas gali patvirtinęs pašalinti specialistą iš įmonės; panaikinama tik jo prieiga prie tos įmonės, o jo paskyra ir ankstesni parašai išsaugomi.
+
+Vadovas įmonės nustatymuose gali atskirai suteikti DSS specialistui teisę tvarkyti įmonės darbo sritį arba bet kada ją atšaukti. Gavęs teisę specialistas gali tvarkyti darbuotojus, dokumentus, priskyrimus ir DSS komisiją; jis išlieka DSS specialistu ir gali pasirašyti tik kaip DSS specialistas. Vadovo parašo PIN keitimas ir vadovo vardu pasirašymas lieka tik vadovui.
 
 Cloud parašų istorija kraunama iš normalizuotos `document_signatures` lentelės puslapiais po 25 įrašus. Ekrane pirmiausia rodomi parašo metaduomenys, o saugyklos URL ir vaizdas įkeliami tik paspaudus „Peržiūrėti parašą“. Darbo eigos būsenos ir kitos funkcijos kol kas tebenaudoja darbo srities `signatures` metaduomenis.
 

@@ -54,18 +54,12 @@ Deno.serve(async (request) => {
     return response(400, { error: 'Employee invitation data is invalid' });
   }
 
-  const [{ data: membership, error: membershipReadError }, { data: isCreator, error: creatorError }] = await Promise.all([
-    userClient
-      .from('organization_memberships')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .maybeSingle(),
-    userClient.rpc('is_creator'),
-  ]);
-  if (membershipReadError || creatorError || (membership?.role !== 'manager' && !isCreator)) {
-    return response(403, { error: 'Only an organization manager can invite employees' });
-  }
+  const { data: canManageOrganization, error: permissionError } = await userClient.rpc(
+    'can_manage_organization',
+    { target_organization_id: organizationId },
+  );
+  if (permissionError) return response(500, { error: `Could not check organization management access: ${permissionError.message}` });
+  if (!canManageOrganization) return response(403, { error: 'Organization management access is required to invite employees' });
 
   const { data: workspace, error: workspaceReadError } = await adminClient
     .from('organization_data')

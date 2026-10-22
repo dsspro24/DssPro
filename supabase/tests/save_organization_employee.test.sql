@@ -13,6 +13,13 @@ values ('90000000-0000-4000-8000-000000000010', 'RPC test organization', '900000
 insert into public.organization_memberships (organization_id, user_id, role)
 values ('90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000001', 'manager');
 
+insert into public.profiles (id, full_name, account_type)
+values ('90000000-0000-4000-8000-000000000002', 'Delegated DSS Specialist', 'dss_specialist')
+on conflict (id) do update set account_type = excluded.account_type;
+
+insert into public.organization_memberships (organization_id, user_id, role)
+values ('90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000002', 'dss_specialist');
+
 insert into public.organization_data (organization_id, data, updated_by)
 values (
   '90000000-0000-4000-8000-000000000010',
@@ -75,7 +82,7 @@ values (
 
 select set_config('request.jwt.claim.sub', '90000000-0000-4000-8000-000000000001', true);
 
-select plan(10);
+select plan(13);
 
 select is(
   public.save_organization_employee(
@@ -208,6 +215,52 @@ select throws_ok(
   'P0001',
   'Organization manager access required',
   'a non-manager cannot save the employee'
+);
+
+update public.organization_memberships
+  set can_manage_workspace = true
+  where organization_id = '90000000-0000-4000-8000-000000000010'
+    and user_id = '90000000-0000-4000-8000-000000000002';
+
+select lives_ok(
+  $$select public.save_organization_employee(
+    '90000000-0000-4000-8000-000000000010',
+    'rpc-test-employee',
+    'Delegated position',
+    '["rpc-test-document"]'::jsonb,
+    '{"rpc-test-document":["Darbuotojas"]}'::jsonb,
+    '[]'::jsonb
+  )$$,
+  'a DSS specialist with delegated access can save employee assignments'
+);
+select is(
+  (
+    select person.value ->> 'position'
+    from public.organization_data as workspace
+    cross join lateral jsonb_array_elements(workspace.data -> 'employees') as person(value)
+    where workspace.organization_id = '90000000-0000-4000-8000-000000000010'
+      and person.value ->> 'id' = 'rpc-test-employee'
+  ),
+  'Delegated position',
+  'delegated employee updates are persisted'
+);
+
+update public.organization_memberships
+  set can_manage_workspace = false
+  where organization_id = '90000000-0000-4000-8000-000000000010'
+    and user_id = '90000000-0000-4000-8000-000000000002';
+select throws_ok(
+  $$select public.save_organization_employee(
+    '90000000-0000-4000-8000-000000000010',
+    'rpc-test-employee',
+    'Revoked update',
+    '["rpc-test-document"]'::jsonb,
+    '{"rpc-test-document":["Darbuotojas"]}'::jsonb,
+    '[]'::jsonb
+  )$$,
+  'P0001',
+  'Organization manager access required',
+  'a DSS specialist loses employee management access when delegation is revoked'
 );
 
 select * from finish();
