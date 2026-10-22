@@ -3503,7 +3503,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       setTaskFilter('visos');
                       if (item.resource) openResourcePreview(item.resource);
                     } else if (userRole === 'dss') {
-                      if (!currentSpecialist?.pin) {
+                      if (!cloudMode && !currentSpecialist?.pin) {
                         setActiveTab('paskyra');
                         setNotice('Nustatykite PIN prieš pasirašydami dokumentus.');
                       } else {
