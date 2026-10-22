@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 
@@ -138,9 +138,6 @@ async function loadManagerWorkspace(user) {
   }
 
   if (isCreator) {
-    const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: { catalogOnly: true } });
-    if (assetMigrationError) throw new Error(`Nepavyko perkelti senų failų į Storage: ${assetMigrationError.message}`);
-
     const [organizationsResult, catalogResult, accountsResult, subscriptionsResult] = await Promise.all([
       supabase.from('organizations').select('id, name, company_code').order('name'),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
@@ -191,9 +188,6 @@ async function loadManagerWorkspace(user) {
   if (!signingPinConfigured) return { requiresSigningPin: true, managerName, ...companyDetails };
   const { data: memberships, error: membershipError } = membershipsResult;
   if (membershipError) throw membershipError;
-  const { error: memberAssetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', { body: {} });
-  if (memberAssetMigrationError) throw new Error(`Nepavyko perkelti įmonės failų į Storage: ${memberAssetMigrationError.message}`);
-
   if (profile?.account_type === 'dss_specialist') {
     const dssMemberships = memberships.filter((membership) => membership.role === 'dss_specialist');
     const organizationIds = dssMemberships.map((membership) => membership.organization_id);
@@ -351,6 +345,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const [notice, setNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const assetMigrationStartedFor = useRef('');
 
   useEffect(() => {
     let active = true;
@@ -395,6 +390,23 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
 
     return () => { active = false; };
   }, [session]);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || workspaceStatus !== 'ready' || !workspace) return undefined;
+    const migrationKey = `${userId}:${workspace.creator ? 'catalog' : 'member'}`;
+    if (assetMigrationStartedFor.current === migrationKey) return undefined;
+    assetMigrationStartedFor.current = migrationKey;
+    let active = true;
+    supabase.functions.invoke('creator-migrate-assets', {
+      body: workspace.creator ? { catalogOnly: true } : {},
+    }).then(({ error }) => {
+      if (error && active) setNotice(`Fono failų atnaujinti nepavyko: ${error.message}`);
+    }).catch((error) => {
+      if (active) setNotice(`Fono failų atnaujinti nepavyko: ${error.message || 'įvyko klaida.'}`);
+    });
+    return () => { active = false; };
+  }, [session?.user?.id, workspaceStatus, workspace]);
 
   const handleAuth = async (event) => {
     event.preventDefault();
@@ -638,8 +650,11 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     };
   }, [session, workspace]);
 
-  if (!authReady || (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading'))) {
-    return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Jungiama prie DSS Pro…</p></main>;
+  if (!authReady) {
+    return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Tikrinama prisijungimo būsena…</p></main>;
+  }
+  if (session && (workspaceStatus === 'idle' || workspaceStatus === 'loading')) {
+    return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><div role="status" className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700 shadow-sm"><span className="size-4 animate-spin rounded-full border-2 border-emerald-700 border-t-transparent" aria-hidden="true" /><span><strong className="block text-slate-900">Prisijungta</strong><span className="text-slate-500">Kraunama jūsų darbo sritis…</span></span></div></main>;
   }
 
   if (session && workspaceStatus === 'ready' && workspace) {
