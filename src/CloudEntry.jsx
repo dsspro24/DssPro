@@ -191,7 +191,7 @@ async function loadManagerWorkspace(user) {
   if (profile?.account_type === 'dss_specialist') {
     const dssMemberships = memberships.filter((membership) => membership.role === 'dss_specialist');
     const organizationIds = dssMemberships.map((membership) => membership.organization_id);
-    const [organizationsResult, catalogResult, invitationsResult] = await Promise.all([
+    const [organizationsResult, catalogResult, invitationsResult, requestsResult] = await Promise.all([
       organizationIds.length
         ? supabase.from('organizations').select('id, name, company_code').in('id', organizationIds)
         : Promise.resolve({ data: [], error: null }),
@@ -201,10 +201,16 @@ async function loadManagerWorkspace(user) {
         .eq('specialist_user_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: true }),
+      supabase.from('dss_organization_requests')
+        .select('id, organization_id, organization_name, specialist_user_id, specialist_name, specialist_email, status, created_at')
+        .eq('specialist_user_id', user.id)
+        .in('status', ['pending', 'accepted'])
+        .order('created_at', { ascending: true }),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
     if (catalogResult.error) throw catalogResult.error;
     if (invitationsResult.error) throw invitationsResult.error;
+    if (requestsResult.error) throw requestsResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const organizations = (organizationsResult.data ?? []).map((organization) => {
       const membership = dssMemberships.find((item) => item.organization_id === organization.id);
@@ -224,6 +230,7 @@ async function loadManagerWorkspace(user) {
       data: {
         organizations,
         dssInvitations: invitationsResult.data ?? [],
+        dssOrganizationRequests: requestsResult.data ?? [],
         employees: [],
         archivedEmployees: [],
         protocolBatches: [],
@@ -301,16 +308,23 @@ async function loadManagerWorkspace(user) {
   const { data: catalogData, error: catalogError } = await supabase
     .from('creator_workspace_data').select('data').eq('id', true).maybeSingle();
   if (catalogError) throw catalogError;
-  const [savedWorkspace, invitationsResult] = await Promise.all([
+  const [savedWorkspace, invitationsResult, requestsResult] = await Promise.all([
     loadOrganizationWorkspace(organizationId, catalogData?.data?.resources ?? []),
     supabase.from('dss_specialist_invitations')
       .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
       .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
+    supabase.from('dss_organization_requests')
+      .select('id, organization_id, organization_name, specialist_user_id, specialist_name, specialist_email, status, created_at')
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
   ]);
   const { data: dssInvitations, error: dssInvitationsError } = invitationsResult;
   if (dssInvitationsError) throw dssInvitationsError;
+  const { data: dssOrganizationRequests, error: dssOrganizationRequestsError } = requestsResult;
+  if (dssOrganizationRequestsError) throw dssOrganizationRequestsError;
   const savedOrganization = savedWorkspace?.organizations?.find((item) => item.id === organizationId);
   const organization = {
     id: organizationId,
@@ -329,7 +343,7 @@ async function loadManagerWorkspace(user) {
     organization,
     managerName,
     catalog: hydratedCatalog,
-    data: { ...hydratedManagerWorkspace, dssInvitations: dssInvitations ?? [] },
+    data: { ...hydratedManagerWorkspace, dssInvitations: dssInvitations ?? [], dssOrganizationRequests: dssOrganizationRequests ?? [] },
   };
 }
 
