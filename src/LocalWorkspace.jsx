@@ -625,6 +625,8 @@ const signerRoleOptions = [
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
 const employeePageSize = 20;
 const signatureHistoryPageSize = 25;
+const dssTaskPageSize = 10;
+const dssSignatureBatchSize = 10;
 
 export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
@@ -790,6 +792,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssSigningError, setDssSigningError] = useState('');
   const [dssReviewConfirmed, setDssReviewConfirmed] = useState(false);
   const [selectedDssTaskIds, setSelectedDssTaskIds] = useState([]);
+  const [dssTaskPage, setDssTaskPage] = useState(1);
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
@@ -1202,18 +1205,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const aapIssueOrganization = data.organizations.find((org) => org.id === aapIssueEmployee?.orgId);
   const employeeBeingEdited = data.employees.find((employee) => employee.id === editingEmployeeId);
   const accessibleOrganizations = userRole === 'dss' ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) : data.organizations;
-  const activeNavigation = userRole === 'dss' && !dssOrganizationIsOpen
-    ? roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
-    : userRole === 'dss' && !dssWorkspaceIsReady
-      ? roleNavigation.dss.filter(([id]) => id !== 'paskyra')
-      : userRole === 'dss' && canManageSelectedWorkspace
-        ? [
-          ...roleNavigation.dss.filter(([id]) => id !== 'paskyra'),
-          ...roleNavigation.vadovas.filter(([id]) => id !== 'skydelis'),
-        ]
-        : userRole === 'dss'
-          ? roleNavigation.dss.filter(([id]) => id !== 'paskyra')
-          : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
+  const activeNavigation = userRole === 'dss'
+    ? dssOrganizationIsOpen
+      ? [
+        ...roleNavigation.dss.filter(([id]) => id !== 'paskyra'),
+        ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis') : []),
+      ]
+      : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
+    : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
   const signatureIsCurrent = (signature) => !signature.validUntil || new Date(signature.validUntil).getTime() >= validityCheckTime;
   const hasCurrentWorkerSignature = (employeeId, resourceId) => data.signatures.some((signature) => signature.employeeId === employeeId && signature.resourceId === resourceId && signature.role === 'Darbuotojas' && signatureIsCurrent(signature));
   const hasEmployeeSignatures = (employeeId) => data.signatures.some((signature) => signature.employeeId === employeeId);
@@ -1389,6 +1388,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     });
   }, [data.signatures, data.resources, data.employees, currentOrg, selectedSpecialistId, validityCheckTime]);
   const currentDssTasks = dssTasks.filter((task) => task.orgId === currentOrg?.id);
+  const dssTaskPageCount = Math.max(1, Math.ceil(currentDssTasks.length / dssTaskPageSize));
+  const currentDssTaskPage = Math.min(dssTaskPage, dssTaskPageCount);
+  const paginatedDssTasks = currentDssTasks.slice(
+    (currentDssTaskPage - 1) * dssTaskPageSize,
+    currentDssTaskPage * dssTaskPageSize,
+  );
+  const selectedCurrentDssTasks = currentDssTasks.filter((task) => selectedDssTaskIds.includes(task.id));
+  const dssTasksToSignCount = Math.min(selectedCurrentDssTasks.length, dssSignatureBatchSize);
   const filteredSpecialists = useMemo(() => {
     const query = specialistQuery.trim().toLocaleLowerCase('lt');
     if (!query) return [];
@@ -2843,6 +2850,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const openDssOrganization = (organization) => {
     setSelectedOrgId(organization.id);
     setOpenedDssOrganizationId(organization.id);
+    setSelectedDssTaskIds([]);
+    setDssTaskPage(1);
     setSelectedEmployeeId(data.employees.find((employee) => employee.orgId === organization.id)?.id ?? '');
     setAapDraft(organization.aapItems ?? defaultAapItems);
     setInviteResourceIds(organization.resources ?? []);
@@ -2855,6 +2864,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const returnToDssOrganizations = () => {
     setOpenedDssOrganizationId('');
+    setSelectedDssTaskIds([]);
+    setDssTaskPage(1);
     setActiveTab('skydelis');
     setMobileMenuOpen(false);
   };
@@ -2865,7 +2876,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('Prieš pasirašydami dokumentus, nustatykite 4 skaitmenų PIN.');
       return;
     }
-    setDssSigningTasks(tasks);
+    setDssSigningTasks(tasks.slice(0, dssSignatureBatchSize));
     setSignatureInk('');
     setSignPinDraft('');
     setDssReviewConfirmed(false);
@@ -2944,9 +2955,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setSignPinDraft('');
     setDssReviewConfirmed(false);
     setDssSigningError('');
-    setSelectedDssTaskIds([]);
+    const signedTaskIds = new Set(tasksToSign.map((task) => task.id));
+    const remainingSelectedCount = selectedDssTaskIds.filter((id) => !signedTaskIds.has(id)
+      && currentDssTasks.some((task) => task.id === id)).length;
+    setSelectedDssTaskIds((current) => current.filter((id) => !signedTaskIds.has(id)));
     setSignatureInk('');
-    setNotice(`DSS dokumentai pasirašyti PIN kodu: ${tasksToSign.length}.`);
+    setNotice(`DSS dokumentai pasirašyti PIN kodu: ${tasksToSign.length}.${remainingSelectedCount ? ` Liko pasirašyti ${remainingSelectedCount} pasirinktų dokumentų; vienu kartu galima pasirašyti iki ${dssSignatureBatchSize}.` : ''}`);
   };
 
   const saveManagerPin = (event) => {
@@ -3860,9 +3874,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <Panel title="Asmeninės apsaugos priemonės"><div className="grid gap-4 sm:grid-cols-2">{[['shoes', 'Batų dydis'], ['clothes', 'Drabužių dydis'], ['pants', 'Kelnių dydis'], ['jacket', 'Striukės dydis'], ['height', 'Ūgis (cm)'], ['weight', 'Svoris (kg)'], ['helmet', 'Šalmo dydis']].map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={currentEmployee?.sizes[key] ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, sizes: { ...employee.sizes, [key]: event.target.value } } : employee) }))} /></label>)}</div><button className={`${buttonClass} mt-5`} onClick={() => { const complete = hasCompleteAapSizes(currentEmployee); if (!complete) { setNotice('Užpildykite batų, drabužių, kelnių ir striukės dydžius.'); return; } setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, aapCompleted: true, status: employee.pin ? 'Aktyvus' : 'Pakviestas' } : employee) })); setNotice('AAP dydžiai išsaugoti. Dydžius galėsite atnaujinti vėliau.'); setActiveTab('uzduotys'); }}>Išsaugoti dydžius</button></Panel>
           </section>}
 
-          {activeTab === 'zurnalai' && userRole === 'dss' && <section className="space-y-5"><PageTitle title="Įmonės žurnalai ir parašai" subtitle="Pasirašykite dokumentus po vieną arba pasirinkite kelis, peržiūrėkite juos ir patvirtinkite vienu PIN." /><Panel title={`${currentOrg?.name} · laukia DSS parašo`}>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={currentDssTasks.length > 0 && currentDssTasks.every((task) => selectedDssTaskIds.includes(task.id))} disabled={!currentDssTasks.length} onChange={(event) => setSelectedDssTaskIds(event.target.checked ? currentDssTasks.map((task) => task.id) : [])} />Pasirinkti visus ({currentDssTasks.length})</label><button type="button" className={buttonClass} disabled={!selectedDssTaskIds.some((id) => currentDssTasks.some((task) => task.id === id))} onClick={() => requestDssSign(currentDssTasks.filter((task) => selectedDssTaskIds.includes(task.id)))}><FileSignature size={16} />Pasirašyti pasirinktus ({currentDssTasks.filter((task) => selectedDssTaskIds.includes(task.id)).length})</button></div>
-            <DataTable headers={['Pasirinkti', 'Darbuotojas', 'Dokumentas', 'Darbuotojo parašas', 'Veiksmas']} rows={currentDssTasks.map((task) => [<input type="checkbox" aria-label={`Pasirinkti ${task.signer} dokumentą`} checked={selectedDssTaskIds.includes(task.id)} onChange={(event) => setSelectedDssTaskIds((current) => event.target.checked ? [...new Set([...current, task.id])] : current.filter((id) => id !== task.id))} />, task.signer, data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas', new Date(task.signedAt).toLocaleString('lt-LT'), <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => requestDssSign([task])}>Pasirašyti</button>])} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
+          {activeTab === 'zurnalai' && userRole === 'dss' && <section className="space-y-5"><PageTitle title="Įmonės žurnalai ir parašai" subtitle={`Pasirašykite dokumentus po vieną arba partijomis iki ${dssSignatureBatchSize}. Kiekvieną pasirinktą dokumentą peržiūrėkite prieš pasirašydami.`} /><Panel title={`${currentOrg?.name} · laukia DSS parašo`}>
+            {!canManageSelectedWorkspace && <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">Įmonė nesuteikė pilnos darbo srities tvarkymo teisės, tačiau galite peržiūrėti jums pateiktus dokumentus, pasirašyti DSS žurnalus ir matyti parašų istoriją.</p>}
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={paginatedDssTasks.length > 0 && paginatedDssTasks.every((task) => selectedDssTaskIds.includes(task.id))} disabled={!paginatedDssTasks.length} onChange={(event) => setSelectedDssTaskIds((current) => event.target.checked
+                ? [...new Set([...current, ...paginatedDssTasks.map((task) => task.id)])]
+                : current.filter((id) => !paginatedDssTasks.some((task) => task.id === id)))} />Pasirinkti visus šiame puslapyje ({paginatedDssTasks.length})</label>
+              <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-600">Pasirinkta {selectedCurrentDssTasks.length} / {currentDssTasks.length} visų dokumentų{selectedCurrentDssTasks.length > dssSignatureBatchSize ? ` · vienu kartu iki ${dssSignatureBatchSize}` : ''}</span><button type="button" className={buttonClass} disabled={!selectedCurrentDssTasks.length} onClick={() => requestDssSign(selectedCurrentDssTasks.slice(0, dssSignatureBatchSize))}><FileSignature size={16} />Pasirašyti {dssTasksToSignCount}{selectedCurrentDssTasks.length > dssTasksToSignCount ? ` iš ${selectedCurrentDssTasks.length}` : ''}</button></div>
+            </div>
+            <DataTable headers={['Pasirinkti', 'Darbuotojas', 'Dokumentas', 'Darbuotojo parašas', 'Veiksmas']} rows={paginatedDssTasks.map((task) => [<input type="checkbox" aria-label={`Pasirinkti ${task.signer} dokumentą`} checked={selectedDssTaskIds.includes(task.id)} onChange={(event) => setSelectedDssTaskIds((current) => event.target.checked ? [...new Set([...current, task.id])] : current.filter((id) => id !== task.id))} />, task.signer, data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas', new Date(task.signedAt).toLocaleString('lt-LT'), <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => requestDssSign([task])}>Pasirašyti</button>])} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
+            {currentDssTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentDssTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentDssTaskPage * dssTaskPageSize, currentDssTasks.length)} iš {currentDssTasks.length} · pasirinkta {selectedCurrentDssTasks.length}</p><nav className="flex items-center gap-2" aria-label="DSS pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage <= 1} onClick={() => setDssTaskPage(Math.max(1, currentDssTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentDssTaskPage} / {dssTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage >= dssTaskPageCount} onClick={() => setDssTaskPage(Math.min(dssTaskPageCount, currentDssTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
           </Panel><Panel title="Parašų istorija"><PaginatedSignatureHistory
             key={`${currentOrg?.id ?? ''}:organization-history`}
             organizationId={currentOrg?.id}
@@ -4005,7 +4026,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
       {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p>{workerSigningTarget.resourceId === 'res-aap' && <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={workerAapBothPagesConfirmed} onChange={(event) => { setWorkerAapBothPagesConfirmed(event.target.checked); setWorkerSignError(''); }} /><span>Patvirtinu, kad vienu parašu pasirašau abu šio AAP kortelės lapus. Tas pats PIN parašas bus pateiktas abiejų lapų vietose.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setWorkerAapBothPagesConfirmed(false); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={workerSigningTarget.resourceId === 'res-aap' && !workerAapBothPagesConfirmed}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
-      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p><div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
+      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p>{dssSigningTasks.length === dssSignatureBatchSize && selectedCurrentDssTasks.length > dssSigningTasks.length && <p className="rounded-md bg-sky-50 p-3 text-sm text-sky-900">Šį kartą bus pasirašyta iki {dssSignatureBatchSize} dokumentų. Likę pasirinkti dokumentai bus palikti kitai pasirašymo partijai.</p>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
     </div>
   );
 }
