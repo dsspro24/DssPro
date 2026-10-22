@@ -185,12 +185,21 @@ const getProtocolPeriod = (value, cadence) => {
   const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + (cadence === 'weekly-sunday' ? 6 : 4));
   return { start: toLocalDateKey(monday), end: toLocalDateKey(end) };
 };
-const hasPassedProtocolTest = (employee, resource) => {
-  if (!resource.relatedTestId) return true;
-  const latestResult = (employee?.testResults ?? [])
+const getLatestProtocolTestResult = (employee, resource) => {
+  if (!resource.relatedTestId) return null;
+  return (employee?.testResults ?? [])
     .filter((result) => result.resourceId === resource.relatedTestId)
     .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
-  return latestResult?.passed === true;
+};
+const hasPassedProtocolTest = (employee, resource) => {
+  if (!resource.relatedTestId) return true;
+  return getLatestProtocolTestResult(employee, resource)?.passed === true;
+};
+const getProtocolTestStatusLabel = (employee, resource) => {
+  if (!resource.relatedTestId) return 'Netaikoma';
+  const result = getLatestProtocolTestResult(employee, resource);
+  if (!result) return 'Laukia rezultato';
+  return result.passed ? 'Išlaikė' : 'Neišlaikė';
 };
 const isProtocolBatchReady = (batch, employees, resource) => Boolean(batch.protocolDate)
   && employees.length > 0
@@ -1089,12 +1098,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     </div>
     {paginatedProtocolBatches.length ? <><DataTable headers={['Nr.', 'Mokymo programa', 'Laikotarpis', 'Darbuotojai', 'Data protokole', 'Būsena', 'Veiksmai']} rows={paginatedProtocolBatches.map(({ batch, resource, employees }) => {
       const ready = isProtocolBatchReady(batch, employees, resource);
-      const status = ready ? 'Paruoštas' : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas' : 'Laukia testo';
+      const waitingEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Laukia rezultato');
+      const failedTestEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Neišlaikė');
+      const status = ready ? 'Paruoštas'
+        : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas'
+          : [
+            waitingEmployees.length ? `Laukia testo rezultato: ${waitingEmployees.map((employee) => employee.name).join(', ')}` : '',
+            failedTestEmployees.length ? `Neišlaikė testo: ${failedTestEmployees.map((employee) => employee.name).join(', ')}` : '',
+          ].filter(Boolean).join(' · ') || 'Laukia datos';
                   const searchTerm = protocolSearch.trim().toLocaleLowerCase('lt');
                   const matchingEmployees = searchTerm ? employees.filter((employee) => employee.name.toLocaleLowerCase('lt').includes(searchTerm)) : [];
                   const listedEmployees = matchingEmployees.length ? matchingEmployees : employees.slice(0, 2);
                   const signedCount = employees.filter((employee) => data.signatures.some((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas')).length;
-                  return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => employee.name).join(', ')}>{listedEmployees.map((employee) => employee.name).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">{signedCount} / {employees.length} pasirašė PIN kodu</small></span>, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
+                  return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join('\n')}>{listedEmployees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">Testas: {resource.relatedTestId ? `${employees.filter((employee) => hasPassedProtocolTest(employee, resource)).length} / ${employees.length} išlaikė` : 'nereikalingas'} · {signedCount} / {employees.length} pasirašė PIN kodu</small></span>, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
@@ -1472,6 +1488,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setCommissionActionError('Nupieškite parašą prieš pasirašydami protokolą.');
       return;
     }
+    const assignmentId = task.assignmentId ?? task.commissionAssignments?.find((assignment) =>
+      assignment.employeeId === task.employeeId && assignment.role === task.role)?.id;
+    if (!assignmentId || !task.batchId) {
+      setCommissionActionError('Komisijos paskyrimo ID nerastas. Uždarykite langą ir atnaujinkite protokolo užduotis.');
+      return;
+    }
     setCommissionActionSubmitting(true);
     setCommissionActionError('');
     let uploadedSignature = null;
@@ -1479,7 +1501,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (cloudMode) {
         uploadedSignature = await uploadSignatureDataUrl(task.organizationId, signatureInk);
         const { data: signature, error } = await supabase.rpc('record_employee_protocol_commission_signature', {
-          input_assignment_id: task.assignmentId,
+          input_assignment_id: assignmentId,
           input_batch_id: task.batchId,
           input_pin: workerSignPin,
           input_signature_path: uploadedSignature.path,
@@ -1488,7 +1510,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setData((current) => ({
           ...current,
           protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), { ...signature, signaturePath: uploadedSignature.path }],
-          commissionTasks: (current.commissionTasks ?? []).map((item) => item.assignmentId === task.assignmentId && item.batchId === task.batchId
+          commissionTasks: (current.commissionTasks ?? []).map((item) => item.assignmentId === assignmentId && item.batchId === task.batchId
             ? { ...item, hasSigned: true, protocolCommissionSignatures: [...(item.protocolCommissionSignatures ?? []), { ...signature, signaturePath: uploadedSignature.path }] }
             : item),
         }));
