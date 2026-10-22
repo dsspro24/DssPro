@@ -1,4 +1,4 @@
-create function public.record_employee_aap_card_signature_with_image(
+create or replace function public.record_employee_aap_card_signature_with_image(
   input_pin text,
   input_signature_path text,
   input_both_pages_confirmed boolean
