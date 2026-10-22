@@ -59,7 +59,18 @@ function DemoApp({ cloudMode = false }) {
   const [activeTab, setActiveTab] = useState('skydelis'); 
   const [courseFilter, setCourseFilter] = useState('visi'); // 'visi' | 'mano' | 'baigti'
   const [registerRole, setRegisterRole] = useState('vadovas');
+  const [registerPlan, setRegisterPlan] = useState('standard');
   const [cloudSignupFeedback, setCloudSignupFeedback] = useState('');
+  const [signupConfirmationEmail, setSignupConfirmationEmail] = useState('');
+
+  const scrollToSignup = () => {
+    const signupSection = document.getElementById('pricing-signup');
+    if (!signupSection) return;
+    window.scrollTo({
+      top: Math.max(0, signupSection.getBoundingClientRect().top + window.scrollY - 24),
+      behavior: 'smooth',
+    });
+  };
 
   // Interactive Mock States
   const [sizes, setSizes] = useState({ shoes: '43', clothing: 'L', pants: '50', height: '182', weight: '80' });
@@ -208,6 +219,7 @@ function DemoApp({ cloudMode = false }) {
           data: {
             full_name: fullName,
             account_type: registerRole === 'dss' ? 'dss_specialist' : 'manager',
+            ...(registerRole === 'vadovas' ? { plan_code: registerPlan } : { plan_code: 'free' }),
             ...(registerRole === 'vadovas' ? { company_name: companyName, company_code: companyCode } : {}),
             signing_pin: signingPin,
           },
@@ -216,9 +228,10 @@ function DemoApp({ cloudMode = false }) {
       });
       if (error) throw error;
       if (data.session) setCurrentPage('app');
-      else setCloudSignupFeedback(registerRole === 'dss'
-        ? 'DSS specialisto paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite. Įmonės vadovo kvietimą galėsite priimti sistemoje.'
-        : 'Vadovo paskyra sukurta. Patvirtinkite el. paštą ir prisijunkite, kad užbaigtumėte įmonės nustatymą.');
+      else {
+        setSignupConfirmationEmail(email);
+        document.getElementById('signup-confirmation-dialog')?.showModal();
+      }
     } catch (error) {
       setCloudSignupFeedback(error.message || 'Nepavyko sukurti paskyros. Patikrinkite duomenis.');
     }
@@ -256,7 +269,7 @@ function DemoApp({ cloudMode = false }) {
                 onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
                 className="bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-bold px-5 py-2 rounded-full text-xs transition-all cursor-pointer shadow-md"
               >
-                {cloudMode ? 'Prisijungti' : 'Prisijungti / Paskyra'}
+                Prisijungti
               </button>
             </header>
 
@@ -276,10 +289,10 @@ function DemoApp({ cloudMode = false }) {
 
                 <div className="flex items-center gap-4 pt-2">
                   <button 
-                    onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
+                    onClick={scrollToSignup}
                     className="bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-bold px-6 py-3 rounded-xl text-xs transition-all cursor-pointer shadow-lg hover:scale-105"
                   >
-                    Pradėti nemokamai →
+                    Peržiūrėti planus
                   </button>
                   <button 
                     onClick={() => { setCurrentPage('app'); setActiveTab('biblioteka'); }}
@@ -367,7 +380,7 @@ function DemoApp({ cloudMode = false }) {
         </div>
 
         {/* KAINOS IR REGISTRACIJA */}
-        <div className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div id="pricing-signup" className="max-w-6xl mx-auto scroll-mt-6 px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-6 space-y-6">
             <div>
               <h2 className="text-2xl font-bold text-slate-800">Kainos</h2>
@@ -377,7 +390,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <button type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === 'standard'} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan('standard'); }} className={`w-full bg-white p-5 rounded-2xl border text-left shadow-sm space-y-4 ${registerRole === 'vadovas' && registerPlan === 'standard' ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
                 <div>
                   <span className="text-xs font-semibold text-slate-400">Standartinis</span>
                   <div className="flex items-baseline gap-1 mt-1">
@@ -391,9 +404,10 @@ function DemoApp({ cloudMode = false }) {
                   <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> VDI žurnalai</li>
                   <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Visi ataskaitų PDF</li>
                 </ul>
-              </div>
+                <span className="block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === 'standard' ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
+              </button>
 
-              <div className="bg-white p-5 rounded-2xl border-2 border-[#1bc880] shadow-sm space-y-4 relative">
+              <button type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === 'pro'} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan('pro'); }} className={`w-full bg-white p-5 rounded-2xl border text-left shadow-sm space-y-4 ${registerRole === 'vadovas' && registerPlan === 'pro' ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
                 <div>
                   <span className="text-xs font-bold text-[#1bc880]">Pro</span>
                   <div className="flex items-baseline gap-1 mt-1">
@@ -408,30 +422,32 @@ function DemoApp({ cloudMode = false }) {
                   <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Komisijos ir DSS parašai</li>
                   <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Prioritetinė pagalba</li>
                 </ul>
-              </div>
+                <span className="block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === 'pro' ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
+              </button>
             </div>
           </div>
 
           <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
-            <h3 className="font-bold text-slate-800 text-base mb-4">Sukurkite paskyrą</h3>
+            <h3 className="font-bold text-slate-800 text-base mb-1">Sukurkite paskyrą</h3>
+            <p className="mb-4 text-xs text-slate-500">Vadovo paskyrai reikia mokamo plano. DSS paskyra nemokama; darbuotojai prisijungia vadovo kvietimu.</p>
 
             <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
               <button 
                 onClick={() => setRegisterRole('vadovas')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'vadovas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
-                {cloudMode ? 'Vadovo paskyra' : 'Įmonės vadovas'}
+                Vadovas · mokama
               </button>
               <button 
                 onClick={() => setRegisterRole('dss')}
                 className={`py-2 rounded-lg text-center cursor-pointer transition-all ${registerRole === 'dss' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
-                {cloudMode ? 'DSS specialisto paskyra' : 'DSS specialistas'}
+                DSS specialistas · nemokama
               </button>
             </div>
             {cloudMode && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-950">
               {registerRole === 'vadovas'
-                ? 'Sukurkite vadovo paskyrą, patvirtinkite el. paštą ir įveskite įmonės duomenis. DSS specialistą galėsite pakviesti įmonės nustatymuose.'
+                ? `Pasirinktas ${registerPlan === 'standard' ? 'Standartinis' : 'Pro'} planas. Sukurkite paskyrą ir patvirtinkite el. paštą; prisijungę užbaigsite įmonės nustatymą.`
                 : 'Sukurkite atskirą DSS specialisto paskyrą ir patvirtinkite el. paštą. Įmonės duomenų įvesti nereikia; vadovo kvietimą priimsite prisijungę.'}
             </p>}
 
@@ -471,7 +487,7 @@ function DemoApp({ cloudMode = false }) {
               </div>
 
               <button type="submit" className="w-full py-3 bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-black rounded-xl mt-2 cursor-pointer transition-all shadow-md">
-                {cloudMode ? 'Sukurti paskyrą' : 'Sukurti nemokamą paskyrą'}
+                {cloudMode ? registerRole === 'vadovas' ? 'Tęsti su pasirinktu planu' : 'Sukurti nemokamą paskyrą' : 'Sukurti paskyrą'}
               </button>
               {cloudSignupFeedback && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">{cloudSignupFeedback}</p>}
             </form>
@@ -483,6 +499,13 @@ function DemoApp({ cloudMode = false }) {
           © 2026 DSS Pro. Visos teisės saugomos.
         </footer>
 
+        {cloudMode && <dialog id="signup-confirmation-dialog" className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-950/60">
+          <h2 className="text-lg font-bold">Patvirtinkite el. paštą</h2>
+          <p className="mt-2 text-sm text-slate-600">Registracijos nuorodą išsiuntėme adresu <strong className="break-all text-slate-900">{signupConfirmationEmail}</strong>.</p>
+          <p className="mt-2 text-sm text-slate-600">Atidarykite laiške esančią nuorodą, tada grįžkite čia ir prisijunkite. Jei laiško nematote, patikrinkite brukalo aplanką.</p>
+          <button type="button" className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => document.getElementById('signup-confirmation-dialog')?.close()}>Supratau</button>
+        </dialog>}
+
       </div>
     );
   }
@@ -491,7 +514,13 @@ function DemoApp({ cloudMode = false }) {
   // SKYDELIS SU DINAMIŠKAIS MENIU SKIRTUKAIS PAGAL ROLE
   // ==========================================
   if (currentPage === 'app') {
-    if (cloudMode) return <CloudEntry onExit={() => setCurrentPage('landing')} />;
+    if (cloudMode) return <CloudEntry
+      onExit={() => setCurrentPage('landing')}
+      onBackToLanding={() => {
+        setCurrentPage('landing');
+        window.setTimeout(scrollToSignup, 0);
+      }}
+    />;
     return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliama darbo sritis…</p></main>}><LocalWorkspace userRole={userRole} onRoleChange={handleRoleChange} onExit={() => setCurrentPage('landing')} /></Suspense>;
   }
 

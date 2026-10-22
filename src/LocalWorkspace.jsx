@@ -485,6 +485,8 @@ const initialData = {
 
 function createInitialCloudWorkspace(organization, managerName = '') {
   const organizationTemplate = initialData.organizations[0];
+  const planCode = organization.plan_code === 'pro' ? 'pro' : 'standard';
+  const plan = planCode === 'pro' ? 'Pro' : 'Standartinis';
   const cloudOrganization = {
     ...organizationTemplate,
     id: organization.id,
@@ -509,7 +511,14 @@ function createInitialCloudWorkspace(organization, managerName = '') {
     protocolBatches: [],
     specialists: [],
     signatures: [],
-    subscriptions: [],
+    subscriptions: [{
+      id: `pending-${organization.id}`,
+      orgId: organization.id,
+      plan,
+      status: 'Laukiama apmokėjimo',
+      price: planCode === 'pro' ? 79 : 29,
+      endsAt: '',
+    }],
     resources: initialData.resources.map((resource) => ({ ...resource, type: normalizeResourceType(resource) })),
   };
 }
@@ -4585,7 +4594,22 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
 }
 function SubscriptionCard({ subscription, onAction }) {
   if (!subscription) return <p className="text-sm text-slate-500">Prenumerata nerasta.</p>;
-  return <div><p className="text-lg font-bold">{subscription.plan} · {subscription.price} €/mėn.</p><p className="mt-1 text-sm text-slate-600">Būsena: {subscription.status} · iki {subscription.endsAt}</p><div className="mt-4 flex flex-wrap gap-2">{subscription.status === 'Aktyvi' ? <button className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800" onClick={() => onAction(subscription.id, 'cancel')}><X size={15} className="inline" />Atšaukti</button> : <button className={buttonClass} onClick={() => onAction(subscription.id, 'renew')}><RotateCcw size={15} />Pratęsti prenumeratą</button>}</div></div>;
+  if (subscription.status === 'Laukiama apmokėjimo') {
+    return <div>
+      <p className="text-lg font-bold">{subscription.plan} · {subscription.price} €/mėn.</p>
+      <p className="mt-1 text-sm font-semibold text-amber-800">Būsena: Laukiama apmokėjimo</p>
+      <p className="mt-2 text-sm text-slate-600">Planą pasirinkote. Mokėjimų integracija dar neprijungta, todėl prenumerata nėra aktyvi.</p>
+    </div>;
+  }
+  return <div>
+    <p className="text-lg font-bold">{subscription.plan} · {subscription.price} €/mėn.</p>
+    <p className="mt-1 text-sm text-slate-600">Būsena: {subscription.status}{subscription.endsAt ? ` · iki ${subscription.endsAt}` : ''}</p>
+    <div className="mt-4 flex flex-wrap gap-2">
+      {subscription.status === 'Aktyvi'
+        ? <button className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800" onClick={() => onAction(subscription.id, 'cancel')}><X size={15} className="inline" />Atšaukti</button>
+        : <button className={buttonClass} onClick={() => onAction(subscription.id, 'renew')}><RotateCcw size={15} />Pratęsti prenumeratą</button>}
+    </div>
+  </div>;
 }
 function CommissionEditor({ org, employees = [], assignments = [], onInvite, onRevoke, cloudMode = false, commissionPinStatus = {}, onSetPin, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
   const [employeeId, setEmployeeId] = useState('');
