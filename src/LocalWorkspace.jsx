@@ -699,6 +699,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [specialistQuery, setSpecialistQuery] = useState('');
   const [employeeForm, setEmployeeForm] = useState({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [pendingEmployeeInvites, setPendingEmployeeInvites] = useState([]);
   const [dssInvitationActionId, setDssInvitationActionId] = useState('');
   const [dssRevokeSubmittingId, setDssRevokeSubmittingId] = useState('');
   const [dssRefreshSubmitting, setDssRefreshSubmitting] = useState(false);
@@ -722,6 +723,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const workspaceAutosaveRequestRef = useRef(Promise.resolve());
   const skipNextWorkspaceAutosaveRef = useRef(false);
   const employeeAssignmentRpcInFlightRef = useRef(false);
+  const commissionRevocationInFlightRef = useRef(new Set());
   const previewFrameRef = useRef(null);
   const archiveDownloadModeRef = useRef(null);
   const resourceHtmlCacheRef = useRef(new Map());
@@ -1030,6 +1032,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
   const currentCommissionAssignments = useMemo(() => (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id), [data.commissionAssignments, currentOrg?.id]);
   const orgEmployees = useMemo(() => data.employees.filter((employee) => employee.orgId === currentOrg?.id), [data.employees, currentOrg?.id]);
+  const managerDashboardEmployees = useMemo(() => [
+    ...orgEmployees,
+    ...pendingEmployeeInvites.filter((employee) => employee.orgId === currentOrg?.id),
+  ], [orgEmployees, pendingEmployeeInvites, currentOrg?.id]);
   const archivedOrgEmployees = useMemo(() => (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id), [data.archivedEmployees, currentOrg?.id]);
   const archiveDetailRecord = archivedOrgEmployees.find((record) => record.id === archiveDetailsId);
   const reportEmployees = useMemo(() => [...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)], [orgEmployees, archivedOrgEmployees]);
@@ -1193,7 +1199,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (employee.status === 'Pakviestas') return { label: 'Pakviestas', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     return { label: 'Nepriskirta', cls: 'bg-slate-100 text-slate-600', Icon: CircleAlert };
   };
-  const filteredOrgEmployees = useMemo(() => orgEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'))), [orgEmployees, employeeSearch]);
+  const filteredOrgEmployees = useMemo(() => managerDashboardEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'))), [managerDashboardEmployees, employeeSearch]);
   const employeePageCount = Math.max(1, Math.ceil(filteredOrgEmployees.length / employeePageSize));
   const currentEmployeePage = Math.min(employeePage, employeePageCount);
   const creatorMembershipsByOrg = useMemo(() => {
@@ -1344,25 +1350,49 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const revokeCommissionAssignment = async (assignment) => {
-    if (cloudMode) {
-      const { data: revoked, error } = await supabase.rpc('revoke_employee_commission_assignment', {
-        input_organization_id: assignment.organizationId,
-        input_assignment_id: assignment.id,
-      });
-      if (error || !revoked) {
-        setNotice(`Komisijos paskyrimo atšaukti nepavyko: ${error?.message ?? 'paskyrimas nerastas.'}`);
-        return;
-      }
-    }
+    if (commissionRevocationInFlightRef.current.has(assignment.id)) return;
+    if (!window.confirm(`Ar tikrai atšaukti ${assignment.employeeName} komisijos paskyrimą? Asmuo nebegaus naujų komisijos protokolų, o ankstesni parašai liks istorijoje.`)) return;
+
+    commissionRevocationInFlightRef.current.add(assignment.id);
+    const previousAssignment = data.commissionAssignments?.find((item) => item.id === assignment.id) ?? assignment;
+    const previousInvitation = data.commissionInvitations?.find((item) => item.id === assignment.id);
     setData((current) => {
-      const commissionAssignments = (current.commissionAssignments ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item);
+      const commissionAssignments = (current.commissionAssignments ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoking' } : item);
       return {
         ...current,
         commissionAssignments,
-        commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item),
+        commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoking' } : item),
       };
     });
-    setNotice(`${assignment.employeeName} komisijos paskyrimas atšauktas.`);
+    setNotice(`${assignment.employeeName} komisijos paskyrimas atšaukiamas.`);
+    try {
+      if (cloudMode) {
+        const { data: revoked, error } = await supabase.rpc('revoke_employee_commission_assignment', {
+          input_organization_id: assignment.organizationId,
+          input_assignment_id: assignment.id,
+        });
+        if (error || !revoked) throw new Error(error?.message ?? 'paskyrimas nerastas.');
+      }
+      setData((current) => ({
+        ...current,
+        commissionAssignments: (current.commissionAssignments ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item),
+        commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === assignment.id ? { ...item, status: 'revoked' } : item),
+      }));
+      setNotice(`${assignment.employeeName} komisijos paskyrimas atšauktas.`);
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        commissionAssignments: (current.commissionAssignments ?? []).map((item) => item.id === assignment.id
+          ? { ...item, status: previousAssignment.status }
+          : item),
+        commissionInvitations: (current.commissionInvitations ?? []).map((item) => item.id === assignment.id
+          ? { ...item, status: previousInvitation?.status ?? assignment.status }
+          : item),
+      }));
+      setNotice(`Komisijos paskyrimo atšaukti nepavyko: ${error.message || 'įvyko klaida.'}`);
+    } finally {
+      commissionRevocationInFlightRef.current.delete(assignment.id);
+    }
   };
 
   const respondToCommissionInvitation = async (accept) => {
@@ -2195,6 +2225,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const { batches, resourceIds } = addEmployeeToProtocolBatches(data, invitedEmployee);
     const employeeToInvite = { ...invitedEmployee, resourceIds };
     setInviteSubmitting(true);
+    if (cloudMode) {
+      setPendingEmployeeInvites((current) => [...current, { ...employeeToInvite, invitePending: true }]);
+      setEmployeeSearch('');
+      setEmployeePage(Math.ceil((managerDashboardEmployees.length + 1) / employeePageSize));
+      inviteDialog?.close();
+    }
     try {
       if (cloudMode) {
         const { error } = await supabase.functions.invoke('invite-employee', {
@@ -2219,12 +2255,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         employees: [...current.employees, employeeToInvite],
         protocolBatches: batches,
       }));
+      setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
       setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
       setEmployeeSearch('');
       setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
       setNotice(cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
       inviteDialog?.close();
     } catch (error) {
+      setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
       setNotice(`Darbuotojo pakviesti nepavyko: ${error.message || 'patikrinkite el. pašto siuntimo nustatymus.'}`);
     } finally {
       setInviteSubmitting(false);
@@ -3206,7 +3244,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? 'Įmonių saugos priežiūra' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div></div>
               {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div>
-                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={orgEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
+                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
               {userRole === 'darbuotojas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos veiksmai">
                 <div className="space-y-3">
@@ -3255,12 +3293,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>
                 <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <span className="font-semibold text-slate-800">{filteredOrgEmployees.length}</span></span></div>
                 <div className="space-y-3 lg:hidden">{paginatedOrgEmployees.map((employee) => {
-                  const assignedResources = (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
+                  const assignedResources = employee.invitePending ? [] : (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
                   const medicalDate = employee.medicalCertificateValidUntil;
                   const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                   const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
-                  const needsReminder = employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key));
-                  const badge = getEmployeeDashboardBadge(employee, assignedResources);
+                  const needsReminder = !employee.invitePending && (employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key)));
+                  const badge = employee.invitePending ? { label: 'Siunčiamas kvietimas', cls: 'bg-sky-100 text-sky-800', Icon: CircleAlert } : getEmployeeDashboardBadge(employee, assignedResources);
                   const BadgeIcon = badge.Icon;
                   return <article className="rounded-lg border border-slate-200 bg-white p-3" key={employee.id}>
                     <div className="flex items-start justify-between gap-2"><h3 className="min-w-0 break-words text-sm font-semibold text-slate-900">{employee.name}</h3><span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${badge.cls}`}>{badge.label}<BadgeIcon size={13} /></span></div>
@@ -3271,10 +3309,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         return <div className="min-w-0" key={group.key}><p className="text-xs font-medium text-slate-500">{group.label}</p>{summary ? <div className="mt-1"><span title={summary.title} className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={13} className="shrink-0" /></span></div> : <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">Netaikoma<CircleAlert size={13} /></p>}</div>;
                       })}
                       <label className="col-span-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[11px] font-medium text-slate-500">Med. pažymėjimas
-                        <span className="flex items-center gap-1.5"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} className={`w-32 rounded-md border px-1.5 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={15} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} /></span>
+                        <span className="flex items-center gap-1.5"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} disabled={employee.invitePending} className={`w-32 rounded-md border px-1.5 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={15} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} /></span>
                       </label>
                     </div>
-                    <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2"><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={17} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={17} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1.5 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={17} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={17} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1.5 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={17} /></button>}</div>
+                    <div inert={employee.invitePending} className={`mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={17} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={17} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1.5 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={17} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={17} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1.5 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={17} /></button>}</div>
                   </article>;
                 })}</div>
                 <div className="hidden w-full overflow-x-auto lg:block"><table className="w-full min-w-max text-left text-[13px]"><thead><tr className="border-y border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
@@ -3287,12 +3325,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   {dashboardResourceGroups.map((group) => renderEmployeeSortHeader(group.key, group.label, 'min-w-36', group.label))}
                 </tr></thead>
                   <tbody className="divide-y divide-slate-100">{paginatedOrgEmployees.map((employee) => {
-                    const assignedResources = (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
+                    const assignedResources = employee.invitePending ? [] : (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
                     const medicalDate = employee.medicalCertificateValidUntil;
                     const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                     const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
-                    const needsReminder = employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key));
-                    const dashboardBadge = getEmployeeDashboardBadge(employee, assignedResources);
+                    const needsReminder = !employee.invitePending && (employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key)));
+                    const dashboardBadge = employee.invitePending ? { label: 'Siunčiamas kvietimas', cls: 'bg-sky-100 text-sky-800', Icon: CircleAlert } : getEmployeeDashboardBadge(employee, assignedResources);
                     return <tr className="border-b border-slate-200 last:border-0 hover:bg-slate-50/80" key={employee.id}>
                       <td className="break-words px-3 py-3 align-middle font-medium text-slate-900">{employee.name}</td>
                       {dashboardResourceGroups.map((group) => {
@@ -3300,13 +3338,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         const SummaryIcon = summary?.Icon ?? CircleAlert;
                         return <td className="px-2 py-3 align-middle" key={group.key}>{summary ? <div className="flex justify-center"><span title={summary.title} className={`inline-flex max-w-full items-center justify-center gap-1.5 truncate rounded-full px-2 py-1 text-[13px] font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={14} className="shrink-0" /></span></div> : <span title="Šio tipo dokumentas darbuotojui nepriskirtas" className="flex items-center justify-center gap-1 text-[13px] text-slate-400">Netaikoma<CircleAlert size={14} /></span>}</td>;
                       })}
-                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" className={`w-28 min-w-0 rounded-md border px-1 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
+                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" disabled={employee.invitePending} className={`w-28 min-w-0 rounded-md border px-1 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
                       <td className="px-2 py-3 align-middle">{(() => {
                         const badge = dashboardBadge;
                         const BadgeIcon = badge.Icon;
                         return <span title="Bendra darbuotojo užduočių būsena" className={`inline-flex w-full items-center justify-center gap-1 rounded-md px-1 py-1 text-[13px] font-semibold ${badge.cls}`}><span>{badge.label}</span><BadgeIcon size={13} /></span>;
                       })()}</td>
-                      <td className="px-1 py-2 align-middle"><div className="flex justify-center gap-0.5"><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={16} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={16} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={16} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={16} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={16} /></button>}</div></td>
+                      <td className="px-1 py-2 align-middle"><div inert={employee.invitePending} className={`flex justify-center gap-0.5 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={16} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={16} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={16} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={16} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={16} /></button>}</div></td>
                     </tr>;
                   })}</tbody></table></div>
                 {filteredOrgEmployees.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Darbuotojų pagal pasirinktus filtrus nerasta.</p>}
@@ -4512,8 +4550,8 @@ function CommissionEditor({ org, employees = [], assignments = [], onInvite, onR
   const [pins, setPins] = useState({});
   const [confirmPins, setConfirmPins] = useState({});
   if (!org) return null;
-  const activeAssignments = assignments.filter((assignment) => ['pending', 'accepted'].includes(assignment.status));
-  const visibleAssignments = assignments.filter((assignment) => assignment.status !== 'revoked');
+  const activeAssignments = assignments.filter((assignment) => ['pending', 'accepted', 'revoking'].includes(assignment.status));
+  const visibleAssignments = assignments.filter((assignment) => !['revoked', 'revoking'].includes(assignment.status));
   const availableEmployees = employees.filter((employee) => !activeAssignments.some((assignment) => assignment.employeeId === employee.id));
   const invite = async (event) => {
     event.preventDefault();

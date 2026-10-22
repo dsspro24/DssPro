@@ -309,7 +309,7 @@ async function loadManagerWorkspace(user) {
   };
 }
 
-export default function CloudEntry() {
+export default function CloudEntry({ onExit }) {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [authMode, setAuthMode] = useState('login');
@@ -499,12 +499,16 @@ export default function CloudEntry() {
     }
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = () => {
     setWorkspace(null);
     setCreatorPreview(null);
     setWorkspaceStatus('idle');
+    setSession(null);
     setForm({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '' });
+    onExit?.();
+    void supabase.auth.signOut().then(({ error }) => {
+      if (error) console.error('Could not complete sign out.', error);
+    }).catch((error) => console.error('Could not complete sign out.', error));
   };
 
   const refreshCreatorWorkspace = async ({ exitPreview = false } = {}) => {
