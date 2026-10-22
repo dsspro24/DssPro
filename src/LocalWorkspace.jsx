@@ -652,6 +652,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const [notice, setNotice] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
+  const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
+    try {
+      const savedIds = JSON.parse(localStorage.getItem(managerNotificationsStorageKey) ?? '[]');
+      return Array.isArray(savedIds) ? savedIds : [];
+    } catch {
+      return [];
+    }
+  });
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
@@ -1125,11 +1134,31 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const completed = entries.every(({ resource, status }) => isTest
       ? employee.progressByResource?.[resource.id] === 'completed' || ['signed', 'unsigned'].includes(status.key)
       : status.key === 'signed');
-    const label = isTest ? completed ? 'Išlaikyta' : 'Neišlaikyta' : completed ? pinSignedStatusLabel : 'Nepasirašyta';
+    const unresolvedEntries = entries.filter(({ status }) => status.key !== 'signed');
+    const waitingSignatureKeys = ['awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'];
+    const waitingSignerKeys = [...new Set(unresolvedEntries
+      .map(({ status }) => status.key)
+      .filter((key) => waitingSignatureKeys.includes(key)))];
+    const onlyWaitingForSignatures = unresolvedEntries.length > 0
+      && unresolvedEntries.every(({ status }) => waitingSignatureKeys.includes(status.key));
+    const label = isTest
+      ? completed ? 'Išlaikyta' : 'Neišlaikyta'
+      : completed ? pinSignedStatusLabel
+        : onlyWaitingForSignatures
+          ? waitingSignerKeys.length === 1
+            ? unresolvedEntries.find(({ status }) => status.key === waitingSignerKeys[0]).status.label
+            : 'Laukia parašų'
+          : unresolvedEntries.every(({ status }) => status.key === 'unsigned')
+            ? 'Užbaigta, nepasirašyta'
+            : unresolvedEntries.every(({ status }) => status.key === 'todo')
+              ? 'Nepradėta'
+              : unresolvedEntries.every(({ status }) => status.key === 'started')
+                ? 'Vyksta'
+                : 'Yra neužbaigtų dokumentų';
     const Icon = completed ? CircleCheck : isTest ? CircleX : CircleAlert;
     const tone = completed ? 'bg-emerald-100 text-emerald-800' : isTest ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800';
     const title = entries.map(({ resource, status }) => {
-      const itemLabel = isTest ? employee.progressByResource?.[resource.id] === 'completed' || ['signed', 'unsigned'].includes(status.key) ? 'Išlaikyta' : 'Neišlaikyta' : status.key === 'signed' ? pinSignedStatusLabel : 'Nepasirašyta';
+      const itemLabel = isTest ? employee.progressByResource?.[resource.id] === 'completed' || ['signed', 'unsigned'].includes(status.key) ? 'Išlaikyta' : 'Neišlaikyta' : status.key === 'signed' ? pinSignedStatusLabel : status.label;
       return `${resource.title}: ${itemLabel}`;
     }).join('\n');
     return { label, Icon, tone, title };
@@ -2306,10 +2335,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openEmployeeEditor = (employee) => {
+    const availableResourceIds = new Set(currentOrg?.resources ?? []);
+    const resourceIds = (employee.resourceIds ?? []).filter((resourceId) => availableResourceIds.has(resourceId)
+      && data.resources.some((resource) => resource.id === resourceId));
     setEditingEmployeeId(employee.id);
     setEmployeePositionDraft(employee.position || 'Darbuotojas');
-    setEmployeeResourceDraft(employee.resourceIds ?? []);
-    setEmployeeSignerDraft(Object.fromEntries((employee.resourceIds ?? []).map((resourceId) => {
+    setEmployeeResourceDraft(resourceIds);
+    setEmployeeSignerDraft(Object.fromEntries(resourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       return [resourceId, getRequiredSigners(resource, currentOrg, employee)];
     }).filter(([, roles]) => roles)));
@@ -2892,6 +2924,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     onRoleChange(role);
   };
 
+  const markCommissionAcceptanceAsRead = (assignmentId) => {
+    const nextReadIds = [...new Set([...readCommissionAcceptanceIds, assignmentId])];
+    setReadCommissionAcceptanceIds(nextReadIds);
+    try {
+      localStorage.setItem(managerNotificationsStorageKey, JSON.stringify(nextReadIds));
+    } catch {
+      // Notification can still be dismissed for the current session.
+    }
+  };
+
   const signedCount = data.signatures.filter((signature) => signature.orgId === currentOrg?.id).length;
   const pendingCount = orgEmployees.reduce((total, employee) => total + employee.resourceIds.filter((resourceId) => {
     const resource = data.resources.find((item) => item.id === resourceId);
@@ -2937,7 +2979,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : userRole === 'vadovas'
         ? [
           ...currentCommissionAssignments
-            .filter((assignment) => assignment.status === 'accepted' && assignment.respondedAt)
+            .filter((assignment) => assignment.status === 'pending')
+            .map((assignment) => ({
+              id: `commission-pending-${assignment.id}`,
+              title: assignment.role === 'Komisijos pirmininkas' ? 'Laukiama komisijos pirmininko sutikimo' : 'Laukiama komisijos nario sutikimo',
+              description: `${assignment.employeeName} laukia kvietimo patvirtinimo.`,
+              pendingCommissionAssignment: assignment,
+            })),
+          ...currentCommissionAssignments
+            .filter((assignment) => assignment.status === 'accepted' && assignment.respondedAt && !readCommissionAcceptanceIds.includes(assignment.id))
             .map((assignment) => ({
               id: `commission-accepted-${assignment.id}`,
               title: 'Darbuotojas sutiko prisijungti prie komisijos',
@@ -3090,6 +3140,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     } else if (userRole === 'vadovas' && item.employee && item.resource && item.commissionMember) {
                       requestCommissionSign(item.employee, item.resource, item.commissionMember);
                     } else if (userRole === 'vadovas' && item.commissionAcceptance) {
+                      markCommissionAcceptanceAsRead(item.commissionAcceptance.id);
+                      setActiveTab('imone');
+                    } else if (userRole === 'vadovas' && item.pendingCommissionAssignment) {
                       setActiveTab('imone');
                     } else if (userRole === 'vadovas' && (item.expiredResource || item.expiredMedicalCertificate || item.medicalCertificateReminder)) {
                       const employee = item.expiredResource?.employee ?? item.expiredMedicalCertificate ?? item.medicalCertificateReminder;
