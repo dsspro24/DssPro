@@ -1452,7 +1452,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           try {
             const { data: tasks, error: taskError } = await supabase.rpc('get_employee_protocol_commission_tasks');
             if (taskError) throw taskError;
-            const commissionTasks = tasks ?? [];
+            const commissionTasks = (tasks ?? []).map((task) => ({
+              ...task,
+              organizationId: task.organizationId ?? currentEmployee?.orgId,
+            }));
             const commissionAssignments = [...new Map(commissionTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id, assignment])).values()];
             const protocolCommissionSignatures = [...new Map(commissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
             setData((current) => ({ ...current, commissionTasks, commissionAssignments, protocolCommissionSignatures }));
@@ -1497,10 +1500,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setCommissionActionError('Nupieškite parašą prieš pasirašydami protokolą.');
       return;
     }
+    const isUuid = (value) => typeof value === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
     const assignmentId = task.assignmentId ?? task.commissionAssignments?.find((assignment) =>
       assignment.employeeId === task.employeeId && assignment.role === task.role)?.id;
-    if (!assignmentId || !task.batchId) {
-      setCommissionActionError('Komisijos paskyrimo ID nerastas. Uždarykite langą ir atnaujinkite protokolo užduotis.');
+    if (!isUuid(task.organizationId) || !isUuid(assignmentId) || !task.batchId) {
+      setCommissionActionError('Nepavyko paruošti komisijos parašo duomenų. Uždarykite langą ir atnaujinkite puslapį.');
       return;
     }
     setCommissionActionSubmitting(true);

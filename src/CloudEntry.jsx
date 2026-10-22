@@ -17,17 +17,24 @@ function getWorkspaceStatus(workspace) {
   return workspace ? 'ready' : 'organization-needed';
 }
 
-function normalizeProtocolCommissionTasks(tasks = []) {
+function isUuid(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeProtocolCommissionTasks(tasks = [], organizationId = null) {
   return tasks.map((task) => {
     const commissionAssignments = task.commissionAssignments ?? task.commission_assignments ?? [];
     const employeeId = task.employeeId ?? task.employee_id;
     const role = task.role;
     const currentAssignment = commissionAssignments.find((assignment) =>
       (assignment.employeeId ?? assignment.employee_id) === employeeId && assignment.role === role);
+    const assignmentId = [task.assignmentId, task.assignment_id, currentAssignment?.id, currentAssignment?.assignment_id]
+      .find(isUuid);
     return {
       ...task,
+      organizationId: task.organizationId ?? task.organization_id ?? organizationId,
       employeeId,
-      assignmentId: task.assignmentId ?? task.assignment_id ?? currentAssignment?.id ?? currentAssignment?.assignment_id,
+      assignmentId,
       batchId: task.batchId ?? task.batch_id,
       commissionAssignments,
     };
@@ -250,7 +257,10 @@ async function loadManagerWorkspace(user) {
     if (commissionInvitationsError) throw commissionInvitationsError;
     if (commissionTasksError) throw commissionTasksError;
     if (employeeSequenceNumberError) throw employeeSequenceNumberError;
-    const normalizedCommissionTasks = normalizeProtocolCommissionTasks(commissionTasks ?? []);
+    const normalizedCommissionTasks = normalizeProtocolCommissionTasks(
+      commissionTasks ?? [],
+      employeeWorkspace.organization?.id ?? employeeMembership.organization_id,
+    );
     const employeeCommissionAssignments = [...new Map(normalizedCommissionTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id ?? assignment.assignment_id, assignment])).values()];
     const employeeProtocolSignatures = [...new Map(normalizedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
     const employeeData = await hydrateWorkspaceAssets({
