@@ -354,7 +354,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-              <div onClick={() => { setCurrentPage('app'); setUserRole('dss'); setActiveTab('zurnalai'); }} className="bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:scale-102 transition-all">
+              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
                   <Lock size={18} />
                 </div>
@@ -362,9 +362,9 @@ function DemoApp({ cloudMode = false }) {
                 <p className="text-xs text-slate-500 leading-relaxed">
                   Darbuotojai, vadovai, DSS specialistai ir komisija pasirašo savo PIN kodu – be popieriaus.
                 </p>
-              </div>
+              </button>
 
-              <div onClick={() => { setCurrentPage('app'); setUserRole('darbuotojas'); setActiveTab('biblioteka'); }} className="bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:scale-102 transition-all">
+              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
                   <Award size={18} />
                 </div>
@@ -372,9 +372,9 @@ function DemoApp({ cloudMode = false }) {
                 <p className="text-xs text-slate-500 leading-relaxed">
                   Priskirkite gaisrinės, chemijos, elektrosaugos ir kitus testus vienu paspaudimu.
                 </p>
-              </div>
+              </button>
 
-              <div onClick={() => { setCurrentPage('app'); setUserRole('darbuotojas'); setActiveTab('aap'); }} className="bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:scale-102 transition-all">
+              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
                   <Shirt size={18} />
                 </div>
@@ -382,7 +382,7 @@ function DemoApp({ cloudMode = false }) {
                 <p className="text-xs text-slate-500 leading-relaxed">
                   Ūgis, svoris, drabužių ir batų dydžiai – AAP išdavimui visada po ranka.
                 </p>
-              </div>
+              </button>
             </div>
 
           </div>
