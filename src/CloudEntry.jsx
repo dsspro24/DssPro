@@ -288,24 +288,27 @@ async function loadManagerWorkspace(user) {
 
   const managerMembership = memberships.find((membership) => membership.role === 'manager');
   if (!managerMembership) return { requiresOrganization: true, managerName, ...companyDetails };
-
-  const { data: organization, error: organizationError } = await supabase
-    .from('organizations').select('id, name, company_code').eq('id', managerMembership.organization_id).single();
-  if (organizationError) throw organizationError;
+  const organizationId = managerMembership.organization_id;
 
   const { data: catalogData, error: catalogError } = await supabase
     .from('creator_workspace_data').select('data').eq('id', true).maybeSingle();
   if (catalogError) throw catalogError;
   const [savedWorkspace, invitationsResult] = await Promise.all([
-    loadOrganizationWorkspace(organization.id, catalogData?.data?.resources ?? []),
+    loadOrganizationWorkspace(organizationId, catalogData?.data?.resources ?? []),
     supabase.from('dss_specialist_invitations')
       .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
-      .eq('organization_id', organization.id)
+      .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
   ]);
   const { data: dssInvitations, error: dssInvitationsError } = invitationsResult;
   if (dssInvitationsError) throw dssInvitationsError;
+  const savedOrganization = savedWorkspace?.organizations?.find((item) => item.id === organizationId);
+  const organization = {
+    id: organizationId,
+    name: savedOrganization?.name ?? companyDetails.companyName,
+    company_code: savedOrganization?.companyCode ?? companyDetails.companyCode,
+  };
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogData?.data ?? null);
   const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
