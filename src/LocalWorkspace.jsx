@@ -3272,7 +3272,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-4 text-sm text-slate-700">Įmonė kviečia jus {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'atstovauti kaip DSS komisijos pirmininką' : 'atstovauti kaip DSS komisijos narį'}. Sutikę gausite pranešimus apie jums pasirašyti pateiktus protokolus.</p>
               <label className="mt-4 flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={commissionConsentChecked} onChange={(event) => setCommissionConsentChecked(event.target.checked)} /><span>Patvirtinu, kad sutinku būti paskirtas(-a) {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'DSS komisijos pirmininku' : 'DSS komisijos nariu'}.</span></label>
               <label className="mt-4 block text-sm font-medium">Sutikimo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
-              <label className="mt-4 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
               {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
               <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => respondToCommissionInvitation(false)}>Atsisakyti kvietimo</button><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setCommissionInvitationTarget(null)}>Uždaryti</button><button type="button" className={buttonClass} disabled={commissionActionSubmitting || !commissionConsentChecked || !signatureInk || !/^\d{4}$/.test(workerSignPin)} onClick={() => respondToCommissionInvitation(true)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Sutikti ir pasirašyti'} <Check size={16} /></button></div>
             </section>
@@ -3287,7 +3287,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 return resource && <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline" onClick={() => openResourcePreview(resource, { protocolBatchId: protocolCommissionTaskTarget.batchId, commissionAssignments: protocolCommissionTaskTarget.commissionAssignments, protocolCommissionSignatures: protocolCommissionTaskTarget.protocolCommissionSignatures })}><Eye size={16} />Peržiūrėti visą protokolą</button>;
               })()}
               <label className="mt-4 block text-sm font-medium">Protokolo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
-              <label className="mt-4 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
               {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
               <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setProtocolCommissionTaskTarget(null)}>Atšaukti</button><button className={buttonClass} disabled={commissionActionSubmitting || !signatureInk || !/^\d{4}$/.test(workerSignPin)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Pasirašyti protokolą'} <FileSignature size={16} /></button></div>
             </form>
@@ -4243,7 +4243,15 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         }
         if (signature?.signedAt) {
           const audit = parsed.createElement('small');
-          audit.textContent = `${formatDate(signature.signedAt)} · ${signature.ip ?? 'IP nenurodytas'}`;
+          const signedAt = new Date(signature.signedAt);
+          const exactTime = Number.isNaN(signedAt.getTime()) ? '' : timeFormatter.format(signedAt);
+          const confirmationMethod = signature.signatureMethod === 'PIN' ? 'Pasirašyta PIN kodu' : signature.signatureMethod ?? 'Pasirašyta';
+          audit.textContent = [
+            formatDate(signature.signedAt),
+            exactTime ? `Tikslus laikas ${exactTime}` : '',
+            confirmationMethod,
+            `IP ${signature.ip ?? 'nenurodytas'}`,
+          ].filter(Boolean).join(' · ');
           pair.append(audit);
         }
         content.append(pair);
@@ -4672,7 +4680,7 @@ function CommissionEditor({ org, employees = [], assignments = [], onInvite, onR
         <label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label>
         <div className="flex items-end gap-2"><label className="min-w-0 flex-1 text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><button className={`${buttonClass} shrink-0`} aria-label={`Nustatyti ${member} PIN`}><LockKeyhole size={15} /></button></div>
       </form>)}</div>
-      {signingTarget?.orgId === org.id && <form onSubmit={onSign} className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Senas komisijos parašo veiksmas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 block text-sm font-medium">Asmeninis 4 skaitmenų PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}
+      {signingTarget?.orgId === org.id && <form onSubmit={onSign} className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Senas komisijos parašo veiksmas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}
     </details>}
   </div>;
 }
