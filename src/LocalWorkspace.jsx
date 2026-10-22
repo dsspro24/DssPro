@@ -3946,6 +3946,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             archivedEmployees={archivedOrgEmployees}
             cloudMode={cloudMode}
             pageSize={10}
+            onPreviewSignature={(signature) => {
+              const resource = data.resources.find((item) => item.id === signature.resourceId)
+                ?? archivedOrgEmployees.flatMap((record) => record.resources).find((item) => item.id === signature.resourceId);
+              if (!resource) {
+                setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
+                return;
+              }
+              const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
+                && batch.resourceId === signature.resourceId
+                && batch.employeeIds.includes(signature.employeeId));
+              openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
+            }}
           /></Panel>}
           </section>}
 
@@ -4130,17 +4142,27 @@ function Metric({ label, value, accent = 'slate', hint }) {
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
 function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [] }) {
-  return <DataTable headers={['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė', 'Parašas', 'Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas']} rows={signatures.map((signature) => [
-    signature.contractNumber || 'Nenurodytas',
-    resources.find((resource) => resource.id === signature.resourceId)?.title ?? archivedEmployees.flatMap((record) => record.resources).find((resource) => resource.id === signature.resourceId)?.title ?? 'Dokumentas',
-    `${signature.signer} · ${signature.role}`,
-    <SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />,
-    signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu',
-    new Date(signature.signedAt).toLocaleString('lt-LT'),
-    signature.validUntil ? new Date(signature.validUntil).toLocaleDateString('lt-LT') : 'Nenustatyta',
-    signature.ip,
-  ])} empty="Parašų dar nėra." />;
+function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature }) {
+  const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė', 'Parašas', 'Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas'];
+  if (onPreviewSignature) headers.push('Peržiūra');
+  return <DataTable headers={headers} rows={signatures.map((signature) => {
+    const resource = resources.find((item) => item.id === signature.resourceId)
+      ?? archivedEmployees.flatMap((record) => record.resources).find((item) => item.id === signature.resourceId);
+    const row = [
+      signature.contractNumber || 'Nenurodytas',
+      resource?.title ?? 'Dokumentas',
+      `${signature.signer} · ${signature.role}`,
+      <SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />,
+      signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu',
+      new Date(signature.signedAt).toLocaleString('lt-LT'),
+      signature.validUntil ? new Date(signature.validUntil).toLocaleDateString('lt-LT') : 'Nenustatyta',
+      signature.ip,
+    ];
+    if (onPreviewSignature) {
+      row.push(<button type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />{resource ? getResourcePreviewActionLabel(resource) : 'Dokumentas nerastas'}</button>);
+    }
+    return row;
+  })} empty="Parašų dar nėra." />;
 }
 function SignatureImagePreview({ signature, emptyLabel = null }) {
   const [imageUrl, setImageUrl] = useState('');
@@ -4176,7 +4198,7 @@ function SignatureImagePreview({ signature, emptyLabel = null }) {
     {error && <p role="alert" className="mt-1 max-w-48 text-xs text-rose-700">{error}</p>}
   </div>;
 }
-function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize }) {
+function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature }) {
   const [page, setPage] = useState(1);
   const [historyResult, setHistoryResult] = useState({ key: '', records: [], totalCount: 0, error: '' });
   const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
@@ -4250,7 +4272,7 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
   return <div className="space-y-3">
     {visibleError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{visibleError}</p>}
     {loading && <p role="status" className="text-sm text-slate-500">Įkeliama parašų istorija…</p>}
-    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} />}
+    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} />}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-slate-500">{loading ? 'Įkeliama parašų istorija…' : visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
       <div className="flex gap-2">
