@@ -233,7 +233,10 @@ function DemoApp({ cloudMode = false }) {
         document.getElementById('signup-confirmation-dialog')?.showModal();
       }
     } catch (error) {
-      setCloudSignupFeedback(error.message || 'Nepavyko sukurti paskyros. Patikrinkite duomenis.');
+      const cooldown = error.message?.match(/only request this after\s+(\d+)\s+seconds?/i);
+      setCloudSignupFeedback(cooldown
+        ? `Dėl saugumo registracijos nuorodos galima prašyti dar kartą po ${cooldown[1]} sek.`
+        : error.message || 'Nepavyko sukurti paskyros. Patikrinkite duomenis.');
     }
   };
 
@@ -503,7 +506,7 @@ function DemoApp({ cloudMode = false }) {
           <h2 className="text-lg font-bold">Patvirtinkite el. paštą</h2>
           <p className="mt-2 text-sm text-slate-600">Registracijos nuorodą išsiuntėme adresu <strong className="break-all text-slate-900">{signupConfirmationEmail}</strong>.</p>
           <p className="mt-2 text-sm text-slate-600">Atidarykite laiške esančią nuorodą, tada grįžkite čia ir prisijunkite. Jei laiško nematote, patikrinkite brukalo aplanką.</p>
-          <button type="button" className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => document.getElementById('signup-confirmation-dialog')?.close()}>Supratau</button>
+          <button type="button" className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => { document.getElementById('signup-confirmation-dialog')?.close(); setCloudSignupFeedback(''); setCurrentPage('app'); setActiveTab('skydelis'); }}>Supratau</button>
         </dialog>}
 
       </div>
