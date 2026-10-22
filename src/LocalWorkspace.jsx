@@ -551,7 +551,7 @@ const assistantCreatedResourceIds = new Set(initialData.resources
 const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadovas: 'Įmonės vadovas', kurejas: 'Turinio kūrėjas' };
 const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
-  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
+  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Istorija', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
@@ -824,7 +824,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssReviewConfirmed, setDssReviewConfirmed] = useState(false);
   const [selectedDssTaskIds, setSelectedDssTaskIds] = useState([]);
   const [dssTaskPage, setDssTaskPage] = useState(1);
-  const [dssJournalView, setDssJournalView] = useState('pending');
+  const [dssHistoryView, setDssHistoryView] = useState('specialist');
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
@@ -3907,11 +3907,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'zurnalai' && userRole === 'dss' && <section className="space-y-5"><PageTitle title="Įmonės žurnalai ir parašai" subtitle={`Pasirašykite dokumentus po vieną arba partijomis iki ${dssSignatureBatchSize}. Kiekvieną pasirinktą dokumentą peržiūrėkite prieš pasirašydami.`} />
-            <div className="flex gap-5 border-b border-slate-200" role="tablist" aria-label="DSS žurnalai ir parašų istorija">
-              <button type="button" role="tab" aria-selected={dssJournalView === 'pending'} className={`border-b-2 px-1 pb-3 text-sm font-semibold ${dssJournalView === 'pending' ? 'border-emerald-700 text-emerald-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`} onClick={() => setDssJournalView('pending')}>Laukia mano parašo <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs">{currentDssTasks.length}</span></button>
-              <button type="button" role="tab" aria-selected={dssJournalView === 'history'} className={`border-b-2 px-1 pb-3 text-sm font-semibold ${dssJournalView === 'history' ? 'border-emerald-700 text-emerald-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`} onClick={() => setDssJournalView('history')}>Pasirašyta · istorija</button>
-            </div>
-            {dssJournalView === 'pending' && <Panel title={`${currentOrg?.name} · laukia DSS parašo`}>
+            <Panel title={`${currentOrg?.name} · laukia DSS parašo`}>
             {!canManageSelectedWorkspace && <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">Įmonė nesuteikė pilnos darbo srities tvarkymo teisės, tačiau galite peržiūrėti jums pateiktus dokumentus, pasirašyti DSS žurnalus ir matyti parašų istoriją.</p>}
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={paginatedDssTasks.length > 0 && paginatedDssTasks.every((task) => selectedDssTaskIds.includes(task.id))} disabled={!paginatedDssTasks.length} onChange={(event) => setSelectedDssTaskIds((current) => event.target.checked
@@ -3934,43 +3930,55 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               ];
             })} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
             {currentDssTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentDssTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentDssTaskPage * dssTaskPageSize, currentDssTasks.length)} iš {currentDssTasks.length} · pasirinkta {selectedCurrentDssTasks.length}</p><nav className="flex items-center gap-2" aria-label="DSS pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage <= 1} onClick={() => setDssTaskPage(Math.max(1, currentDssTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentDssTaskPage} / {dssTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage >= dssTaskPageCount} onClick={() => setDssTaskPage(Math.min(dssTaskPageCount, currentDssTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
-          </Panel>}
-          {dssJournalView === 'history' && <Panel title="DSS specialisto pasirašyti dokumentai"><PaginatedSignatureHistory
-            key={`${currentOrg?.id ?? ''}:organization-history`}
-            organizationId={currentOrg?.id}
-            signerUserId={cloudMode ? cloudUserId : undefined}
-            signerRole="DSS specialistas"
-            signatures={data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'DSS specialistas' && (cloudMode ? signature.signerUserId === cloudUserId : signature.signer === currentSpecialist?.name))}
-            resources={data.resources}
-            employees={[...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)]}
-            archivedEmployees={archivedOrgEmployees}
-            cloudMode={cloudMode}
-            pageSize={10}
-            onPreviewSignature={(signature) => {
-              const resource = data.resources.find((item) => item.id === signature.resourceId)
-                ?? archivedOrgEmployees.flatMap((record) => record.resources).find((item) => item.id === signature.resourceId);
-              if (!resource) {
-                setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
-                return;
-              }
-              const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
-                && batch.resourceId === signature.resourceId
-                && batch.employeeIds.includes(signature.employeeId));
-              openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
-            }}
-          /></Panel>}
+          </Panel>
           </section>}
 
-          {activeTab === 'parasai' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="space-y-5"><PageTitle title="Mano parašai" subtitle="Pasirašytų dokumentų data, veiksmo rolė ir demo aplinkos IP žyma." /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : currentSpecialist?.name}><PaginatedSignatureHistory
+          {activeTab === 'parasai' && userRole === 'dss' && <section className="space-y-5">
+            <PageTitle title="Istorija" subtitle="Peržiūrėkite savo pasirašytus dokumentus arba šios įmonės darbuotojų pasirašytus dokumentus." />
+            <div className="flex gap-5 border-b border-slate-200" role="tablist" aria-label="Parašų istorijos tipas">
+              <button type="button" role="tab" aria-selected={dssHistoryView === 'specialist'} className={`border-b-2 px-1 pb-3 text-sm font-semibold ${dssHistoryView === 'specialist' ? 'border-emerald-700 text-emerald-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`} onClick={() => setDssHistoryView('specialist')}>Mano parašai</button>
+              <button type="button" role="tab" aria-selected={dssHistoryView === 'employees'} className={`border-b-2 px-1 pb-3 text-sm font-semibold ${dssHistoryView === 'employees' ? 'border-emerald-700 text-emerald-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`} onClick={() => setDssHistoryView('employees')}>Darbuotojų parašai</button>
+            </div>
+            <Panel title={dssHistoryView === 'specialist' ? `${currentOrg?.name} · mano pasirašyti dokumentai` : `${currentOrg?.name} · darbuotojų pasirašyti dokumentai`}>
+              <PaginatedSignatureHistory
+                key={`${currentOrg?.id ?? ''}:${dssHistoryView}`}
+                organizationId={currentOrg?.id}
+                signerUserId={dssHistoryView === 'specialist' && cloudMode ? cloudUserId : undefined}
+                signerRole={dssHistoryView === 'specialist' ? 'DSS specialistas' : 'Darbuotojas'}
+                signatures={dssHistoryView === 'specialist'
+                  ? data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'DSS specialistas' && (cloudMode ? signature.signerUserId === cloudUserId : signature.signer === currentSpecialist?.name))
+                  : data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'Darbuotojas')}
+                resources={data.resources}
+                employees={[...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)]}
+                archivedEmployees={archivedOrgEmployees}
+                cloudMode={cloudMode}
+                pageSize={10}
+                showDocumentPreview
+                onPreviewSignature={(signature) => {
+                  const resource = data.resources.find((item) => item.id === signature.resourceId)
+                    ?? archivedOrgEmployees.flatMap((record) => record.resources).find((item) => item.id === signature.resourceId);
+                  if (!resource) {
+                    setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
+                    return;
+                  }
+                  const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
+                    && batch.resourceId === signature.resourceId
+                    && batch.employeeIds.includes(signature.employeeId));
+                  openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
+                }}
+              />
+            </Panel>
+          </section>}
+
+          {activeTab === 'parasai' && userRole === 'darbuotojas' && <section className="space-y-5"><PageTitle title="Mano parašai" subtitle="Pasirašytų dokumentų data, veiksmo rolė ir demo aplinkos IP žyma." /><Panel title={currentEmployee?.name}><PaginatedSignatureHistory
             key={`${currentOrg?.id ?? ''}:${userRole === 'darbuotojas' ? currentEmployee?.id ?? '' : cloudUserId}:personal-history`}
             organizationId={currentOrg?.id}
-            employeeId={userRole === 'darbuotojas' ? currentEmployee?.id : undefined}
-            signerUserId={userRole === 'dss' ? cloudUserId : undefined}
-            signatures={userRole === 'darbuotojas' ? employeeSignatures : data.signatures.filter((signature) => signature.signer === currentSpecialist?.name)}
+            employeeId={currentEmployee?.id}
+            signatures={employeeSignatures}
             resources={data.resources}
             employees={orgEmployees}
             cloudMode={cloudMode}
-            pageSize={userRole === 'dss' ? 10 : signatureHistoryPageSize}
+            pageSize={signatureHistoryPageSize}
           /></Panel></section>}
 
           {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
@@ -4142,8 +4150,10 @@ function Metric({ label, value, accent = 'slate', hint }) {
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
 function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature }) {
-  const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė', 'Parašas', 'Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas'];
+function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false }) {
+  const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė'];
+  if (!showDocumentPreview) headers.push('Parašas');
+  headers.push('Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas');
   if (onPreviewSignature) headers.push('Peržiūra');
   return <DataTable headers={headers} rows={signatures.map((signature) => {
     const resource = resources.find((item) => item.id === signature.resourceId)
@@ -4152,12 +4162,14 @@ function SignatureTable({ signatures, resources, archivedEmployees = [], onPrevi
       signature.contractNumber || 'Nenurodytas',
       resource?.title ?? 'Dokumentas',
       `${signature.signer} · ${signature.role}`,
-      <SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />,
+    ];
+    if (!showDocumentPreview) row.push(<SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />);
+    row.push(
       signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu',
       new Date(signature.signedAt).toLocaleString('lt-LT'),
       signature.validUntil ? new Date(signature.validUntil).toLocaleDateString('lt-LT') : 'Nenustatyta',
       signature.ip,
-    ];
+    );
     if (onPreviewSignature) {
       row.push(<button type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />{resource ? getResourcePreviewActionLabel(resource) : 'Dokumentas nerastas'}</button>);
     }
@@ -4198,16 +4210,23 @@ function SignatureImagePreview({ signature, emptyLabel = null }) {
     {error && <p role="alert" className="mt-1 max-w-48 text-xs text-rose-700">{error}</p>}
   </div>;
 }
-function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature }) {
+function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature, showDocumentPreview = false }) {
   const [page, setPage] = useState(1);
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('visos');
   const [historyResult, setHistoryResult] = useState({ key: '', records: [], totalCount: 0, error: '' });
   const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
-  const localRecords = useMemo(() => [...signatures].sort((left, right) => {
+  const historyResources = useMemo(() => [...resources, ...archivedEmployees.flatMap((record) => record.resources)], [archivedEmployees, resources]);
+  const resourceById = useMemo(() => new Map(historyResources.map((resource) => [resource.id, resource])), [historyResources]);
+  const matchingResourceIds = useMemo(() => resourceTypeFilter === 'visos'
+    ? []
+    : historyResources.filter((resource) => normalizeResourceType(resource) === resourceTypeFilter).map((resource) => resource.id), [historyResources, resourceTypeFilter]);
+  const localRecords = useMemo(() => signatures.filter((signature) => resourceTypeFilter === 'visos'
+    || normalizeResourceType(resourceById.get(signature.resourceId) ?? {}) === resourceTypeFilter).sort((left, right) => {
     const timeDifference = new Date(right.signedAt).getTime() - new Date(left.signedAt).getTime();
     return timeDifference || String(right.id).localeCompare(String(left.id));
-  }), [signatures]);
+  }), [resourceById, resourceTypeFilter, signatures]);
   const localPageCount = Math.max(1, Math.ceil(localRecords.length / pageSize));
-  const requestKey = JSON.stringify([organizationId, employeeId, signerUserId, signerRole, page, pageSize]);
+  const requestKey = JSON.stringify([organizationId, employeeId, signerUserId, signerRole, resourceTypeFilter, page, pageSize]);
   const resultIsCurrent = historyResult.key === requestKey;
   const cloudCount = resultIsCurrent ? historyResult.totalCount : 0;
   const loading = cloudMode && Boolean(organizationId) && !resultIsCurrent;
@@ -4230,6 +4249,13 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
     if (employeeId) query = query.eq('employee_id', employeeId);
     if (signerUserId) query = query.eq('signer_user_id', signerUserId);
     if (signerRole) query = query.eq('signer_role', signerRole);
+    if (resourceTypeFilter !== 'visos' && !matchingResourceIds.length) {
+      Promise.resolve().then(() => {
+        if (active) setHistoryResult({ key: requestKey, records: [], totalCount: 0, error: '' });
+      });
+      return () => { active = false; };
+    }
+    if (resourceTypeFilter !== 'visos') query = query.in('document_id', matchingResourceIds);
     query
       .order('signed_at', { ascending: false })
       .order('signature_id', { ascending: false })
@@ -4267,12 +4293,21 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
         setHistoryResult({ key: requestKey, records: [], totalCount: 0, error: `Parašų istorijos įkelti nepavyko: ${queryError.message}` });
       });
     return () => { active = false; };
-  }, [cloudMode, employeeById, employeeId, organizationId, page, pageSize, requestKey, signerRole, signerUserId]);
+  }, [cloudMode, employeeById, employeeId, matchingResourceIds, organizationId, page, pageSize, requestKey, resourceTypeFilter, signerRole, signerUserId]);
 
   return <div className="space-y-3">
+    {showDocumentPreview && <label className="block max-w-xs text-sm font-medium">Dokumento tipas
+      <select className={`${inputClass} mt-1`} value={resourceTypeFilter} onChange={(event) => { setResourceTypeFilter(event.target.value); setPage(1); }}>
+        <option value="visos">Visi dokumentai</option>
+        <option value="Žurnalas">Žurnalai</option>
+        <option value="Protokolas">Protokolai</option>
+        <option value="Kortelė">Kortelės</option>
+        <option value="Testas">Testai</option>
+      </select>
+    </label>}
     {visibleError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{visibleError}</p>}
     {loading && <p role="status" className="text-sm text-slate-500">Įkeliama parašų istorija…</p>}
-    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} />}
+    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} showDocumentPreview={showDocumentPreview} />}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-slate-500">{loading ? 'Įkeliama parašų istorija…' : visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
       <div className="flex gap-2">
