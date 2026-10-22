@@ -3044,6 +3044,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const markCommissionAcceptanceAsRead = (assignmentId) => {
     const nextReadIds = [...new Set([...readCommissionAcceptanceIds, assignmentId])];
     setReadCommissionAcceptanceIds(nextReadIds);
+    const userKey = cloudUserId || 'demo';
+    setData((current) => ({
+      ...current,
+      managerNotificationsReadByUser: {
+        ...(current.managerNotificationsReadByUser ?? {}),
+        [userKey]: [...new Set([...(current.managerNotificationsReadByUser?.[userKey] ?? []), assignmentId])],
+      },
+    }));
     try {
       localStorage.setItem(managerNotificationsStorageKey, JSON.stringify(nextReadIds));
     } catch {
@@ -3057,6 +3065,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return resource && ['todo', 'started', 'unsigned', 'expired', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(employee, resource).key);
   }).length, 0) + dssTasks.filter((task) => task.orgId === currentOrg?.id).length;
   const currentDateKey = toLocalDateKey(new Date(validityCheckTime));
+  const managerReadIdsFromWorkspace = data.managerNotificationsReadByUser?.[cloudUserId || 'demo'] ?? [];
   const updateMedicalCertificateDate = (employeeId, validUntil) => setData((current) => ({
     ...current,
     employees: current.employees.map((employee) => employee.id === employeeId
@@ -3104,7 +3113,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               pendingCommissionAssignment: assignment,
             })),
           ...currentCommissionAssignments
-            .filter((assignment) => assignment.status === 'accepted' && assignment.respondedAt && !readCommissionAcceptanceIds.includes(assignment.id))
+            .filter((assignment) => assignment.status === 'accepted'
+              && assignment.respondedAt
+              && !readCommissionAcceptanceIds.includes(assignment.id)
+              && !managerReadIdsFromWorkspace.includes(assignment.id))
             .map((assignment) => ({
               id: `commission-accepted-${assignment.id}`,
               title: 'Darbuotojas sutiko prisijungti prie komisijos',
