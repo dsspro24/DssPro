@@ -675,7 +675,32 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
+  const [activeTab, setActiveTabState] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
+  const setActiveTab = (tab) => {
+    if (tab === activeTab) return;
+    const currentState = window.history.state;
+    window.history.pushState({
+      ...(currentState && typeof currentState === 'object' ? currentState : {}),
+      dssProWorkspaceTab: tab,
+    }, '');
+    setActiveTabState(tab);
+  };
+  useEffect(() => {
+    const currentState = window.history.state;
+    window.history.replaceState({
+      ...(currentState && typeof currentState === 'object' ? currentState : {}),
+      dssProWorkspaceTab: activeTab,
+    }, '');
+  }, [activeTab]);
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (typeof event.state?.dssProWorkspaceTab === 'string') {
+        setActiveTabState(event.state.dssProWorkspaceTab);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
