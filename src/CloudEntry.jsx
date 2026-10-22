@@ -311,20 +311,10 @@ async function loadManagerWorkspace(user) {
   };
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogData?.data ?? null);
-  const [{ data: commissionAssignments, error: commissionAssignmentsError }, { data: protocolCommissionSignatures, error: protocolCommissionSignaturesError }] = await Promise.all([
-    supabase.rpc('get_organization_commission_assignments', { input_organization_id: organization.id }),
-    supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organization.id }),
-  ]);
-  if (commissionAssignmentsError) throw commissionAssignmentsError;
-  if (protocolCommissionSignaturesError) throw protocolCommissionSignaturesError;
-  const managerCommissionAssignments = (commissionAssignments ?? []).map((assignment) => ({
-    ...assignment,
-    signaturePath: assignment.consentSignaturePath,
-  }));
   const hydratedManagerWorkspace = await hydrateWorkspaceAssets({
     ...hydratedWorkspace,
-    commissionAssignments: managerCommissionAssignments,
-    protocolCommissionSignatures: protocolCommissionSignatures ?? [],
+    commissionAssignments: [],
+    protocolCommissionSignatures: [],
   });
 
   return {

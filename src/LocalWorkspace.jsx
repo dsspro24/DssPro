@@ -978,6 +978,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   useEffect(() => {
     if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
     let active = true;
+    supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: selectedOrgId })
+      .then(({ data: signatures, error }) => {
+        if (!active) return;
+        if (error) {
+          setNotice(`Komisijos protokolo parašų įkelti nepavyko: ${error.message}`);
+          return;
+        }
+        setData((current) => ({
+          ...current,
+          protocolCommissionSignatures: [
+            ...(current.protocolCommissionSignatures ?? []).filter((signature) => signature.orgId !== selectedOrgId),
+            ...(signatures ?? []),
+          ],
+        }));
+      })
+      .catch((error) => {
+        if (active) setNotice(`Komisijos protokolo parašų įkelti nepavyko: ${error.message}`);
+      });
+    return () => { active = false; };
+  }, [cloudMode, selectedOrgId, userRole]);
+
+  useEffect(() => {
+    if (!cloudMode || !selectedOrgId || userRole !== 'vadovas') return undefined;
+    let active = true;
     let requestInFlight = false;
     const refreshCommissionAssignments = async () => {
       if (requestInFlight || document.visibilityState === 'hidden') return;
@@ -1002,6 +1026,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         requestInFlight = false;
       }
     };
+    refreshCommissionAssignments();
     const intervalId = window.setInterval(refreshCommissionAssignments, 30_000);
     document.addEventListener('visibilitychange', refreshCommissionAssignments);
     return () => {
