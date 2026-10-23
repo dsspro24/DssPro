@@ -661,6 +661,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData();
     const workspaceData = {
       ...loadedData,
+      resources: (loadedData.resources ?? []).map((resource) => {
+        if (resource.id !== 'res-medical-examination-schedule') return resource;
+        const defaults = initialData.resources.find((item) => item.id === resource.id);
+        return {
+          ...defaults,
+          ...resource,
+          html: resource.html || defaults?.html,
+          templateKind: resource.templateKind ?? defaults?.templateKind,
+          requiredSigners: resource.requiredSigners ?? defaults?.requiredSigners,
+          defaultSettings: { ...defaults?.defaultSettings, ...resource.defaultSettings },
+        };
+      }),
       organizations: (loadedData.organizations ?? []).map((organization) => ({
         ...initialData.organizations[0],
         ...organization,
@@ -2264,6 +2276,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const getResourceWithHtml = async (resource, { useCache = true } = {}) => {
+    if (resource.id === 'res-medical-examination-schedule') {
+      const defaultResource = initialData.resources.find((item) => item.id === resource.id);
+      resource = {
+        ...defaultResource,
+        ...resource,
+        html: resource.html || defaultResource?.html,
+        templateKind: resource.templateKind ?? defaultResource?.templateKind,
+        requiredSigners: resource.requiredSigners ?? defaultResource?.requiredSigners,
+        defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
+      };
+    }
     if (resource.html || !resource.htmlUrl) return resource;
     const cached = useCache ? resourceHtmlCacheRef.current.get(resource.id) : null;
     if (cached) return cached;
@@ -4802,7 +4825,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : parsed.querySelector('.journal-page .journal-table');
+  const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : resource.templateKind === 'medical-examination-schedule' ? parsed.querySelector('.document-page .journal-table') : parsed.querySelector('.journal-page .journal-table');
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
@@ -4813,7 +4836,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     while (rows.length < rowCount) table.tBodies[0].append(rows[0].cloneNode(true));
     rows = [...table.tBodies[0].rows];
   }
-  if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card'].includes(resource.templateKind)) {
+  if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card', 'medical-examination-schedule'].includes(resource.templateKind)) {
     rows.forEach((row, index) => {
       if (row.cells[0]) row.cells[0].textContent = String(index + 1);
     });
@@ -5177,7 +5200,10 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       PROTOCOL_NUMBER: escapeHtml(resource.protocolNumber ?? ''),
       LOCATION_PLACE: '',
     };
-    const html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || '<p>Šis šablonas dar neturi turinio.</p>');
+    const fallbackHtml = resource.id === 'res-medical-examination-schedule'
+      ? medicalExaminationScheduleTemplate
+      : '<p>Šis šablonas dar neturi turinio.</p>';
+    const html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || fallbackHtml);
     const populatedHtml = populateJournalRows(html, resource, employee, org, signatures, resource.previewSpecialists ?? [], resources);
     return ['Protokolas', 'Kortelė'].includes(resource.type) && resource.id !== 'res-aap'
       ? numberDocumentSequenceColumn(populatedHtml)
