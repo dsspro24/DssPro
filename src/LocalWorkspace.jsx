@@ -2349,7 +2349,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
     if (userRole === 'darbuotojas' && resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee)) {
       setActiveTab('aap');
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
@@ -2389,11 +2389,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
-      previewSignatures = await hydrateSignatureImages(data.signatures.filter((signature) =>
-        signature.resourceId === resource.id && previewEmployeeIds.has(signature.employeeId)));
+      const resourceSignatures = data.signatures.filter((signature) =>
+        signature.resourceId === resource.id && previewEmployeeIds.has(signature.employeeId));
+      if (previewSignature?.resourceId === resource.id
+        && previewEmployeeIds.has(previewSignature.employeeId)
+        && !resourceSignatures.some((signature) => signature.id === previewSignature.id)) {
+        resourceSignatures.push(previewSignature);
+      }
+      previewSignatures = await hydrateSignatureImages(resourceSignatures);
       protocolCommissionSignatures = await hydrateSignatureImages(protocolCommissionSignatures);
     }
-    const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && hasCurrentWorkerSignature(currentEmployee.id, resource.id));
+    const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && (
+      hasCurrentWorkerSignature(currentEmployee.id, resource.id)
+      || (previewSignature?.employeeId === currentEmployee.id && previewSignature.resourceId === resource.id && previewSignature.role === 'Darbuotojas')
+    ));
     const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
     previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, previewSignatures), resource.title);
     if (autoPrint) {
@@ -4037,7 +4046,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
                     && batch.resourceId === signature.resourceId
                     && batch.employeeIds.includes(signature.employeeId));
-                  openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
+                  openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id });
                 }}
               />
             </Panel>
@@ -4052,17 +4061,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             employees={orgEmployees}
             cloudMode={cloudMode}
             pageSize={signatureHistoryPageSize}
-            showProtocolDocument
+            showDocumentPreview
             onPreviewSignature={(signature) => {
               const resource = data.resources.find((item) => item.id === signature.resourceId);
               if (!resource) {
-                setNotice('Pasirašyto protokolo peržiūrėti nepavyko: dokumento šablonas nerastas.');
+                setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
                 return;
               }
               const protocolBatch = (data.protocolBatches ?? []).find((batch) => batch.orgId === signature.orgId
                 && batch.resourceId === signature.resourceId
                 && batch.employeeIds.includes(signature.employeeId));
-              openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
+              openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id });
             }}
           /></Panel></section>}
 
@@ -4240,7 +4249,7 @@ function Metric({ label, value, accent = 'slate', hint }) {
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
 function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false, showProtocolDocument = false }) {
+function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false }) {
   const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė'];
   if (!showDocumentPreview) headers.push('Parašas');
   headers.push('Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas');
@@ -4253,11 +4262,7 @@ function SignatureTable({ signatures, resources, archivedEmployees = [], onPrevi
       resource?.title ?? 'Dokumentas',
       `${signature.signer} · ${signature.role}`,
     ];
-    if (!showDocumentPreview) {
-      row.push(showProtocolDocument && onPreviewSignature && normalizeResourceType(resource ?? {}) === 'Protokolas'
-        ? <button key={signature.id} type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />Peržiūrėti protokolą</button>
-        : <SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />);
-    }
+    if (!showDocumentPreview) row.push(<SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />);
     row.push(
       signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu',
       new Date(signature.signedAt).toLocaleString('lt-LT'),
@@ -4304,7 +4309,7 @@ function SignatureImagePreview({ signature, emptyLabel = null }) {
     {error && <p role="alert" className="mt-1 max-w-48 text-xs text-rose-700">{error}</p>}
   </div>;
 }
-function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature, showDocumentPreview = false, showProtocolDocument = false }) {
+function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature, showDocumentPreview = false }) {
   const [page, setPage] = useState(1);
   const [resourceTypeFilter, setResourceTypeFilter] = useState('visos');
   const [historyResult, setHistoryResult] = useState({ key: '', records: [], totalCount: 0, error: '' });
@@ -4401,7 +4406,7 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
     </label>}
     {visibleError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{visibleError}</p>}
     {loading && <p role="status" className="text-sm text-slate-500">Įkeliama parašų istorija…</p>}
-    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} showDocumentPreview={showDocumentPreview} showProtocolDocument={showProtocolDocument} />}
+    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} showDocumentPreview={showDocumentPreview} />}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-slate-500">{loading ? 'Įkeliama parašų istorija…' : visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
       <div className="flex gap-2">
@@ -4974,7 +4979,7 @@ function escapeHtml(value) {
 function buildAapIssuanceHtml(issuance, employee, org) {
   const rows = issuance.items.map((item, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason || '')}</td><td>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td><td>${escapeHtml(item.validity || '')}</td></tr>`).join('');
   const signedAt = issuance.signedAt ? new Date(issuance.signedAt).toLocaleString('lt-LT') : '';
-  return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.signature-image{display:block;width:220px;height:80px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>Išdavimą patvirtino darbuotojas</strong>${signatureImageHtml(issuance)}<p>${escapeHtml(issuance.signer || employee.name)}</p></section><section><strong>Pasirašyta PIN kodu</strong><p>${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
+  return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.signature-image{display:block;width:220px;height:80px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>AAP gavimą patvirtino darbuotojas</strong>${signatureImageHtml(issuance)}<p>${escapeHtml(issuance.signer || employee.name)}</p></section><section><strong>Pasirašyta PIN kodu</strong><p>${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
 }
 function TestForm({ questions, answers, setAnswers, onSubmit }) {
   const [validationError, setValidationError] = useState('');
