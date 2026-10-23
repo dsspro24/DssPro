@@ -4,6 +4,7 @@ import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploa
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
+import medicalExaminationScheduleTemplate from './assets/medical-examination-schedule.html?raw';
 import workplaceInstructionsTemplate from './assets/workplace-dss-instructions-journal.html?raw';
 import introInstructionsTemplate from './assets/intro-dss-instructions-journal.html?raw';
 import workRulesTemplate from './assets/work-rules-familiarization-journal.html?raw';
@@ -489,6 +490,7 @@ const initialData = {
     { id: manualHandlingTestId, title: 'Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programos testas', type: 'Testas', category: 'Krovinių kėlimas rankomis', image: '/courses/construction-ppe.jpg', duration: '19 klausimų', html: '<h2>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programa</h2><p>Atsakykite į visus 19 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: manualHandlingQuestions },
     { id: knowledgeAssessmentProtocolId, title: 'Mokymo programos žinių patikrinimo protokolas', type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true },
     ...defaultCompanyProtocolTemplates.map(({ id, title, testId }) => ({ id, title, type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true })),
+    { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 20, populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 15, populateEmployees: true, regulationNumber: '' } },
     { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 20, populateEmployees: true, date: '', instructorName: '' } },
@@ -2332,7 +2334,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     try {
       let htmlUrl = resourceForm.html.trim() ? resourceForm.htmlUrl : '';
       if (cloudMode && userRole === 'kurejas' && resourceForm.html.trim()
-        && resourceForm.html !== existingResource?.html
+        && (resourceForm.html !== existingResource?.html || (!existingResource?.htmlUrl && Boolean(existingResource?.html)))
         && htmlUrl === (existingResource?.htmlUrl ?? '')) {
         const htmlFile = new File([resourceForm.html], `${editingResourceId ?? 'resource'}.html`, { type: 'text/html' });
         const uploadedHtml = await uploadCreatorAsset(htmlFile);
@@ -4796,7 +4798,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function populateJournalRows(html, resource, employee, org, signatures, specialists, allResources = []) {
-  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card'];
+  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -4866,7 +4868,18 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const workerProof = proof(item, worker);
       const workerDate = formatDate(worker?.signedAt);
 
-      if (resource.templateKind === 'familiarization-card') {
+      if (resource.templateKind === 'medical-examination-schedule') {
+        const settings = resource.defaultSettings ?? {};
+        writeRow(row, [
+          String(index + 1),
+          escapeHtml(item.name),
+          escapeHtml(item.position || 'Darbuotojas'),
+          escapeHtml(settings.periodicity || '1 kartą per 2 metus'),
+          formatDate(item.medicalExamDate ?? item.lastMedicalExamDate),
+          formatDate(item.nextMedicalExamDate ?? item.medicalCertificateValidUntil),
+          workerProof,
+        ]);
+      } else if (resource.templateKind === 'familiarization-card') {
         writeRow(row, [String(index + 1), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
       } else if (resource.templateKind === 'work-rules-journal') {
         writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
@@ -5157,6 +5170,8 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     const values = {
       COMPANY_NAME: escapeHtml(org?.name ?? ''),
       COMPANY_CODE: escapeHtml(org?.companyCode ?? ''),
+      DIRECTOR_NAME: escapeHtml(resource.defaultSettings?.directorName ?? org?.manager ?? ''),
+      DOCUMENT_DATE: `${new Date().getFullYear()} m. ____________________ d.`,
       PROTOCOL_TITLE: escapeHtml(resource.title ?? ''),
       PROTOCOL_DATE: escapeHtml(resource.protocolDateText ?? ''),
       PROTOCOL_NUMBER: escapeHtml(resource.protocolNumber ?? ''),
@@ -5346,6 +5361,8 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
   const labels = {
     rowCount: 'Eilučių skaičius',
     populateEmployees: 'Automatiškai pildyti darbuotojus',
+    periodicity: 'Medicininės apžiūros periodiškumas',
+    directorName: 'Direktoriaus vardas, pavardė',
     date: 'Data',
     instructionNumber: 'Instrukcijos numeris',
     instructionTitle: 'Instruktavimo pavadinimas',
