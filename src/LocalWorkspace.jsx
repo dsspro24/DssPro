@@ -836,6 +836,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [commissionActionSubmitting, setCommissionActionSubmitting] = useState(false);
   const [commissionActionError, setCommissionActionError] = useState('');
   const [dssSigningTasks, setDssSigningTasks] = useState([]);
+  const [dssSigningSubmitting, setDssSigningSubmitting] = useState(false);
+  const [dssSigningProgress, setDssSigningProgress] = useState(0);
   const [signPinDraft, setSignPinDraft] = useState('');
   const [dssSigningError, setDssSigningError] = useState('');
   const [dssReviewConfirmed, setDssReviewConfirmed] = useState(false);
@@ -2979,6 +2981,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const signDssTask = async (event) => {
     event.preventDefault();
+    if (dssSigningSubmitting) return;
     const specialist = data.specialists.find((person) => person.id === selectedSpecialistId);
     if (!cloudMode && (!specialist?.pin || signPinDraft !== specialist.pin)) {
       setDssSigningError('PIN neteisingas arba dar nenustatytas.');
@@ -2997,64 +3000,72 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setDssSigningError('Pasirašytinų dokumentų nebėra.');
       return;
     }
-    if (cloudMode) {
-      const signatures = [];
-      for (const task of tasksToSign) {
-        let uploadedSignature;
-        try {
-          uploadedSignature = await uploadSignatureDataUrl(task.orgId, signatureInk);
-        } catch (error) {
-          if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
-          setDssSigningError(`Parašo įkelti nepavyko: ${error.message}`);
-          return;
+    setDssSigningSubmitting(true);
+    setDssSigningProgress(0);
+    try {
+      if (cloudMode) {
+        const signatures = [];
+        for (const [index, task] of tasksToSign.entries()) {
+          let uploadedSignature;
+          try {
+            uploadedSignature = await uploadSignatureDataUrl(task.orgId, signatureInk);
+          } catch (error) {
+            if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+            setDssSigningError(`Parašo įkelti nepavyko: ${error.message}`);
+            return;
+          }
+          const { data: signature, error } = await supabase.rpc('record_dss_signature_with_image', {
+            input_organization_id: task.orgId,
+            input_employee_id: task.employeeId,
+            input_resource_id: task.resourceId,
+            input_pin: signPinDraft,
+            input_signature_image: uploadedSignature.path,
+          });
+          if (error || !signature) {
+            await removeSignatureAsset(uploadedSignature.path);
+            if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+            setDssSigningError(error?.message || 'PIN neteisingas arba per daug kartų bandyta.');
+            return;
+          }
+          signatures.push({ ...signature, signaturePath: uploadedSignature.path });
+          setDssSigningProgress(index + 1);
         }
-        const { data: signature, error } = await supabase.rpc('record_dss_signature_with_image', {
-          input_organization_id: task.orgId,
-          input_employee_id: task.employeeId,
-          input_resource_id: task.resourceId,
-          input_pin: signPinDraft,
-          input_signature_image: uploadedSignature.path,
-        });
-        if (error || !signature) {
-          await removeSignatureAsset(uploadedSignature.path);
-          if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
-          setDssSigningError(error?.message || 'PIN neteisingas arba per daug kartų bandyta.');
-          return;
-        }
-        signatures.push({ ...signature, signaturePath: uploadedSignature.path });
+        setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
+      } else {
+        const signedAt = new Date().toISOString();
+        setData((current) => ({ ...current, signatures: [...current.signatures, ...tasksToSign.map((task, index) => {
+          const employee = current.employees.find((person) => person.id === task.employeeId);
+          const resource = current.resources.find((item) => item.id === task.resourceId);
+          return {
+            id: `sig-${Date.now()}-${index}`,
+            orgId: task.orgId,
+            employeeId: task.employeeId,
+            contractNumber: employee?.contractNumber ?? task.contractNumber ?? '',
+            resourceId: task.resourceId,
+            signer: specialist.name,
+            role: 'DSS specialistas',
+            signatureMethod: 'PIN',
+            signedAt,
+            validUntil: getValidityUntil(resource?.validityMonths),
+            signatureImage: signatureInk,
+            ip: '127.0.0.1 (demo)',
+          };
+        })] }));
       }
-      setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
-    } else {
-      const signedAt = new Date().toISOString();
-      setData((current) => ({ ...current, signatures: [...current.signatures, ...tasksToSign.map((task, index) => {
-        const employee = current.employees.find((person) => person.id === task.employeeId);
-        const resource = current.resources.find((item) => item.id === task.resourceId);
-        return {
-          id: `sig-${Date.now()}-${index}`,
-          orgId: task.orgId,
-          employeeId: task.employeeId,
-          contractNumber: employee?.contractNumber ?? task.contractNumber ?? '',
-          resourceId: task.resourceId,
-          signer: specialist.name,
-          role: 'DSS specialistas',
-          signatureMethod: 'PIN',
-          signedAt,
-          validUntil: getValidityUntil(resource?.validityMonths),
-          signatureImage: signatureInk,
-          ip: '127.0.0.1 (demo)',
-        };
-      })] }));
+      setDssSigningTasks([]);
+      setSignPinDraft('');
+      setDssReviewConfirmed(false);
+      setDssSigningError('');
+      const signedTaskIds = new Set(tasksToSign.map((task) => task.id));
+      const remainingSelectedCount = selectedDssTaskIds.filter((id) => !signedTaskIds.has(id)
+        && currentDssTasks.some((task) => task.id === id)).length;
+      setSelectedDssTaskIds((current) => current.filter((id) => !signedTaskIds.has(id)));
+      setSignatureInk('');
+      setNotice(`DSS dokumentai pasirašyti PIN kodu: ${tasksToSign.length}.${remainingSelectedCount ? ` Liko pasirašyti ${remainingSelectedCount} pasirinktų dokumentų; vienu kartu galima pasirašyti iki ${dssSignatureBatchSize}.` : ''}`);
+    } finally {
+      setDssSigningSubmitting(false);
+      setDssSigningProgress(0);
     }
-    setDssSigningTasks([]);
-    setSignPinDraft('');
-    setDssReviewConfirmed(false);
-    setDssSigningError('');
-    const signedTaskIds = new Set(tasksToSign.map((task) => task.id));
-    const remainingSelectedCount = selectedDssTaskIds.filter((id) => !signedTaskIds.has(id)
-      && currentDssTasks.some((task) => task.id === id)).length;
-    setSelectedDssTaskIds((current) => current.filter((id) => !signedTaskIds.has(id)));
-    setSignatureInk('');
-    setNotice(`DSS dokumentai pasirašyti PIN kodu: ${tasksToSign.length}.${remainingSelectedCount ? ` Liko pasirašyti ${remainingSelectedCount} pasirinktų dokumentų; vienu kartu galima pasirašyti iki ${dssSignatureBatchSize}.` : ''}`);
   };
 
   const saveManagerPin = (event) => {
@@ -4041,6 +4052,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             employees={orgEmployees}
             cloudMode={cloudMode}
             pageSize={signatureHistoryPageSize}
+            showProtocolDocument
+            onPreviewSignature={(signature) => {
+              const resource = data.resources.find((item) => item.id === signature.resourceId);
+              if (!resource) {
+                setNotice('Pasirašyto protokolo peržiūrėti nepavyko: dokumento šablonas nerastas.');
+                return;
+              }
+              const protocolBatch = (data.protocolBatches ?? []).find((batch) => batch.orgId === signature.orgId
+                && batch.resourceId === signature.resourceId
+                && batch.employeeIds.includes(signature.employeeId));
+              openResourcePreview(resource, { employeeId: signature.employeeId, protocolBatchId: protocolBatch?.id });
+            }}
           /></Panel></section>}
 
           {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
@@ -4169,7 +4192,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
       {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p>{workerSigningTarget.resourceId === 'res-aap' && <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={workerAapBothPagesConfirmed} onChange={(event) => { setWorkerAapBothPagesConfirmed(event.target.checked); setWorkerSignError(''); }} /><span>Patvirtinu, kad vienu parašu pasirašau abu šio AAP kortelės lapus. Tas pats PIN parašas bus pateiktas abiejų lapų vietose.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setWorkerAapBothPagesConfirmed(false); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={workerSigningTarget.resourceId === 'res-aap' && !workerAapBothPagesConfirmed}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
-      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p>{dssSigningTasks.length === dssSignatureBatchSize && selectedCurrentDssTasks.length > dssSigningTasks.length && <p className="rounded-md bg-sky-50 p-3 text-sm text-sky-900">Šį kartą bus pasirašyta iki {dssSignatureBatchSize} dokumentų. Likę pasirinkti dokumentai bus palikti kitai pasirašymo partijai.</p>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningTasks.length > 1 && !dssReviewConfirmed}><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</button></div></form></div>}
+      {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p>{dssSigningSubmitting && <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950"><span className="size-5 shrink-0 animate-spin rounded-full border-2 border-sky-700 border-t-transparent" aria-hidden="true" /><span><strong className="block">Pasirašoma, prašome palaukti…</strong><span className="text-sky-800">Pasirašyta {dssSigningProgress} iš {dssSigningTasks.length} dokumentų.</span></span></div>}{dssSigningTasks.length === dssSignatureBatchSize && selectedCurrentDssTasks.length > dssSigningTasks.length && <p className="rounded-md bg-sky-50 p-3 text-sm text-sky-900">Šį kartą bus pasirašyta iki {dssSignatureBatchSize} dokumentų. Likę pasirinkti dokumentai bus palikti kitai pasirašymo partijai.</p>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} disabled={dssSigningSubmitting} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<div className={dssSigningSubmitting ? 'pointer-events-none opacity-60' : ''}><SignaturePad value={signatureInk} onChange={setSignatureInk} /></div><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required disabled={dssSigningSubmitting} /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={dssSigningSubmitting} onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningSubmitting || (dssSigningTasks.length > 1 && !dssReviewConfirmed)}>{dssSigningSubmitting ? <><span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />Pasirašoma…</> : <><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</>}</button></div></form></div>}
     </div>
   );
 }
@@ -4217,7 +4240,7 @@ function Metric({ label, value, accent = 'slate', hint }) {
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
 function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false }) {
+function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false, showProtocolDocument = false }) {
   const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė'];
   if (!showDocumentPreview) headers.push('Parašas');
   headers.push('Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas');
@@ -4230,7 +4253,11 @@ function SignatureTable({ signatures, resources, archivedEmployees = [], onPrevi
       resource?.title ?? 'Dokumentas',
       `${signature.signer} · ${signature.role}`,
     ];
-    if (!showDocumentPreview) row.push(<SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />);
+    if (!showDocumentPreview) {
+      row.push(showProtocolDocument && onPreviewSignature && normalizeResourceType(resource ?? {}) === 'Protokolas'
+        ? <button key={signature.id} type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />Peržiūrėti protokolą</button>
+        : <SignatureImagePreview key={signature.id} signature={signature} emptyLabel="Nėra" />);
+    }
     row.push(
       signature.signatureMethod === 'PIN' ? 'PIN kodu' : signature.signatureMethod ?? 'PIN kodu',
       new Date(signature.signedAt).toLocaleString('lt-LT'),
@@ -4277,7 +4304,7 @@ function SignatureImagePreview({ signature, emptyLabel = null }) {
     {error && <p role="alert" className="mt-1 max-w-48 text-xs text-rose-700">{error}</p>}
   </div>;
 }
-function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature, showDocumentPreview = false }) {
+function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, signerRole, signatures, resources, employees, archivedEmployees = [], cloudMode, pageSize = signatureHistoryPageSize, onPreviewSignature, showDocumentPreview = false, showProtocolDocument = false }) {
   const [page, setPage] = useState(1);
   const [resourceTypeFilter, setResourceTypeFilter] = useState('visos');
   const [historyResult, setHistoryResult] = useState({ key: '', records: [], totalCount: 0, error: '' });
@@ -4374,7 +4401,7 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
     </label>}
     {visibleError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{visibleError}</p>}
     {loading && <p role="status" className="text-sm text-slate-500">Įkeliama parašų istorija…</p>}
-    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} showDocumentPreview={showDocumentPreview} />}
+    {!loading && !visibleError && <SignatureTable signatures={visibleRecords} resources={resources} archivedEmployees={archivedEmployees} onPreviewSignature={onPreviewSignature} showDocumentPreview={showDocumentPreview} showProtocolDocument={showProtocolDocument} />}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-xs text-slate-500">{loading ? 'Įkeliama parašų istorija…' : visibleCount ? `Rodoma ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, visibleCount)} iš ${visibleCount} parašų` : 'Parašų dar nėra.'}</p>
       <div className="flex gap-2">
