@@ -3562,9 +3562,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </select>
           </label>
         )}
-        {userRole === 'darbuotojas' && <label className="mb-4 text-xs text-emerald-100">Darbuotojas
-          <select value={currentEmployee?.id ?? ''} onChange={(event) => { setSelectedEmployeeId(event.target.value); setMobileMenuOpen(false); }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">{orgEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>
-        </label>}
         <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1">
           {activeNavigation.map(([id, label, Icon]) => (
             <button key={id} onClick={() => { setActiveTab(id); setNotice(''); setMobileMenuOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium lg:min-h-0 ${activeTab === id ? 'bg-white/15 text-white' : 'text-emerald-100/75 hover:bg-white/10 hover:text-white'}`}>
@@ -3572,7 +3569,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </button>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/15 pt-4 text-xs text-emerald-100/70">{roleLabels[userRole]}</div>
+        {userRole !== 'darbuotojas' && <div className="mt-auto border-t border-white/15 pt-4 text-xs text-emerald-100/70">{roleLabels[userRole]}</div>}
         </div>
       </aside>
 
