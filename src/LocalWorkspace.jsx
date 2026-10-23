@@ -777,6 +777,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [specialistQuery, setSpecialistQuery] = useState('');
   const [employeeForm, setEmployeeForm] = useState({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const openInviteForRehire = useRef(false);
   const [pendingEmployeeInvites, setPendingEmployeeInvites] = useState([]);
   const [dssInvitationActionId, setDssInvitationActionId] = useState('');
   const [dssOrganizationRequestActionId, setDssOrganizationRequestActionId] = useState('');
@@ -1131,6 +1132,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
   useEffect(() => {
+    if (!openInviteForRehire.current || activeTab !== 'komanda') return;
+    document.getElementById('invite-employee-dialog')?.showModal();
+    openInviteForRehire.current = false;
+  }, [activeTab]);
+  useEffect(() => {
     if (!cloudMode || userRole !== 'vadovas' || !selectedOrgId) {
       return undefined;
     }
@@ -1193,6 +1199,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   ], [orgEmployees, pendingEmployeeInvites, currentOrg?.id]);
   const archivedOrgEmployees = useMemo(() => (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id), [data.archivedEmployees, currentOrg?.id]);
   const archiveDetailRecord = archivedOrgEmployees.find((record) => record.id === archiveDetailsId);
+  const archiveDetailIsLatestForEmail = archiveDetailRecord && !archivedOrgEmployees.some((record) => record.employee.email?.trim().toLocaleLowerCase('lt') === archiveDetailRecord.employee.email?.trim().toLocaleLowerCase('lt')
+    && new Date(record.archivedAt).getTime() > new Date(archiveDetailRecord.archivedAt).getTime());
   const reportEmployees = useMemo(() => [...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)], [orgEmployees, archivedOrgEmployees]);
   const selectedOrgResources = useMemo(() => data.resources.filter((resource) => currentOrg?.resources.includes(resource.id)), [data.resources, currentOrg?.resources]);
   const reportSignatures = useMemo(() => data.signatures.filter((signature) => signature.orgId === currentOrg?.id && currentOrg?.resources.includes(signature.resourceId) && (reportTypeFilter === 'visos' || data.resources.find((resource) => resource.id === signature.resourceId)?.type === reportTypeFilter)), [data.signatures, currentOrg?.id, currentOrg?.resources, reportTypeFilter, data.resources]);
@@ -1285,6 +1293,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const hasEmployeeSignatures = (employeeId) => data.signatures.some((signature) => signature.employeeId === employeeId);
   const normalizedFormEmail = employeeForm.email.trim().toLocaleLowerCase('lt');
   const duplicateFormEmail = normalizedFormEmail && data.employees.find((employee) => employee.orgId === currentOrg?.id && employee.email?.toLocaleLowerCase('lt') === normalizedFormEmail);
+  const matchingArchivedEmployee = normalizedFormEmail
+    ? (data.archivedEmployees ?? [])
+      .filter((record) => record.orgId === currentOrg?.id && record.employee.email?.trim().toLocaleLowerCase('lt') === normalizedFormEmail)
+      .sort((left, right) => new Date(right.archivedAt).getTime() - new Date(left.archivedAt).getTime())[0] ?? null
+    : null;
   const employeeEmailError = employeeForm.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employeeForm.email.trim())
     ? 'Įveskite teisingą el. pašto adresą.'
     : duplicateFormEmail ? `El. paštas ${employeeForm.email.trim()} jau naudojamas kito darbuotojo.` : '';
@@ -2473,16 +2486,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const email = employeeForm.email.trim().toLowerCase();
     const contractNumber = employeeForm.contractNumber.trim();
     if (!name || !email || !contractNumber || employeeEmailError || employeeContractNumberError) return;
+    const rehireRecord = matchingArchivedEmployee;
     const invitedAt = new Date().toISOString();
     const assignedResourceIds = expandProtocolResourceAssignments(
       inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)),
       data.resources,
     ).filter((resourceId) => currentOrg.resources.includes(resourceId));
     const invitedEmployee = {
-      id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: 'Pakviestas', inviteCount: 1, invitedAt,
+      id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: rehireRecord ? 'Aktyvus' : 'Pakviestas', inviteCount: 1, invitedAt,
       medicalCertificateValidUntil: employeeForm.medicalCertificateValidUntil || '',
       medicalCertificateReminderDate: getMedicalCertificateReminderDate(employeeForm.medicalCertificateValidUntil),
-      resourceIds: assignedResourceIds, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '',
+      resourceIds: assignedResourceIds, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, progressByResource: {}, testResults: [], pin: rehireRecord?.employee.pin ?? '',
     };
     const { batches, resourceIds } = addEmployeeToProtocolBatches(data, invitedEmployee);
     const employeeToInvite = { ...invitedEmployee, resourceIds };
@@ -2495,21 +2509,31 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     try {
       if (cloudMode) {
-        const { error } = await supabase.functions.invoke('invite-employee', {
-          body: {
-            organizationId: currentOrg.id,
-            employee: employeeToInvite,
-            protocolBatches: batches,
-            redirectTo: window.location.origin,
-          },
-        });
-        if (error) {
-          let message = error.message;
-          if (error.context instanceof Response) {
-            const details = await error.context.clone().json().catch(() => null);
-            message = details?.error ?? message;
+        if (rehireRecord) {
+          const { error } = await supabase.rpc('restore_archived_employee', {
+            input_organization_id: currentOrg.id,
+            input_archive_id: rehireRecord.id,
+            input_employee: employeeToInvite,
+            input_protocol_batches: batches,
+          });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.functions.invoke('invite-employee', {
+            body: {
+              organizationId: currentOrg.id,
+              employee: employeeToInvite,
+              protocolBatches: batches,
+              redirectTo: window.location.origin,
+            },
+          });
+          if (error) {
+            let message = error.message;
+            if (error.context instanceof Response) {
+              const details = await error.context.clone().json().catch(() => null);
+              message = details?.error ?? message;
+            }
+            throw new Error(message);
           }
-          throw new Error(message);
         }
       }
       setData((current) => ({
@@ -2521,7 +2545,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
       setEmployeeSearch('');
       setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
-      setNotice(cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
+      setNotice(rehireRecord
+        ? `${name} atkurtas kaip naujas darbuotojas. Prisijungimo paskyra, slaptažodis ir PIN išsaugoti; archyvo įrašas nepakeistas.`
+        : cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
       inviteDialog?.close();
     } catch (error) {
       setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
@@ -3788,7 +3814,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </Panel>}
               {canManageSelectedWorkspace && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 <form onSubmit={inviteEmployee} className="space-y-5">
-                  <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
+                  <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{matchingArchivedEmployee ? 'Grąžinti darbuotoją į darbą' : 'Pakviesti darbuotoją'}</h2><p className="mt-1 text-sm text-slate-500">{matchingArchivedEmployee ? 'Bus sukurtas naujas darbo įrašas. Ankstesnis archyvas liks nepakeistas, o paskyra ir PIN išliks tie patys.' : 'Įveskite darbuotojo duomenis ir parinkite dokumentus.'}</p></div><button type="button" aria-label="Uždaryti darbuotojo formą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
+                  {matchingArchivedEmployee && <p role="status" className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Pagal el. paštą rastas ankstesnis darbuotojas: <strong>{matchingArchivedEmployee.employee.name}</strong>. Prisijungimui naudos esamą slaptažodį ir PIN.</p>}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="text-sm font-medium">Vardas<input className={`${inputClass} mt-1`} value={employeeForm.firstName} onChange={(event) => setEmployeeForm({ ...employeeForm, firstName: event.target.value })} required /></label>
                     <label className="text-sm font-medium">Pavardė<input className={`${inputClass} mt-1`} value={employeeForm.lastName} onChange={(event) => setEmployeeForm({ ...employeeForm, lastName: event.target.value })} required /></label>
@@ -3799,7 +3826,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>
                   <label className="block text-sm font-medium">Darbuotojo ruošinys<select className={`${inputClass} mt-1`} value={selectedAssignmentPresetId} onChange={(event) => { const presetId = event.target.value; const preset = (currentOrg.employeeAssignmentPresets ?? []).find((item) => item.id === presetId); setSelectedAssignmentPresetId(presetId); if (preset) setInviteResourceIds(preset.resourceIds.filter((id) => currentOrg.resources.includes(id))); }}><option value="">Pasirinkti ruošinį</option>{(currentOrg.employeeAssignmentPresets ?? []).map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · {preset.resourceIds.length} dokumentai</option>)}</select>{!(currentOrg.employeeAssignmentPresets ?? []).length && <span className="mt-1 block text-xs font-normal text-slate-500">Ruošinius susikurkite darbuotojų sąrašo skiltyje „Ruošiniai“.</span>}</label>
                   <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => <label className="flex items-center gap-2 text-sm" key={resource.id}><input type="checkbox" checked={inviteResourceIds.includes(resource.id)} onChange={(event) => { setSelectedAssignmentPresetId(''); setInviteResourceIds((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id)); }} />{resource.title}</label>)}{!currentOrg.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</div></fieldset>
-                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
+                  <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? matchingArchivedEmployee ? 'Atkuriama paskyra…' : 'Siunčiamas kvietimas…' : matchingArchivedEmployee ? 'Atkurti ir priimti į darbą' : 'Pakviesti'}</button></div>
                 </form>
               </dialog>}
               {canManageSelectedWorkspace && <dialog id="assignment-presets-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
@@ -4100,7 +4127,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {archivePrintMode === 'all' && <div className="archive-print-target archive-print-all"><h1 className="mb-2 text-2xl font-bold">{currentOrg?.name} · Darbuotojų archyvas</h1><p className="mb-6 text-sm text-slate-500">Archyvuota {new Date().toLocaleString('lt-LT')}</p>{archivedOrgEmployees.map((record) => <ArchiveEmployeeDetails key={record.id} record={record} organizationName={currentOrg?.name} />)}</div>}
           </section>}
 
-          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>{creatorReadOnlyPreview && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
+          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex flex-wrap justify-end gap-2">{canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchivePrintMode(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}<button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>{creatorReadOnlyPreview && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
@@ -4208,7 +4235,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
 function ArchiveEmployeeDetails({ record, organizationName }) {
   const employee = record.employee;
-  const sizes = Object.entries(employee.sizes ?? {}).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`);
+  const sizeLabels = {
+    pants: 'Kelnių dydis',
+    shoes: 'Batų dydis',
+    height: 'Ūgis',
+    helmet: 'Šalmo dydis',
+    jacket: 'Striukės dydis',
+    weight: 'Svoris',
+    clothes: 'Drabužių dydis',
+  };
+  const sizes = Object.entries(employee.sizes ?? {})
+    .filter(([key, value]) => sizeLabels[key] && value)
+    .map(([key, value]) => `${sizeLabels[key]}: ${value}${key === 'height' ? ' cm' : key === 'weight' ? ' kg' : ''}`);
   return <div className="archive-person-record space-y-5">
     <header className="archive-person-print-title"><h1 className="text-2xl font-bold">{employee.name}</h1><p className="mt-1 text-sm">{record.organization?.name ?? organizationName ?? ''} · Darbuotojo archyvo įrašas</p></header>
     <dl className="grid gap-3 border-b border-slate-100 pb-4 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
