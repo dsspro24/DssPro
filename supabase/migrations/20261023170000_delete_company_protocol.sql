@@ -31,6 +31,8 @@ begin
     where item.value ->> 'id' = input_resource_id
       and item.value ->> 'organizationId' = input_organization_id::text
       and item.value ->> 'type' = 'Protokolas'
+      and coalesce(item.value ->> 'sourceResourceId', '') <> ''
+      and coalesce(item.value ->> 'isProtocolTemplate', 'false') <> 'true'
   ) then
     return false;
   end if;
