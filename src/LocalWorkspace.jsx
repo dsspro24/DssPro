@@ -713,6 +713,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const dssWorkspaceIsReady = !cloudMode || (dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'ready');
   const [notice, setNotice] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef(null);
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
     try {
@@ -913,6 +914,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [profileMenuOpen]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!notificationsRef.current?.contains(event.target)) setNotificationsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setNotificationsOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [notificationsOpen]);
 
   useEffect(() => {
     if (!cloudMode) {
@@ -1972,7 +1989,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const { data: signature, error } = resource.id === 'res-aap'
         ? await supabase.rpc('record_employee_aap_card_signature_with_image', {
           input_pin: workerSignPin,
-          input_signature_image: uploadedSignature.path,
+          input_signature_path: uploadedSignature.path,
           input_both_pages_confirmed: workerAapBothPagesConfirmed,
         })
         : await supabase.rpc('record_employee_signature_with_image', {
@@ -1982,7 +1999,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         });
       if (error) {
         await removeSignatureAsset(uploadedSignature.path);
-        setWorkerSignError(error.message || 'PIN patikrinti nepavyko.');
+        const isMissingAapSignatureFunction = resource.id === 'res-aap'
+          && error.message?.includes('record_employee_aap_card_signature_with_image');
+        setWorkerSignError(isMissingAapSignatureFunction
+          ? 'AAP kortelės parašo išsaugoti nepavyko. Serveryje neatnaujinta parašo funkcija; pritaikykite naujausias Supabase migracijas ir bandykite dar kartą.'
+          : error.message || 'PIN patikrinti nepavyko.');
         return;
       }
       if (!signature) {
@@ -3472,13 +3493,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
             <a href="#pagalba" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" className="hidden size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700 sm:grid"><LifeBuoy size={18} /></a>
-            <div className="relative">
+            <div ref={notificationsRef} className="relative">
               <button type="button" aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => { setProfileMenuOpen(false); setNotificationsOpen((open) => !open); }} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
                 <Bell size={18} />
                 {notifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white">{notifications.length}</span>}
               </button>
               {notificationsOpen && <div className="workspace-notifications-menu mt-2 z-30 overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><span className="text-xs text-slate-500">{notifications.length} pranešimų</span></div>
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{notifications.length} pranešimų</span><button type="button" aria-label="Uždaryti pranešimus" className="grid size-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => setNotificationsOpen(false)}><X size={18} /></button></div></div>
                 {notifications.length ? <ul>{notifications.map((item) => <li key={item.id} className="border-b border-slate-100 last:border-0">
                   <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={() => {
                     setNotificationsOpen(false);
