@@ -5163,7 +5163,10 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       LOCATION_PLACE: '',
     };
     const html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || '<p>Šis šablonas dar neturi turinio.</p>');
-    return populateJournalRows(html, resource, employee, org, signatures, resource.previewSpecialists ?? [], resources);
+    const populatedHtml = populateJournalRows(html, resource, employee, org, signatures, resource.previewSpecialists ?? [], resources);
+    return ['Protokolas', 'Kortelė'].includes(resource.type) && resource.id !== 'res-aap'
+      ? numberDocumentSequenceColumn(populatedHtml)
+      : populatedHtml;
   }
   const workerSignature = signatures.filter((item) => item.employeeId === employee?.id && item.resourceId === resource.id && item.role === 'Darbuotojas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
   const employerSignature = signatures.filter((item) => item.employeeId === employee?.id && item.resourceId === resource.id && item.role === 'Vadovas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
@@ -5240,6 +5243,20 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   parsed.head.append(style);
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
+
+function numberDocumentSequenceColumn(html) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const table = [...parsed.querySelectorAll('table')].find((candidate) => !candidate.closest('.signature-audit'));
+  if (!table) return html;
+
+  const heading = table.tHead?.rows[0]?.cells[0];
+  if (heading) heading.textContent = 'Eil. Nr.';
+  [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
+    if (row.cells[0]) row.cells[0].textContent = String(index + 1);
+  });
+  return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+}
+
 function buildQuizPreviewHtml(resource) {
   const multipleAnswersAllowed = resource.questions.some((question) => Array.isArray(question.correctIndices) || question.multipleAnswers === true);
   const questionMarkup = resource.questions.map((question, index) => {
