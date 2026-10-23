@@ -807,6 +807,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [editingResourceId, setEditingResourceId] = useState(null);
   const [protocolSource, setProtocolSource] = useState(null);
   const [protocolTitle, setProtocolTitle] = useState('');
+  const [protocolRelatedTestId, setProtocolRelatedTestId] = useState('');
+  const [protocolRelatedJournalId, setProtocolRelatedJournalId] = useState('');
   const [resourceSettingsTarget, setResourceSettingsTarget] = useState(null);
   const [resourceSettingsDraft, setResourceSettingsDraft] = useState({});
   const [draftQuestions, setDraftQuestions] = useState([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
@@ -2255,19 +2257,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setDraftQuestions([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   };
 
-  const getResourceWithHtml = async (resource) => {
+  const getResourceWithHtml = async (resource, { useCache = true } = {}) => {
     if (resource.html || !resource.htmlUrl) return resource;
-    const cached = resourceHtmlCacheRef.current.get(resource.id);
+    const cached = useCache ? resourceHtmlCacheRef.current.get(resource.id) : null;
     if (cached) return cached;
     const request = fetch(resource.htmlUrl).then(async (response) => {
       if (!response.ok) throw new Error(`Nepavyko įkelti HTML šablono: ${response.status}`);
       return { ...resource, html: await response.text() };
     });
-    resourceHtmlCacheRef.current.set(resource.id, request);
+    if (useCache) resourceHtmlCacheRef.current.set(resource.id, request);
     try {
       return await request;
     } catch (error) {
-      resourceHtmlCacheRef.current.delete(resource.id);
+      if (useCache) resourceHtmlCacheRef.current.delete(resource.id);
       throw error;
     }
   };
@@ -2466,6 +2468,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     event.preventDefault();
     const title = protocolTitle.trim();
     if (!protocolSource || !currentOrg || !title) return;
+    const availableResourceIds = new Set(currentOrg.resources);
     const protocol = {
       ...protocolSource,
       id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -2473,6 +2476,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       organizationId: currentOrg.id,
       sourceResourceId: protocolSource.id,
       type: 'Protokolas',
+      relatedTestId: availableResourceIds.has(protocolRelatedTestId) ? protocolRelatedTestId || null : null,
+      relatedJournalId: availableResourceIds.has(protocolRelatedJournalId) ? protocolRelatedJournalId || null : null,
       questions: [],
       signatures: true,
       isProtocolTemplate: false,
@@ -2486,17 +2491,38 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }));
     setProtocolSource(null);
     setProtocolTitle('');
+    setProtocolRelatedTestId('');
+    setProtocolRelatedJournalId('');
     setNotice(`Protokolas „${title}“ išsaugotas įmonės bibliotekoje.`);
   };
 
   const openCompanyProtocolForm = (resource) => {
     setProtocolSource(resource);
     setProtocolTitle('');
+    const assignedResourceIds = new Set(currentOrg?.resources ?? []);
+    setProtocolRelatedTestId(assignedResourceIds.has(resource.relatedTestId) ? resource.relatedTestId : '');
+    setProtocolRelatedJournalId(assignedResourceIds.has(resource.relatedJournalId) ? resource.relatedJournalId : '');
   };
 
-  const deleteCompanyProtocol = (resource) => {
+  const deleteCompanyProtocol = async (resource) => {
     if (resource.type !== 'Protokolas' || resource.organizationId !== currentOrg?.id) return;
     if (!window.confirm(`Ištrinti protokolą „${resource.title}“ iš įmonės bibliotekos?`)) return;
+    if (cloudMode) {
+      try {
+        const { data: deleted, error } = await supabase.rpc('delete_company_protocol', {
+          input_organization_id: currentOrg.id,
+          input_resource_id: resource.id,
+        });
+        if (error) throw error;
+        if (!deleted) {
+          setNotice('Protokolas nerastas arba jo ištrinti negalima.');
+          return;
+        }
+      } catch (error) {
+        setNotice(`Protokolo ištrinti nepavyko: ${error.message}`);
+        return;
+      }
+    }
     setData((current) => ({
       ...current,
       resources: current.resources.filter((item) => item.id !== resource.id),
@@ -2511,14 +2537,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
     if (userRole === 'darbuotojas' && resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee)) {
       setActiveTab('aap');
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
       return;
     }
     try {
-      resource = await getResourceWithHtml(resource);
+      resource = await getResourceWithHtml(resource, { useCache: !archivedRecord });
     } catch (error) {
       setNotice(`HTML šablono įkelti nepavyko: ${error.message}`);
       return;
@@ -2532,12 +2558,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       validityMonths: companySettings.validityMonths ?? resource.validityMonths,
     };
     const protocolBatch = (data.protocolBatches ?? []).find((batch) => batch.id === protocolBatchId);
-    const activeEmployees = templateOnly ? [] : protocolBatch
+    const activeEmployees = templateOnly || archivedRecord ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.employees.find((item) => item.id === employeeId)).filter(Boolean)
       : userRole === 'darbuotojas'
         ? [currentEmployee].filter((item) => item?.resourceIds?.includes(resource.id))
         : data.employees.filter((item) => item.orgId === currentOrg?.id && item.resourceIds?.includes(resource.id));
-    const archivedEmployees = templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
+    const archivedEmployees = archivedRecord
+      ? [archivedRecord.employee]
+      : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
       : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
     const organizationEmployees = [
@@ -2551,7 +2579,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
-      const resourceSignatures = data.signatures.filter((signature) =>
+      const resourceSignatures = (archivedRecord?.signatures ?? data.signatures).filter((signature) =>
         signature.resourceId === resource.id && previewEmployeeIds.has(signature.employeeId));
       if (previewSignature?.resourceId === resource.id
         && previewEmployeeIds.has(previewSignature.employeeId)
@@ -2565,8 +2593,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       hasCurrentWorkerSignature(currentEmployee.id, resource.id)
       || (previewSignature?.employeeId === currentEmployee.id && previewSignature.resourceId === resource.id && previewSignature.role === 'Darbuotojas')
     ));
-    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
-    previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, currentEmployee, currentOrg, previewSignatures), resource.title);
+    const previewOrganization = archivedRecord
+      ? { ...currentOrg, ...archivedRecord.organization }
+      : currentOrg;
+    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: archivedRecord ? [...data.resources, ...archivedRecord.resources] : data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
+    const previewEmployee = archivedRecord
+      ? previewEmployees.find((person) => person.id === employeeId)
+      : currentEmployee;
+    previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title);
     if (autoPrint) {
       printPdfHtml(previewDocument.printHtml, resource.title)
         .catch((error) => setNotice(`PDF atsisiųsti nepavyko: ${error.message}`));
@@ -3704,8 +3738,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     </th>
   );
   const previewArchivedSignature = (record, signature) => {
-    const resource = data.resources.find((item) => item.id === signature.resourceId)
-      ?? record.resources.find((item) => item.id === signature.resourceId);
+    const resource = record.resources.find((item) => item.id === signature.resourceId)
+      ?? data.resources.find((item) => item.id === signature.resourceId);
     if (!resource) {
       setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
       return;
@@ -3713,7 +3747,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
       && batch.resourceId === signature.resourceId
       && batch.employeeIds.includes(signature.employeeId));
-    openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id });
+    openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id, archivedRecord: record });
   };
   const openArchiveDetails = (recordId) => {
     setArchiveDetailRecord(null);
@@ -4406,7 +4440,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
       {previewResource?.type === 'Testas' && quizResult?.resourceId === previewResource.id && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950 p-4"><section role="dialog" aria-modal="true" aria-labelledby="quiz-outcome-title" aria-live="polite" className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-xl"><h2 id="quiz-outcome-title" className={`text-3xl font-bold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? 'Išlaikyta' : 'Neišlaikyta :('}</h2><p className="mt-2 text-sm text-slate-600">Rezultatas: {quizResult.score}%</p>{quizResult.passed ? <button type="button" className={`${buttonClass} mt-5`} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={16} />Pasirašyti</button> : <button type="button" className="mt-5 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => { setQuizResult(null); setQuizAnswers({}); }}>Bandyti dar kartą</button>}</section></div>}
 
-      {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei; vėliau priskyrimą galėsite pakeisti bibliotekoje.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setProtocolSource(null)}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
+      {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><label className="mt-4 block text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedTestId} onChange={(event) => setProtocolRelatedTestId(event.target.value)}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Testas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><label className="mt-4 block text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedJournalId} onChange={(event) => setProtocolRelatedJournalId(event.target.value)}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Žurnalas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei. Susiejimą galite praleisti.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => { setProtocolSource(null); setProtocolRelatedTestId(''); setProtocolRelatedJournalId(''); }}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
       {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
       <dialog id="aap-issuance-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60" onClose={() => { setAapIssueEmployeeId(null); setAapIssueSelectedItemIds([]); }}>
