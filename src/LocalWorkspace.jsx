@@ -2551,7 +2551,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       inviteDialog?.close();
     } catch (error) {
       setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
-      setNotice(`Darbuotojo pakviesti nepavyko: ${error.message || 'patikrinkite el. pašto siuntimo nustatymus.'}`);
+      const errorMessage = error.message || 'patikrinkite el. pašto siuntimo nustatymus.';
+      if (rehireRecord && /could not find the function.*restore_archived_employee/i.test(errorMessage)) {
+        setNotice('Darbuotojo paskyros atkurti nepavyko: Supabase duomenų bazėje nėra restore_archived_employee funkcijos. Pritaikykite migraciją 20261023140000_restore_archived_employee.sql. Naujas kvietimas nebuvo išsiųstas.');
+      } else {
+        setNotice(`${rehireRecord ? 'Darbuotojo paskyros atkurti' : 'Darbuotojo pakviesti'} nepavyko: ${errorMessage}`);
+      }
     } finally {
       setInviteSubmitting(false);
     }
