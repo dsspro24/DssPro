@@ -42,6 +42,17 @@
   flex: 1 1 0%;
 }
 
+.workspace-notifications-menu {
+  position: absolute;
+  right: 0;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: min(20rem, calc(100dvh - 5rem));
+}
+
+.workspace-notifications-menu li button {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .fixed.inset-0 > section:has(iframe) {
     padding: 12px;
@@ -96,6 +107,16 @@
     width: calc(100vw - 24px);
     height: calc(100dvh - 24px);
     max-height: calc(100dvh - 24px);
+  }
+
+  .workspace-notifications-menu {
+    position: fixed;
+    top: 4rem;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 5rem);
+    margin-top: 0;
   }
 
   #workspace-mobile-menu {

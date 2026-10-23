@@ -3477,10 +3477,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <Bell size={18} />
                 {notifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white">{notifications.length}</span>}
               </button>
-              {notificationsOpen && <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl">
+              {notificationsOpen && <div className="workspace-notifications-menu mt-2 z-30 overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><span className="text-xs text-slate-500">{notifications.length} pranešimų</span></div>
-                {notifications.length ? <ul className="max-h-80 overflow-y-auto">{notifications.map((item) => <li key={item.id} className="border-b border-slate-100 last:border-0">
-                  <button type="button" className="w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => {
+                {notifications.length ? <ul>{notifications.map((item) => <li key={item.id} className="border-b border-slate-100 last:border-0">
+                  <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={() => {
                     setNotificationsOpen(false);
                     setNotice('');
                     if (userRole === 'darbuotojas') {
