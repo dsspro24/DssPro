@@ -3531,7 +3531,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </select>
           </label>
         )}
-        {userRole === 'darbuotojas' && <label className="mb-4 text-xs text-emerald-100">Demo darbuotojas
+        {userRole === 'darbuotojas' && <label className="mb-4 text-xs text-emerald-100">Darbuotojas
           <select value={currentEmployee?.id ?? ''} onChange={(event) => { setSelectedEmployeeId(event.target.value); setMobileMenuOpen(false); }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">{orgEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>
         </label>}
         <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1">
