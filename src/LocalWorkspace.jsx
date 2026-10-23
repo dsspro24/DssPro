@@ -4831,10 +4831,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
   const configuredRowCount = Number(resource.defaultSettings?.rowCount) || rows.length;
   const rowCount = Math.max(configuredRowCount, employees.length);
-  if (table?.tBodies[0] && rows[0]) {
-    while (rows.length > rowCount) table.tBodies[0].deleteRow(rows.length - 1);
-    while (rows.length < rowCount) table.tBodies[0].append(rows[0].cloneNode(true));
-    rows = [...table.tBodies[0].rows];
+  const tableBody = table?.tBodies[0];
+  if (tableBody && rows[0]) {
+    while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
+    while (tableBody.rows.length < rowCount) tableBody.append(rows[0].cloneNode(true));
+    rows = [...tableBody.rows];
   }
   if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card', 'medical-examination-schedule'].includes(resource.templateKind)) {
     rows.forEach((row, index) => {
