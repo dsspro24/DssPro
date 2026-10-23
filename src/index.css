@@ -194,11 +194,6 @@
     display: block !important;
   }
 
-  .archive-print-all .archive-person-record:not(:last-child) {
-    break-after: page;
-    page-break-after: always;
-  }
-
   .archive-print-target table {
     width: 100%;
     border-collapse: collapse;

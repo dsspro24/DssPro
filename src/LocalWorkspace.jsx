@@ -761,6 +761,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [aapIssueSignSubmitting, setAapIssueSignSubmitting] = useState(false);
   const [archiveDetailsId, setArchiveDetailsId] = useState(null);
   const [archivePrintMode, setArchivePrintMode] = useState(null);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [archivePage, setArchivePage] = useState(1);
   const [reportTypeFilter, setReportTypeFilter] = useState('visos');
   const [reportAapSearch, setReportAapSearch] = useState('');
   const [protocolSearch, setProtocolSearch] = useState('');
@@ -1040,7 +1042,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!archivePrintMode) return undefined;
     if (archiveDownloadModeRef.current === archivePrintMode) return undefined;
     archiveDownloadModeRef.current = archivePrintMode;
-    const target = document.querySelector(archivePrintMode === 'all' ? '.archive-print-all' : '.archive-print-target');
+    const target = document.querySelector('.archive-print-target');
     if (!target) {
       archiveDownloadModeRef.current = null;
       return undefined;
@@ -1198,6 +1200,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...pendingEmployeeInvites.filter((employee) => employee.orgId === currentOrg?.id),
   ], [orgEmployees, pendingEmployeeInvites, currentOrg?.id]);
   const archivedOrgEmployees = useMemo(() => (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id), [data.archivedEmployees, currentOrg?.id]);
+  const filteredArchivedEmployees = useMemo(() => {
+    const query = archiveSearch.trim().toLocaleLowerCase('lt');
+    if (!query) return archivedOrgEmployees;
+    return archivedOrgEmployees.filter((record) => [
+      record.employee.name,
+      record.employee.email,
+      record.employee.contractNumber,
+      record.employee.position,
+    ].some((value) => value?.toLocaleLowerCase('lt').includes(query)));
+  }, [archivedOrgEmployees, archiveSearch]);
+  const archivePageSize = 12;
+  const archivePageCount = Math.max(1, Math.ceil(filteredArchivedEmployees.length / archivePageSize));
+  const visibleArchivedEmployees = filteredArchivedEmployees.slice(
+    (Math.min(archivePage, archivePageCount) - 1) * archivePageSize,
+    Math.min(archivePage, archivePageCount) * archivePageSize,
+  );
   const archiveDetailRecord = archivedOrgEmployees.find((record) => record.id === archiveDetailsId);
   const archiveDetailIsLatestForEmail = archiveDetailRecord && !archivedOrgEmployees.some((record) => record.employee.email?.trim().toLocaleLowerCase('lt') === archiveDetailRecord.employee.email?.trim().toLocaleLowerCase('lt')
     && new Date(record.archivedAt).getTime() > new Date(archiveDetailRecord.archivedAt).getTime());
@@ -3536,6 +3554,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       </button>
     </th>
   );
+  const previewArchivedSignature = (record, signature) => {
+    const resource = data.resources.find((item) => item.id === signature.resourceId)
+      ?? record.resources.find((item) => item.id === signature.resourceId);
+    if (!resource) {
+      setNotice('Pasirašyto dokumento peržiūrėti nepavyko: dokumento šablonas nerastas.');
+      return;
+    }
+    const protocolBatch = data.protocolBatches.find((batch) => batch.orgId === signature.orgId
+      && batch.resourceId === signature.resourceId
+      && batch.employeeIds.includes(signature.employeeId));
+    openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id });
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
@@ -4123,13 +4153,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'archyvas' && canManageSelectedWorkspace && <section className="archive-page space-y-5">
-            <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." /><div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={!archivedOrgEmployees.length} onClick={() => setArchivePrintMode('all')}><Download size={16} />Atsisiųsti visą archyvą</button>{creatorReadOnlyPreview && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40" disabled={!archivedOrgEmployees.length} onClick={() => deleteCreatorArchivedEmployees(currentOrg)}><Trash2 size={16} />Ištrinti visą archyvą</button>}</div></div>
+            <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." />{creatorReadOnlyPreview && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40" disabled={!archivedOrgEmployees.length} onClick={() => deleteCreatorArchivedEmployees(currentOrg)}><Trash2 size={16} />Ištrinti visą archyvą</button>}</div>
             <p className="archive-print-controls text-sm text-slate-500">Archyvo įrašai skirti tik peržiūrai: pasirašymo datos ir kiti duomenys nekoreguojami.</p>
-            {archivedOrgEmployees.length ? <div className="archive-print-controls grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{archivedOrgEmployees.map((record) => <button key={record.id} type="button" className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-emerald-700 hover:bg-emerald-50/40" onClick={() => setArchiveDetailsId(record.id)}><span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{record.employee.name}</span><span className="mt-1 block text-xs text-slate-500">Sutartis: {record.employee.contractNumber || 'Nenurodyta'} · {record.signatures.length} parašų</span></span><ChevronRight size={18} className="shrink-0 text-slate-400" /></button>)}</div> : <p className="archive-print-controls rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Šios įmonės archyve darbuotojų dar nėra.</p>}
-            {archivePrintMode === 'all' && <div className="archive-print-target archive-print-all"><h1 className="mb-2 text-2xl font-bold">{currentOrg?.name} · Darbuotojų archyvas</h1><p className="mb-6 text-sm text-slate-500">Archyvuota {new Date().toLocaleString('lt-LT')}</p>{archivedOrgEmployees.map((record) => <ArchiveEmployeeDetails key={record.id} record={record} organizationName={currentOrg?.name} />)}</div>}
+            {archivedOrgEmployees.length > 0 && <div className="archive-print-controls space-y-4">
+              <label className="relative block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti archyve</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={archiveSearch} onChange={(event) => { setArchiveSearch(event.target.value); setArchivePage(1); }} placeholder="Ieškoti pagal vardą, el. paštą, pareigas ar sutarties Nr." /></label>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <strong className="text-slate-800">{filteredArchivedEmployees.length}</strong></span>{archiveSearch && <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => { setArchiveSearch(''); setArchivePage(1); }}>Išvalyti paiešką</button>}</div>
+            </div>}
+            {visibleArchivedEmployees.length ? <div className="archive-print-controls grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visibleArchivedEmployees.map((record) => <button key={record.id} type="button" className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-emerald-700 hover:bg-emerald-50/40" onClick={() => setArchiveDetailsId(record.id)}><span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{record.employee.name}</span><span className="mt-1 block text-xs text-slate-500">Sutartis: {record.employee.contractNumber || 'Nenurodyta'} · {record.signatures.length} parašų</span></span><ChevronRight size={18} className="shrink-0 text-slate-400" /></button>)}</div> : <p className="archive-print-controls rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">{archivedOrgEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'Šios įmonės archyve darbuotojų dar nėra.'}</p>}
+            {filteredArchivedEmployees.length > archivePageSize && <div className="archive-print-controls flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">Rodoma {(Math.min(archivePage, archivePageCount) - 1) * archivePageSize + 1}–{Math.min(archivePage, archivePageCount) * archivePageSize} iš {filteredArchivedEmployees.length}</p><div className="flex items-center gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={archivePage <= 1} onClick={() => setArchivePage((page) => Math.max(1, page - 1))}>Ankstesnis</button><span className="text-sm text-slate-500">{Math.min(archivePage, archivePageCount)} / {archivePageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={archivePage >= archivePageCount} onClick={() => setArchivePage((page) => Math.min(archivePageCount, page + 1))}>Kitas</button></div></div>}
           </section>}
 
-          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex flex-wrap justify-end gap-2">{canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchivePrintMode(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}<button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>{creatorReadOnlyPreview && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} /></section></div>}
+          {archiveDetailRecord && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailRecord.id}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></div><div className="flex flex-wrap justify-end gap-2">{canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchivePrintMode(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}<button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>{creatorReadOnlyPreview && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => setArchiveDetailsId(null)}><X size={18} /></button></div></div><ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} onPreviewSignature={(signature) => previewArchivedSignature(archiveDetailRecord, signature)} /></section></div>}
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
@@ -4235,7 +4269,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   );
 }
 
-function ArchiveEmployeeDetails({ record, organizationName }) {
+function ArchiveEmployeeDetails({ record, organizationName, onPreviewSignature }) {
   const employee = record.employee;
   const sizeLabels = {
     pants: 'Kelnių dydis',
@@ -4261,7 +4295,7 @@ function ArchiveEmployeeDetails({ record, organizationName }) {
       ['AAP dydžiai', sizes.join(', ') || 'Nenurodyti'],
     ].map(([label, value]) => <div key={label}><dt className="text-slate-500">{label}</dt><dd className="break-words font-semibold">{value}</dd></div>)}</dl>
     <div className="border-b border-slate-100 pb-4"><h3 className="mb-2 text-sm font-semibold">Dokumentai archyvavimo metu</h3>{record.resources.length ? <ul className="space-y-1">{record.resources.map((resource) => <li className="text-sm text-slate-700" key={resource.id}>{resource.title} · {resource.type}</li>)}</ul> : <p className="text-sm text-slate-500">Priskirtų dokumentų nėra.</p>}</div>
-    <div><h3 className="mb-2 text-sm font-semibold">Visi užfiksuoti parašai</h3><SignatureTable signatures={record.signatures} resources={record.resources} /></div>
+    <div><h3 className="mb-2 text-sm font-semibold">Visi užfiksuoti parašai</h3><SignatureTable signatures={record.signatures} resources={record.resources} showDocumentPreview onPreviewSignature={onPreviewSignature} previewColumnClassName="archive-print-controls" /></div>
   </div>;
 }
 function recordSignaturesLabel(count) { return `${count} ${count === 1 ? 'parašas' : count > 1 && count < 10 ? 'parašai' : 'parašų'}`; }
@@ -4288,12 +4322,14 @@ function Metric({ label, value, accent = 'slate', hint }) {
   };
   return <div className={`workspace-metric rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${accents[accent] ?? accents.slate}`}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}</div>;
 }
-function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header) => <th className="px-3 py-2 font-semibold" key={header}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
-function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false }) {
+function DataTable({ headers, rows, empty = 'Duomenų dar nėra.' }) { return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500">{headers.map((header, index) => { const label = typeof header === 'string' ? header : header.label; return <th className={`px-3 py-2 font-semibold ${typeof header === 'string' ? '' : header.className ?? ''}`} key={typeof header === 'string' ? header : header.key ?? index}>{label}</th>; })}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr className="border-b border-slate-100 last:border-0" key={index}>{row.map((cell, cellIndex) => <td className="px-3 py-3 align-top" key={cellIndex}>{cell}</td>)}</tr>) : <tr><td className="px-3 py-5 text-slate-500" colSpan={headers.length}>{empty}</td></tr>}</tbody></table></div>; }
+function SignatureTable({ signatures, resources, archivedEmployees = [], onPreviewSignature, showDocumentPreview = false, previewColumnClassName = '' }) {
   const headers = ['Darbo sutarties Nr.', 'Dokumentas', 'Pasirašė'];
   if (!showDocumentPreview) headers.push('Parašas');
   headers.push('Patvirtinimas', 'Data', 'Galioja iki', 'IP adresas');
-  if (onPreviewSignature) headers.push('Peržiūra');
+  if (onPreviewSignature) headers.push(previewColumnClassName
+    ? { label: 'Dokumento peržiūra', key: 'document-preview', className: previewColumnClassName }
+    : 'Peržiūra');
   return <DataTable headers={headers} rows={signatures.map((signature) => {
     const resource = resources.find((item) => item.id === signature.resourceId)
       ?? archivedEmployees.flatMap((record) => record.resources).find((item) => item.id === signature.resourceId);
@@ -4310,7 +4346,7 @@ function SignatureTable({ signatures, resources, archivedEmployees = [], onPrevi
       signature.ip,
     );
     if (onPreviewSignature) {
-      row.push(<button type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />{resource ? getResourcePreviewActionLabel(resource) : 'Dokumentas nerastas'}</button>);
+      row.push(<span className={previewColumnClassName} key={`preview-${signature.id}`}><button type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature)}><Eye size={14} />{resource ? getResourcePreviewActionLabel(resource) : 'Dokumentas nerastas'}</button></span>);
     }
     return row;
   })} empty="Parašų dar nėra." />;
