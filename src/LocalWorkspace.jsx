@@ -665,6 +665,11 @@ const signerRoleOptions = [
   { value: 'DSS specialistas', label: 'DSS specialistas' },
   { value: 'Komisijos narys', label: 'Komisijos nariai' },
 ];
+const protocolSignerRoleOptions = [
+  ...signerRoleOptions.filter(({ value }) => value !== 'Komisijos narys'),
+  { value: 'Komisijos pirmininkas', label: 'Komisijos pirmininkas' },
+  { value: 'Komisijos narys', label: 'Komisijos nariai' },
+];
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
 const employeePageSize = 20;
 const signatureHistoryPageSize = 25;
@@ -1202,7 +1207,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [cloudMode, selectedOrgId, userRole]);
   const pendingCommissionInvitations = (data.commissionInvitations ?? []).filter((invitation) => invitation.status === 'pending' && (!currentEmployee || invitation.employeeId === currentEmployee.id));
   const commissionProtocolTasks = cloudMode
-    ? (data.commissionTasks ?? []).filter((task) => !currentEmployee || task.employeeId === currentEmployee.id)
+    ? (data.commissionTasks ?? []).filter((task) => {
+      if (currentEmployee && task.employeeId !== currentEmployee.id) return false;
+      const organization = data.organizations.find((item) => item.id === (task.organizationId ?? currentEmployee?.orgId));
+      const signerOverrides = organization?.resourceSettings?.[task.resourceId]?.commissionSignerOverrides;
+      return typeof signerOverrides?.[task.role] === 'boolean' ? signerOverrides[task.role] : true;
+    })
     : (data.commissionAssignments ?? [])
       .filter((assignment) => assignment.organizationId === currentEmployee?.orgId && assignment.employeeId === currentEmployee?.id && assignment.status === 'accepted')
       .flatMap((assignment) => (data.protocolBatches ?? [])
@@ -1212,6 +1222,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .map((batch) => {
           const resource = data.resources.find((item) => item.id === batch.resourceId && item.templateKind === 'knowledge-assessment-protocol');
           if (!resource) return null;
+          const signerOverrides = currentOrg?.resourceSettings?.[resource.id]?.commissionSignerOverrides;
+          if (typeof signerOverrides?.[assignment.role] === 'boolean' && !signerOverrides[assignment.role]) return null;
           const allPassed = !resource.relatedTestId || batch.employeeIds.every((employeeId) => data.employees
             .find((item) => item.id === employeeId)
             ?.testResults?.some((result) => result.resourceId === resource.relatedTestId && result.passed));
@@ -2067,12 +2079,38 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const openResourceSettings = (resource) => {
     const defaults = resource.defaultSettings ?? {};
     const saved = currentOrg?.resourceSettings?.[resource.id] ?? {};
+    const defaultRequiredSigners = [...(defaults.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'])];
+    const acceptedRoles = new Set((data.commissionAssignments ?? [])
+      .filter((assignment) => assignment.organizationId === currentOrg?.id && assignment.status === 'accepted')
+      .map((assignment) => assignment.role));
+    const commissionSignerOverrides = saved.commissionSignerOverrides ?? {};
+    if (resource.templateKind === 'knowledge-assessment-protocol' && !Array.isArray(saved.requiredSigners)) {
+      protocolSignerRoleOptions.slice(-2).forEach(({ value }) => {
+        if (typeof commissionSignerOverrides[value] === 'boolean'
+          ? commissionSignerOverrides[value]
+          : acceptedRoles.has(value)) defaultRequiredSigners.push(value);
+      });
+    } else if (resource.templateKind === 'knowledge-assessment-protocol') {
+      protocolSignerRoleOptions.slice(-2).forEach(({ value }) => {
+        const required = typeof commissionSignerOverrides[value] === 'boolean'
+          ? commissionSignerOverrides[value]
+          : acceptedRoles.has(value);
+        if (required) defaultRequiredSigners.push(value);
+        else {
+          const index = defaultRequiredSigners.indexOf(value);
+          if (index >= 0) defaultRequiredSigners.splice(index, 1);
+        }
+      });
+    }
     setResourceSettingsTarget(resource);
     setResourceSettingsDraft({
       ...defaults,
       ...saved,
       validityMonths: saved.validityMonths ?? defaults.validityMonths ?? resource.validityMonths ?? 12,
-      requiredSigners: saved.requiredSigners ?? defaults.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'],
+      requiredSigners: resource.templateKind === 'knowledge-assessment-protocol'
+        ? [...new Set(defaultRequiredSigners)]
+        : saved.requiredSigners ?? [...new Set(defaultRequiredSigners)],
+      ...(resource.templateKind === 'knowledge-assessment-protocol' ? { commissionSignerOverrides } : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { protocolCadence: saved.protocolCadence ?? defaults.protocolCadence ?? 'weekly-friday' } : {}),
     });
   };
@@ -5077,6 +5115,15 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     if (commissionLines[2]) commissionLines[2].closest('.commission-row')?.remove();
 
     const signatureRows = parsed.querySelectorAll('.signatures-section .sig-row');
+    const signerOverrides = resource.defaultSettings?.commissionSignerOverrides ?? {};
+    const requiresChairSignature = typeof signerOverrides['Komisijos pirmininkas'] === 'boolean'
+      ? signerOverrides['Komisijos pirmininkas']
+      : chairSigners.length > 0;
+    const requiresMemberSignatures = typeof signerOverrides['Komisijos narys'] === 'boolean'
+      ? signerOverrides['Komisijos narys']
+      : memberSigners.length > 0;
+    if (!requiresChairSignature) signatureRows[0]?.remove();
+    if (!requiresMemberSignatures) signatureRows[1]?.remove();
     const renderCommissionSignatures = (container, signers) => {
       if (!container) return;
       const content = container.querySelector('.sig-content');
@@ -5116,8 +5163,8 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         content.append(pair);
       });
     };
-    renderCommissionSignatures(signatureRows[0], chairSigners);
-    renderCommissionSignatures(signatureRows[1], memberSigners);
+    if (requiresChairSignature) renderCommissionSignatures(signatureRows[0], chairSigners);
+    if (requiresMemberSignatures) renderCommissionSignatures(signatureRows[1], memberSigners);
     const style = parsed.createElement('style');
     style.textContent = '.commission-signature-proof{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:3px 0}.commission-signature-proof .signature-image{width:90px;height:30px;object-fit:contain}.commission-signature-proof small{font-size:8px;color:#64748b}';
     parsed.head.append(style);
@@ -5455,7 +5502,19 @@ function ProtocolSettingsDialog({ resource, settings, onChange, onSave, onClose 
     <label className="block text-sm font-medium">Naują protokolą kurti<select className={`${inputClass} mt-1`} value={settings.protocolCadence ?? 'weekly-friday'} onChange={(event) => onChange({ ...settings, protocolCadence: event.target.value })}><option value="weekly-friday">Kas penktadienį (pirmadienis–penktadienis)</option><option value="weekly-sunday">Kas sekmadienį (pirmadienis–sekmadienis)</option><option value="until-full">Surinkus 15 darbuotojų</option></select></label>
     <p className="mt-2 text-sm text-slate-500">Darbuotojai grupuojami pagal pakvietimo datą. Tuščias periodas protokolo įrašo nesukuria. „Surinkus 15 darbuotojų“ režime data nustatoma, kai užsipildo paskutinė eilutė.</p>
     <label className="mt-4 block text-sm font-medium">Galiojimas (mėnesiais)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={settings.validityMonths ?? resource.validityMonths ?? 12} onChange={(event) => onChange({ ...settings, validityMonths: event.target.value })} /></label>
-    <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']), value])] : (settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']).filter((role) => role !== value) })} />{label}</label>)}</div></fieldset>
+    <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><p className="text-xs text-slate-500">Komisijos vaidmenys automatiškai parenkami pagal priimtus paskyrimus. Vadovas gali juos pakeisti.</p><div className="grid gap-2 sm:grid-cols-2">{protocolSignerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => {
+      const currentRequiredSigners = settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'];
+      const requiredSigners = event.target.checked
+        ? [...new Set([...currentRequiredSigners, value])]
+        : currentRequiredSigners.filter((role) => role !== value);
+      onChange({
+        ...settings,
+        requiredSigners,
+        ...(value === 'Komisijos pirmininkas' || value === 'Komisijos narys'
+          ? { commissionSignerOverrides: { ...(settings.commissionSignerOverrides ?? {}), [value]: event.target.checked } }
+          : {}),
+      });
+    }} />{label}</label>)}</div></fieldset>
     <div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
   </form></div>;
 }
