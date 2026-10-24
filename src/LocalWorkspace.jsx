@@ -2685,6 +2685,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+    if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview) {
+      if (reportArchiveData.organizationId !== currentOrg?.id || reportArchiveData.loading) {
+        setNotice('Palaukite, kol bus įkelti archyvuotų darbuotojų ataskaitų duomenys.');
+        return;
+      }
+      if (reportArchiveData.error) {
+        setNotice(`Žurnalo peržiūros duomenų įkelti nepavyko: ${reportArchiveData.error}`);
+        return;
+      }
+    }
     if (userRole === 'darbuotojas' && resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee)) {
       setActiveTab('aap');
       setNotice('AAP dydžiai nenustatyti. Užpildykite batų, drabužių, kelnių ir striukės dydžius.');
@@ -2705,6 +2715,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       validityMonths: companySettings.validityMonths ?? resource.validityMonths,
     };
     const protocolBatch = (data.protocolBatches ?? []).find((batch) => batch.id === protocolBatchId);
+    const previewArchivedEmployees = activeTab === 'ataskaitos'
+      ? reportArchivedEmployees
+      : (data.archivedEmployees ?? [])
+        .filter((record) => record.orgId === currentOrg?.id)
+        .map((record) => record.employee);
     const activeEmployees = templateOnly || archivedRecord ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.employees.find((item) => item.id === employeeId)).filter(Boolean)
       : userRole === 'darbuotojas'
@@ -2714,10 +2729,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? [archivedRecord.employee]
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
-      : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
+      : previewArchivedEmployees.filter((employee) => employee.resourceIds?.includes(resource.id));
     const sequenceEmployees = [...new Map([
       ...data.employees.filter((person) => person.orgId === currentOrg?.id),
-      ...(data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id).map((record) => record.employee),
+      ...previewArchivedEmployees,
       ...activeEmployees,
       ...archivedEmployees,
     ].map((person) => [person.id, person])).values()]
