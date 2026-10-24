@@ -5456,7 +5456,10 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       ? medicalExaminationScheduleTemplate
       : '<p>Šis šablonas dar neturi turinio.</p>';
     const html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || fallbackHtml);
-    if (resource.templateOnly) return `<!doctype html>\n${html}`;
+    if (resource.templateOnly) {
+      const templateHtml = resource.type === 'Protokolas' ? numberDocumentSequenceColumn(html) : html;
+      return `<!doctype html>\n${templateHtml}`;
+    }
     const populatedHtml = populateJournalRows(html, resource, employee, org, signatures, resource.previewSpecialists ?? [], resources);
     return ['Protokolas', 'Kortelė'].includes(resource.type) && resource.id !== 'res-aap'
       ? numberDocumentSequenceColumn(populatedHtml)
