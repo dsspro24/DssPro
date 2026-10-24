@@ -2624,19 +2624,34 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ...(data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id).map((item) => item.employee),
     ];
     const employeeSequenceNumbers = new Map(organizationEmployees.map((item, index) => [item.id, index + 1]));
+    const previewSignatureSource = archivedRecord?.signatures ?? data.signatures;
+    const previewSignatureResourceIds = new Set([resource.id]);
+    if (resource.templateKind === 'internal-documents-register') {
+      getInternalRegisterRelatedResources(resource, resource.previewResources ?? data.resources)
+        .forEach((relatedResource) => previewSignatureResourceIds.add(relatedResource.id));
+    }
     const previewEmployees = [...activeEmployees, ...archivedEmployees]
       .filter((person) => !employeeId || person.id === employeeId)
+      .sort((left, right) => {
+        const activityDate = (person) => {
+          const signedAt = previewSignatureSource
+            .filter((signature) => signature.employeeId === person.id && previewSignatureResourceIds.has(signature.resourceId))
+            .reduce((latest, signature) => Math.max(latest, new Date(signature.signedAt).getTime() || 0), 0);
+          const completedAt = resource.relatedTestId
+            ? (person.testResults ?? [])
+              .filter((result) => result.resourceId === resource.relatedTestId)
+              .reduce((latest, result) => Math.max(latest, new Date(result.completedAt).getTime() || 0), 0)
+            : 0;
+          return Math.max(signedAt, completedAt, new Date(person.invitedAt ?? person.createdAt ?? 0).getTime() || 0);
+        };
+        return activityDate(right) - activityDate(left) || left.name.localeCompare(right.name, 'lt');
+      })
       .map((person) => ({ ...person, sequenceNumber: person.sequenceNumber ?? employeeSequenceNumbers.get(person.id) ?? '' }));
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
-      const signatureResourceIds = new Set([resource.id]);
-      if (resource.templateKind === 'internal-documents-register') {
-        getInternalRegisterRelatedResources(resource, resource.previewResources ?? data.resources)
-          .forEach((relatedResource) => signatureResourceIds.add(relatedResource.id));
-      }
-      const resourceSignatures = (archivedRecord?.signatures ?? data.signatures).filter((signature) =>
-        signatureResourceIds.has(signature.resourceId) && previewEmployeeIds.has(signature.employeeId));
+      const resourceSignatures = previewSignatureSource.filter((signature) =>
+        previewSignatureResourceIds.has(signature.resourceId) && previewEmployeeIds.has(signature.employeeId));
       if (previewSignature?.resourceId === resource.id
         && previewEmployeeIds.has(previewSignature.employeeId)
         && !resourceSignatures.some((signature) => signature.id === previewSignature.id)) {
@@ -2656,7 +2671,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployee = archivedRecord
       ? previewEmployees.find((person) => person.id === employeeId)
       : currentEmployee;
-    previewDocument.printHtml = prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title);
+    previewDocument.printHtml = addRecordPageBreaks(prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title));
+    const firstPreviewPage = getRecordPreviewPage(previewDocument.printHtml, 0);
+    previewDocument.previewHtml = firstPreviewPage.html;
+    previewDocument.previewPageCount = firstPreviewPage.pageCount;
+    previewDocument.previewPageIndex = 0;
     if (autoPrint) {
       printPdfHtml(previewDocument.printHtml, resource.title)
         .catch((error) => setNotice(`PDF atsisiųsti nepavyko: ${error.message}`));
@@ -4498,7 +4517,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><label className="mt-4 block text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedTestId} onChange={(event) => setProtocolRelatedTestId(event.target.value)}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Testas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><label className="mt-4 block text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedJournalId} onChange={(event) => setProtocolRelatedJournalId(event.target.value)}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Žurnalas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei. Susiejimą galite praleisti.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => { setProtocolSource(null); setProtocolRelatedTestId(''); setProtocolRelatedJournalId(''); }}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
-      {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
+      {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}{previewResource.previewPageCount > 1 && <nav className="mb-3 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Dokumento puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex === 0} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.max(0, current.previewPageIndex - 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Ankstesnis</button><span>Puslapis {previewResource.previewPageIndex + 1} iš {previewResource.previewPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex >= previewResource.previewPageCount - 1} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.min(current.previewPageCount - 1, current.previewPageIndex + 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Kitas</button></nav>}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.previewHtml ?? previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
       <dialog id="aap-issuance-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60" onClose={() => { setAapIssueEmployeeId(null); setAapIssueSelectedItemIds([]); }}>
         {aapIssueEmployee && <form onSubmit={createAapIssuance} className="space-y-5">
           <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Naujas AAP išdavimas</h2><p className="mt-1 text-sm text-slate-500">{aapIssueEmployee.name} · ankstesni pasirašyti įrašai nekeičiami.</p></div><button type="button" aria-label="Uždaryti AAP išdavimo formą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => document.getElementById('aap-issuance-dialog')?.close()}><X size={20} /></button></div>
@@ -5327,6 +5346,33 @@ function numberDocumentSequenceColumn(html) {
     if (row.cells[0]) row.cells[0].textContent = String(index + 1);
   });
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+}
+
+function addRecordPageBreaks(html) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const style = parsed.createElement('style');
+  style.textContent = '@media print{.journal-page .journal-table tbody tr:nth-child(20n + 1):not(:first-child),.protocol-table tbody tr:nth-child(20n + 1):not(:first-child),.card-page .card-table tbody tr:nth-child(20n + 1):not(:first-child),.card-container table tbody tr:nth-child(20n + 1):not(:first-child){break-before:page;page-break-before:always}}';
+  parsed.head.append(style);
+  return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+}
+
+function getRecordPreviewPage(html, pageIndex, pageSize = 20) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table');
+  const body = table?.tBodies[0];
+  if (!body || body.rows.length <= pageSize) return { html, pageCount: 1 };
+
+  const rows = [...body.rows];
+  const pageCount = Math.ceil(rows.length / pageSize);
+  const pageDocument = new DOMParser().parseFromString(html, 'text/html');
+  const pageBody = pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table')?.tBodies[0];
+  if (!pageBody) return { html, pageCount: 1 };
+  const start = pageIndex * pageSize;
+  const pageRows = rows.slice(start, start + pageSize);
+  pageBody.replaceChildren(...pageRows.map((row) => pageDocument.importNode(row, true)));
+  if (pageIndex > 0) pageDocument.querySelector('.cover-page')?.remove();
+  if (pageIndex < pageCount - 1) pageDocument.querySelector('.signature-audit')?.remove();
+  return { html: `<!DOCTYPE html>\n${pageDocument.documentElement.outerHTML}`, pageCount };
 }
 
 function buildQuizPreviewHtml(resource) {
