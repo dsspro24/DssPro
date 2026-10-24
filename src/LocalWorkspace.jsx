@@ -2323,12 +2323,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const getResourceWithHtml = async (resource, { useCache = true } = {}) => {
-    if (resource.id === 'res-medical-examination-schedule') {
+    if (resource.id === 'res-medical-examination-schedule' || resource.id === 'res-work-rules-journal') {
       const defaultResource = initialData.resources.find((item) => item.id === resource.id);
       resource = {
         ...defaultResource,
         ...resource,
-        html: resource.html || defaultResource?.html,
+        html: defaultResource?.html || resource.html,
         templateKind: resource.templateKind ?? defaultResource?.templateKind,
         requiredSigners: resource.requiredSigners ?? defaultResource?.requiredSigners,
         defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
@@ -4910,6 +4910,10 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       if (typeof value === 'string' && value.trim()) element.textContent = value;
     });
   }
+  if (resource.templateKind === 'work-rules-journal') {
+    const sequenceHeading = table?.tHead?.rows[0]?.cells[0];
+    if (sequenceHeading) sequenceHeading.textContent = 'Eil. Nr.';
+  }
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
@@ -4993,7 +4997,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       } else if (resource.templateKind === 'familiarization-card') {
         writeRow(row, [String(item.sequenceNumber ?? ''), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
       } else if (resource.templateKind === 'work-rules-journal') {
-        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
       } else if (resource.templateKind === 'intro-dss-journal') {
         writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), instructorNames, instructors.map((entry) => escapeHtml(entry.role)).join('<br>'), workerProof, instructorProofs]);
       } else if (resource.templateKind === 'workplace-dss-journal') {
