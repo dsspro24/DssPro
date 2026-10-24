@@ -203,12 +203,31 @@ const hasPassedProtocolTest = (employee, resource) => {
   if (!resource.relatedTestId) return true;
   return Boolean(getLatestPassedProtocolTestResult(employee, resource));
 };
+const getProtocolTestPassSummary = (employees, resource) => {
+  if (!resource.relatedTestId) return 'Nėra susieto testo';
+  const assignedEmployees = employees.filter((employee) => employee.resourceIds?.includes(resource.relatedTestId));
+  if (!assignedEmployees.length) return 'Testas nepriskirtas';
+  const passedCount = assignedEmployees.filter((employee) => hasPassedProtocolTest(employee, resource)).length;
+  return `${Math.round((passedCount / assignedEmployees.length) * 100)}% (${passedCount} / ${assignedEmployees.length})`;
+};
 const getProtocolTestStatusLabel = (employee, resource) => {
   if (!resource.relatedTestId) return 'Netaikoma';
   if (getLatestPassedProtocolTestResult(employee, resource)) return 'Išlaikė';
   const result = getLatestProtocolTestResult(employee, resource);
   if (!result) return 'Laukia rezultato';
   return 'Neišlaikė';
+};
+const getInternalRegisterRelatedResources = (resource, allResources) => {
+  const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
+    ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
+  return [
+    findRelatedResource('res-intro-dss-journal', /įvadin.*(dss|saug|instruktav)|dss.*įvadin/i),
+    findRelatedResource('res-fire-safety-journal', /gaisrin/i),
+    findRelatedResource('res-work-rules-journal', /darbo tvarkos taisykl/i),
+    findRelatedResource('res-job-description-journal', /pareigin.*nuostat/i),
+    findRelatedResource('res-professional-risk-journal', /profesin.*rizik|rizikos vertinim|\bprv\b/i),
+    findRelatedResource('res-safety-data-sheets', /saugos duomenų lap|\bsdl\b/i),
+  ].filter(Boolean);
 };
 const expandProtocolResourceAssignments = (resourceIds, resources) => {
   const assignedIds = new Set(resourceIds);
@@ -497,8 +516,8 @@ const initialData = {
     { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 15, populateEmployees: true, date: '', instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
     { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 15, populateEmployees: true, date: '', instructorName: '', instructorPosition: '' } },
     { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 15, populateEmployees: true, date: '' } },
-    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 12, populateEmployees: true } },
-    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { rowCount: 15, populateEmployees: false, date: '', instructionNumber: '', instructionTitle: '', instructorName: '', changedInstruction: '' } },
+    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 12, populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
+    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { date: '', instructionNumber: '', instructionTitle: '', instructorPosition: '', changedInstruction: '' } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 20, populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', html: aapTemplate, requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
@@ -1389,7 +1408,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={protocolStatusFilter} onChange={(event) => { setProtocolStatusFilter(event.target.value); setProtocolPage(1); }}><option value="visos">Visos būsenos</option><option value="collecting">Kaupiamas</option><option value="waiting">Laukia testo</option><option value="ready">Paruoštas</option></select></label>
       <p className="pb-2 text-sm text-slate-500">Protokolų: <span className="font-semibold text-slate-800">{visibleProtocolBatches.length}</span></p>
     </div>
-    {paginatedProtocolBatches.length ? <><DataTable headers={['Nr.', 'Mokymo programa', 'Laikotarpis', 'Darbuotojai', 'Data protokole', 'Būsena', 'Veiksmai']} rows={paginatedProtocolBatches.map(({ batch, resource, employees }) => {
+    {paginatedProtocolBatches.length ? <><DataTable headers={['Nr.', 'Mokymo programa', 'Laikotarpis', 'Darbuotojai', 'Testo išlaikymas', 'Data protokole', 'Būsena', 'Veiksmai']} rows={paginatedProtocolBatches.map(({ batch, resource, employees }) => {
       const ready = isProtocolBatchReady(batch, employees, resource);
       const waitingEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Laukia rezultato');
       const failedTestEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Neišlaikė');
@@ -1403,7 +1422,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   const matchingEmployees = searchTerm ? employees.filter((employee) => employee.name.toLocaleLowerCase('lt').includes(searchTerm)) : [];
                   const listedEmployees = matchingEmployees.length ? matchingEmployees : employees.slice(0, 2);
                   const signedCount = employees.filter((employee) => data.signatures.some((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas')).length;
-                  return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join('\n')}>{listedEmployees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">Testas: {resource.relatedTestId ? `${employees.filter((employee) => hasPassedProtocolTest(employee, resource)).length} / ${employees.length} išlaikė` : 'nereikalingas'} · {signedCount} / {employees.length} pasirašė PIN kodu</small></span>, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
+                  return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join('\n')}>{listedEmployees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">{signedCount} / {employees.length} pasirašė PIN kodu</small></span>, getProtocolTestPassSummary(employees, resource), batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
@@ -2611,8 +2630,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
+      const signatureResourceIds = new Set([resource.id]);
+      if (resource.templateKind === 'internal-documents-register') {
+        getInternalRegisterRelatedResources(resource, resource.previewResources ?? data.resources)
+          .forEach((relatedResource) => signatureResourceIds.add(relatedResource.id));
+      }
       const resourceSignatures = (archivedRecord?.signatures ?? data.signatures).filter((signature) =>
-        signature.resourceId === resource.id && previewEmployeeIds.has(signature.employeeId));
+        signatureResourceIds.has(signature.resourceId) && previewEmployeeIds.has(signature.employeeId));
       if (previewSignature?.resourceId === resource.id
         && previewEmployeeIds.has(previewSignature.employeeId)
         && !resourceSignatures.some((signature) => signature.id === previewSignature.id)) {
@@ -4826,6 +4850,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : resource.templateKind === 'medical-examination-schedule' ? parsed.querySelector('.document-page .journal-table') : parsed.querySelector('.journal-page .journal-table');
+  if (resource.templateKind === 'internal-documents-register') {
+    parsed.querySelectorAll('[data-setting]').forEach((element) => {
+      const value = resource.defaultSettings?.[element.dataset.setting];
+      if (typeof value === 'string' && value.trim()) element.textContent = value;
+    });
+  }
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
@@ -4836,6 +4866,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
     while (tableBody.rows.length < rowCount) tableBody.append(rows[0].cloneNode(true));
     rows = [...tableBody.rows];
+  }
+  if (resource.templateKind === 'internal-documents-register') {
+    const expectedCellCount = table?.tHead?.rows[2]?.cells.length ?? 0;
+    rows.forEach((row) => {
+      while (row.cells.length < expectedCellCount) row.insertCell();
+    });
   }
   if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card', 'medical-examination-schedule'].includes(resource.templateKind)) {
     rows.forEach((row, index) => {
@@ -4878,7 +4914,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const approval = signature
         ? `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeFormatter.format(new Date(signature.signedAt)))}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`
         : `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>`;
-      writeRow(row, [settings.instructionNumber, settings.instructionTitle || resource.title, formatDate(signature?.signedAt || settings.date), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, settings.changedInstruction].map((value) => value ?? ''));
+      writeRow(row, [escapeHtml(settings.instructionNumber ?? ''), escapeHtml(settings.instructionTitle || resource.title), formatDate(signature?.signedAt || settings.date), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, escapeHtml(settings.changedInstruction ?? '')]);
       row.cells[3].innerHTML = `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${signature ? escapeHtml(signature.signer) : escapeHtml(signerName)}<br>${approval}`;
     }
   } else {
@@ -4917,16 +4953,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const settings = resource.defaultSettings ?? {};
         writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(settings.regulationNumber ?? ''), workerDate, workerProof]);
       } else if (resource.templateKind === 'internal-documents-register') {
-        const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
-          ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
-        const related = [
-          findRelatedResource('res-intro-dss-journal', /įvadin.*(dss|saug|instruktav)|dss.*įvadin/i),
-          findRelatedResource('res-fire-safety-journal', /gaisrin/i),
-          findRelatedResource('res-work-rules-journal', /darbo tvarkos taisykl/i),
-          findRelatedResource('res-job-description-journal', /pareigin.*nuostat/i),
-          findRelatedResource('res-professional-risk-journal', /profesin.*rizik|rizikos vertinim|\bprv\b/i),
-          findRelatedResource('res-safety-data-sheets', /saugos duomenų lap|\bsdl\b/i),
-        ];
+        const related = getInternalRegisterRelatedResources(resource, allResources);
         const relatedSignature = (linkedResource, role) => linkedResource && signatures
           .filter((signature) => signature.employeeId === item.id && signature.resourceId === linkedResource.id && signature.role === role)
           .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
@@ -4947,6 +4974,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const positionWorker = relatedSignature(positionResource, 'Darbuotojas');
         const riskWorker = relatedSignature(riskResource, 'Darbuotojas');
         const sdsWorker = relatedSignature(sdsResource, 'Darbuotojas');
+        const registerWorker = relatedSignature(resource, 'Darbuotojas');
         const settingFor = (linkedResource, ...keys) => {
           const settings = { ...linkedResource?.defaultSettings, ...org?.resourceSettings?.[linkedResource?.id] };
           return keys.map((key) => settings[key]).find(Boolean) ?? '';
@@ -4963,14 +4991,16 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           formatDate(rulesWorker?.signedAt),
           relatedProof(rulesResource, rulesWorker, 'Darbuotojas'),
           formatDate(positionWorker?.signedAt),
-          escapeHtml(settingFor(positionResource, 'regulationNumber')),
+          escapeHtml(resource.defaultSettings?.jobDescriptionNumber || settingFor(positionResource, 'regulationNumber')),
           relatedProof(positionResource, positionWorker, 'Darbuotojas'),
           formatDate(riskWorker?.signedAt),
-          escapeHtml(settingFor(riskResource, 'riskAssessmentNumber', 'cardNumber', 'documentNumber')),
+          escapeHtml(resource.defaultSettings?.riskAssessmentNumber || settingFor(riskResource, 'riskAssessmentNumber', 'cardNumber', 'documentNumber')),
           relatedProof(riskResource, riskWorker, 'Darbuotojas'),
           formatDate(sdsWorker?.signedAt),
-          escapeHtml(settingFor(sdsResource, 'safetyDataSheetNumber', 'documentNumber')),
+          escapeHtml(resource.defaultSettings?.safetyDataSheetNumber || settingFor(sdsResource, 'safetyDataSheetNumber', 'documentNumber')),
           relatedProof(sdsResource, sdsWorker, 'Darbuotojas'),
+          formatDate(registerWorker?.signedAt),
+          relatedProof(resource, registerWorker, 'Darbuotojas'),
         ]);
       } else if (resource.templateKind === 'knowledge-assessment-protocol') {
         const result = getLatestPassedProtocolTestResult(item, resource) ?? getLatestProtocolTestResult(item, resource);
@@ -5391,12 +5421,22 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     periodicity: 'Medicininės apžiūros periodiškumas',
     directorName: 'Direktoriaus vardas, pavardė',
     date: 'Data',
-    instructionNumber: 'Instrukcijos numeris',
-    instructionTitle: 'Instruktavimo pavadinimas',
+    instructionNumber: 'Instrukcijos Nr.',
+    instructionTitle: 'Instrukcijos pavadinimas',
     instructorName: 'Instruktuojančiojo vardas, pavardė',
     instructorPosition: 'Instruktuojančiojo pareigos',
     regulationNumber: 'Pareiginių nuostatų Nr.',
-    changedInstruction: 'Pakeista į',
+    introInstructionLabel: 'DSS įvadinio instruktavimo skiltis',
+    fireInstructionLabel: 'Gaisrinės saugos skiltis',
+    workRulesLabel: 'Darbo tvarkos taisyklių skiltis',
+    jobDescriptionLabel: 'Pareiginių nuostatų skiltis',
+    riskAssessmentLabel: 'Rizikos vertinimo dokumentų skiltis',
+    safetyDataSheetsLabel: 'Saugos duomenų lapų skiltis',
+    registerConfirmationLabel: 'Žurnalo patvirtinimo skiltis',
+    jobDescriptionNumber: 'Pareiginių nuostatų Nr.',
+    riskAssessmentNumber: 'Rizikos vertinimo dokumento Nr.',
+    safetyDataSheetNumber: 'Saugos duomenų lapo Nr.',
+    changedInstruction: 'Instrukcija pakeista į',
     validityMonths: 'Galiojimas (mėnesiais)',
   };
   const textFields = Object.entries(settings).filter(([key, value]) => key !== 'requiredSigners' && typeof value !== 'boolean');
