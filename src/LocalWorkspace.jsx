@@ -2684,7 +2684,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka' && !currentOrg?.resources.includes(resource.id)) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka') } = {}) => {
     if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview) {
       if (reportArchiveData.organizationId !== currentOrg?.id || reportArchiveData.loading) {
         setNotice('Palaukite, kol bus įkelti archyvuotų darbuotojų ataskaitų duomenys.');
