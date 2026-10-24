@@ -203,20 +203,6 @@ const hasPassedProtocolTest = (employee, resource) => {
   if (!resource.relatedTestId) return true;
   return Boolean(getLatestPassedProtocolTestResult(employee, resource));
 };
-const getProtocolTestPassSummary = (employees, resource) => {
-  if (!resource.relatedTestId) return 'Nėra susieto testo';
-  const assignedEmployees = employees.filter((employee) => employee.resourceIds?.includes(resource.relatedTestId));
-  if (!assignedEmployees.length) return 'Testas nepriskirtas';
-  const passedCount = assignedEmployees.filter((employee) => hasPassedProtocolTest(employee, resource)).length;
-  return `${Math.round((passedCount / assignedEmployees.length) * 100)}% (${passedCount} / ${assignedEmployees.length})`;
-};
-const getProtocolTestStatusLabel = (employee, resource) => {
-  if (!resource.relatedTestId) return 'Netaikoma';
-  if (getLatestPassedProtocolTestResult(employee, resource)) return 'Išlaikė';
-  const result = getLatestProtocolTestResult(employee, resource);
-  if (!result) return 'Laukia rezultato';
-  return 'Neišlaikė';
-};
 const getInternalRegisterRelatedResources = (resource, allResources) => {
   const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
     ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
@@ -1433,21 +1419,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={protocolStatusFilter} onChange={(event) => { setProtocolStatusFilter(event.target.value); setProtocolPage(1); }}><option value="visos">Visos būsenos</option><option value="collecting">Kaupiamas</option><option value="waiting">Laukia testo</option><option value="ready">Paruoštas</option></select></label>
       <p className="pb-2 text-sm text-slate-500">Protokolų: <span className="font-semibold text-slate-800">{visibleProtocolBatches.length}</span></p>
     </div>
-    {paginatedProtocolBatches.length ? <><DataTable headers={['Nr.', 'Mokymo programa', 'Laikotarpis', 'Darbuotojai', 'Testo išlaikymas', 'Data protokole', 'Būsena', 'Veiksmai']} rows={paginatedProtocolBatches.map(({ batch, resource, employees }) => {
+    {paginatedProtocolBatches.length ? <><DataTable headers={['Nr.', 'Mokymo programa', 'Laikotarpis', 'Data protokole', 'Būsena', 'Veiksmai']} rows={paginatedProtocolBatches.map(({ batch, resource, employees }) => {
       const ready = isProtocolBatchReady(batch, employees, resource);
-      const waitingEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Laukia rezultato');
-      const failedTestEmployees = employees.filter((employee) => getProtocolTestStatusLabel(employee, resource) === 'Neišlaikė');
       const status = ready ? 'Paruoštas'
         : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas'
-          : [
-            waitingEmployees.length ? `Laukia testo rezultato: ${waitingEmployees.map((employee) => employee.name).join(', ')}` : '',
-            failedTestEmployees.length ? `Neišlaikė testo: ${failedTestEmployees.map((employee) => employee.name).join(', ')}` : '',
-          ].filter(Boolean).join(' · ') || 'Laukia datos';
-                  const searchTerm = protocolSearch.trim().toLocaleLowerCase('lt');
-                  const matchingEmployees = searchTerm ? employees.filter((employee) => employee.name.toLocaleLowerCase('lt').includes(searchTerm)) : [];
-                  const listedEmployees = matchingEmployees.length ? matchingEmployees : employees.slice(0, 2);
-                  const signedCount = employees.filter((employee) => data.signatures.some((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas')).length;
-                  return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, <span className="block max-w-64 whitespace-normal" title={employees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join('\n')}>{listedEmployees.map((employee) => `${employee.name} · ${getProtocolTestStatusLabel(employee, resource)}`).join(', ')}{employees.length > listedEmployees.length ? ` +${employees.length - listedEmployees.length}` : ''}<small className="mt-1 block text-xs text-slate-500">{signedCount} / {employees.length} pasirašė PIN kodu</small></span>, getProtocolTestPassSummary(employees, resource), batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} className="mr-1 inline" />Atidaryti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
+          : resource.relatedTestId ? 'Laukia testo' : 'Laukia datos';
+      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
@@ -2670,7 +2647,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
       : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
-    const sequenceEmployees = [...new Map([...activeEmployees, ...archivedEmployees].map((person) => [person.id, person])).values()]
+    const sequenceEmployees = [...new Map([
+      ...data.employees.filter((person) => person.orgId === currentOrg?.id),
+      ...(data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id).map((record) => record.employee),
+      ...activeEmployees,
+      ...archivedEmployees,
+    ].map((person) => [person.id, person])).values()]
       .map((person, index) => ({ person, index }))
       .sort((left, right) => {
         const registrationDate = (person) => new Date(person.invitedAt ?? person.createdAt ?? 0).getTime() || 0;
@@ -4464,7 +4446,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {(reportTypeFilter === 'visos' || reportTypeFilter === 'Kortelė') && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Ieškokite darbuotojo ir peržiūrėkite jo AAP kortelę. Atsisiuntimas pasiekiamas atidarius kortelės peržiūrą.</p></div><Panel title="AAP pagal darbuotoją">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="block w-full max-w-xl text-sm font-medium">Ieškoti darbuotojo<div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={reportAapSearch} onChange={(event) => { setReportAapSearch(event.target.value); setReportAapPage(1); }} placeholder="Vardas, pavardė, pareigos arba sutarties Nr." /></div></label>{reportAapSearch && <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => { setReportAapSearch(''); setReportAapPage(1); }}>Išvalyti paiešką</button>}</div>
                 <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm text-slate-500"><span>Darbuotojai: <strong className="text-slate-800">{filteredReportAapEmployees.length}</strong></span></div>
-                {filteredReportAapEmployees.length ? <div className="divide-y divide-slate-100">{paginatedReportAapEmployees.map((employee) => <div key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-48 flex-1"><p className="font-semibold text-slate-900">{employee.name}</p><p className="mt-0.5 text-sm text-slate-500">{employee.position || 'Darbuotojas'}{employee.contractNumber ? ` · Sutartis ${employee.contractNumber}` : ''}</p></div><span className={`text-xs font-semibold ${hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'text-emerald-700' : 'text-amber-700'}`}>{hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'AAP kortelė pasirašyta' : 'Laukia darbuotojo parašo'}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(reportAapResource, { employeeId: employee.id })}><Eye size={15} />Peržiūrėti</button></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">{reportAapEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'AAP kortelės dar nepriskirtos darbuotojams.'}</p>}
+                {filteredReportAapEmployees.length ? <div className="divide-y divide-slate-100">{paginatedReportAapEmployees.map((employee) => <div key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-48 flex-1"><p className="font-semibold text-slate-900">{employee.name}</p><p className="mt-0.5 text-sm text-slate-500">{employee.position || 'Darbuotojas'}{employee.contractNumber ? ` · Sutartis ${employee.contractNumber}` : ''}</p></div><span className={`text-xs font-semibold ${hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'text-emerald-700' : 'text-amber-700'}`}>{hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'AAP kortelė pasirašyta' : 'Laukia darbuotojo parašo'}</span><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(reportAapResource, { employeeId: employee.id })}><Eye size={15} />Peržiūrėti</button></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">{reportAapEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'AAP kortelės dar nepriskirtos darbuotojams.'}</p>}
                 {filteredReportAapEmployees.length > reportAapPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentReportAapPage - 1) * reportAapPageSize + 1}–{Math.min(currentReportAapPage * reportAapPageSize, filteredReportAapEmployees.length)} iš {filteredReportAapEmployees.length}</p><nav className="flex items-center gap-2" aria-label="AAP darbuotojų puslapiavimas"><button type="button" aria-label="Ankstesnis AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage <= 1} onClick={() => setReportAapPage(Math.max(1, currentReportAapPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentReportAapPage} / {reportAapPageCount}</span><button type="button" aria-label="Kitas AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage >= reportAapPageCount} onClick={() => setReportAapPage(Math.min(reportAapPageCount, currentReportAapPage + 1))}><ChevronRight size={17} /></button></nav></div>}
               </Panel></section>}
               {reportTypeFilter !== 'Testas' && <div className="space-y-6">{reportProtocolGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div></section>)}</div>}
@@ -4931,7 +4913,10 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
-  const rowCount = resource.templateKind === 'fire-safety-journal' ? 1 : employees.length;
+  const configuredRowCount = Number(resource.defaultSettings?.rowCount) || rows.length;
+  const rowCount = resource.templateKind === 'fire-safety-journal'
+    ? 1
+    : Math.max(configuredRowCount, employees.length);
   const tableBody = table?.tBodies[0];
   if (tableBody && rows[0]) {
     while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
@@ -5399,12 +5384,15 @@ function numberDocumentSequenceColumn(html) {
   const heading = table.tHead?.rows[0]?.cells[0];
   if (heading) heading.textContent = 'Eil. Nr.';
   [...table.tBodies].forEach((body) => {
+    let sequenceNumber = 0;
     [...body.rows].forEach((row) => {
       const hasRecord = [...row.cells].slice(1).some((cell) => cell.textContent.trim() || cell.querySelector('img, svg, canvas'));
-      if (!hasRecord) row.remove();
-    });
-    [...body.rows].forEach((row, index) => {
-      if (row.cells[0] && !row.cells[0].textContent.trim()) row.cells[0].textContent = String(index + 1);
+      if (!hasRecord || !row.cells[0]) {
+        if (row.cells[0]) row.cells[0].textContent = '';
+        return;
+      }
+      sequenceNumber += 1;
+      if (!row.cells[0].textContent.trim()) row.cells[0].textContent = String(sequenceNumber);
     });
   });
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
@@ -5507,7 +5495,7 @@ function ReportTestCard({ resource, attemptCount, passedCount, onSelect }) {
 function ReportResourceCard({ resource, employeeCount, signatureCount, onPreview, onDownload }) {
   return <article className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
     {resource.image ? <img src={resource.image} alt="" className="h-36 w-full object-cover" /> : <div className="grid h-36 place-items-center bg-slate-100 text-slate-500"><BookOpen size={28} /></div>}
-    <div className="flex flex-1 flex-col gap-3 p-4"><div><p className="text-xs font-semibold text-emerald-800">{resource.category} · {resource.type}</p><h3 className="mt-2 font-bold leading-snug">{resource.title}</h3></div><p className="text-xs text-slate-500">{employeeCount} darbuotojų · {signatureCount} parašų įrašų</p><div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-3"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={onPreview}><Eye size={15} className="mr-1 inline" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={onDownload}><Download size={15} />Atsisiųsti PDF</button></div></div>
+    <div className="flex flex-1 flex-col gap-3 p-4"><div><p className="text-xs font-semibold text-emerald-800">{resource.category} · {resource.type}</p><h3 className="mt-2 font-bold leading-snug">{resource.title}</h3></div><p className="text-xs text-slate-500">{employeeCount} darbuotojų · {signatureCount} parašų įrašų</p><div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-3"><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={onPreview}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={onDownload}><Download size={15} />Atsisiųsti PDF</button></div></div>
   </article>;
 }
 
