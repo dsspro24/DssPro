@@ -559,7 +559,7 @@ const initialData = {
     { id: manualHandlingTestId, title: 'Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programos testas', type: 'Testas', category: 'Krovinių kėlimas rankomis', image: '/courses/construction-ppe.jpg', duration: '19 klausimų', html: '<h2>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programa</h2><p>Atsakykite į visus 19 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: manualHandlingQuestions },
     { id: knowledgeAssessmentProtocolId, title: 'Mokymo programos žinių patikrinimo protokolas', type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true },
     ...defaultCompanyProtocolTemplates.map(({ id, title, testId }) => ({ id, title, type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true })),
-    { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 20, populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '' } },
+    { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 20, populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 15, populateEmployees: true, regulationNumber: '' } },
     { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 20, populateEmployees: true, date: '', instructorName: '' } },
@@ -5427,11 +5427,26 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   }
   if (resource.type === 'Testas' && resource.questions?.length) return buildQuizPreviewHtml(resource);
   if (resource.id !== 'res-aap') {
+    const configuredDate = resource.defaultSettings?.date;
+    const parsedDocumentDate = typeof configuredDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(configuredDate)
+      ? (() => {
+        const [year, month, day] = configuredDate.split('-').map(Number);
+        const parsed = new Date(year, month - 1, day);
+        return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day
+          ? parsed
+          : null;
+      })()
+      : null;
+    const documentDate = resource.templateKind === 'medical-examination-schedule'
+      ? parsedDocumentDate
+        ? new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: 'long', day: 'numeric' }).format(parsedDocumentDate)
+        : '____ m. ____________ d.'
+      : `${new Date().getFullYear()} m. ____________________ d.`;
     const values = {
       COMPANY_NAME: escapeHtml(org?.name ?? ''),
       COMPANY_CODE: escapeHtml(org?.companyCode ?? ''),
       DIRECTOR_NAME: escapeHtml(resource.defaultSettings?.directorName ?? org?.manager ?? ''),
-      DOCUMENT_DATE: `${new Date().getFullYear()} m. ____________________ d.`,
+      DOCUMENT_DATE: escapeHtml(documentDate),
       PROTOCOL_TITLE: escapeHtml(resource.title ?? ''),
       PROTOCOL_DATE: escapeHtml(resource.protocolDateText ?? ''),
       PROTOCOL_NUMBER: escapeHtml(resource.protocolNumber ?? ''),
