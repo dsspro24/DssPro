@@ -2554,22 +2554,35 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const employeeNames = records.map((record) => record.employee.name).join(', ');
     if (!window.confirm(`Ištrinti ${records.length === 1 ? 'archyvo įrašą' : `visus ${records.length} archyvo įrašus`} įmonėje „${organization.name}“? Bus pašalinti darbuotojų duomenys, parašai, testų rezultatai ir protokolų priskyrimai. Tai negrįžtama.`)) return;
 
+    const { data: signaturePaths, error: pathsError } = await supabase.rpc('creator_get_archived_employee_signature_paths', {
+      input_organization_id: organization.id,
+      input_archive_ids: archiveIds,
+    });
+    if (pathsError) {
+      setNotice(`Archyvo parašų failų sąrašo gauti nepavyko: ${pathsError.message}`);
+      return;
+    }
+
+    const paths = [...new Set(signaturePaths ?? [])];
+    for (let index = 0; index < paths.length; index += 100) {
+      const { error: storageError } = await supabase.storage.from('signature-assets').remove(paths.slice(index, index + 100));
+      if (storageError) {
+        setNotice(`Archyvo parašų failų pašalinti nepavyko; darbuotojų duomenys nebuvo ištrinti. Pabandykite dar kartą: ${storageError.message}`);
+        return;
+      }
+    }
+
     const { data: deletedCount, error } = await supabase.rpc('creator_delete_archived_employees', {
       input_organization_id: organization.id,
       input_archive_ids: archiveIds,
     });
     if (error) {
-      setNotice(`Archyvo ištrinti nepavyko: ${error.message}`);
+      setNotice(`Parašų failai pašalinti, tačiau archyvo duomenų ištrinti nepavyko. Pabandykite dar kartą: ${error.message}`);
       return;
     }
 
     const employeeIds = new Set(records.map((record) => record.employee.id));
     const recordIds = new Set(records.map((record) => record.id));
-    const signaturePaths = [...new Set(records.flatMap((record) => record.signatures ?? []).map((signature) => signature.signaturePath).filter(Boolean))];
-    if (signaturePaths.length) {
-      const { error: storageError } = await supabase.storage.from('signature-assets').remove(signaturePaths);
-      if (storageError) setNotice(`Archyvo įrašai ištrinti, bet parašų failus pašalinti nepavyko: ${storageError.message}`);
-    }
     setData((current) => ({
       ...current,
       archivedEmployees: (current.archivedEmployees ?? []).filter((record) => !recordIds.has(record.id)),
