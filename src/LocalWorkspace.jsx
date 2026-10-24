@@ -2164,6 +2164,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setResourceSettingsDraft({
       ...defaults,
       ...saved,
+      ...(resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule'
+        ? { date: saved.date ?? defaults.date ?? '' }
+        : {}),
       validityMonths: saved.validityMonths ?? defaults.validityMonths ?? resource.validityMonths ?? 12,
       requiredSigners: resource.templateKind === 'knowledge-assessment-protocol'
         ? [...new Set(defaultRequiredSigners)]
@@ -5731,6 +5734,8 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     validityMonths: 'Galiojimas (mėnesiais)',
   };
   const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount'].includes(key) && typeof value !== 'boolean');
+  if ((resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule')
+    && !textFields.some(([key]) => key === 'date')) textFields.push(['date', '']);
   const booleanFields = Object.entries(settings).filter(([, value]) => typeof value === 'boolean');
 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div><fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset><div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
