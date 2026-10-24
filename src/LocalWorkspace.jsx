@@ -96,18 +96,6 @@ function printPdfHtml(html, title) {
   });
 }
 
-function createArchivePdfHtml(element) {
-  const clone = element.cloneNode(true);
-  clone.classList.add('archive-print-target');
-  clone.querySelectorAll('.archive-print-controls').forEach((control) => control.remove());
-  clone.querySelectorAll('.archive-person-print-title').forEach((title) => { title.style.display = 'block'; });
-  const styles = [...document.head.querySelectorAll('style, link[rel="stylesheet"]')]
-    .map((style) => style.outerHTML)
-    .join('\n');
-  const printOverrides = '<style>body{margin:0;background:#fff}.archive-print-target{position:relative!important;inset:auto!important;display:block!important;width:100%!important;max-width:none!important;max-height:none!important;height:auto!important;overflow:visible!important;border:0!important;background:#fff!important;box-shadow:none!important;color:#111827!important;padding:0!important}.archive-print-target *{visibility:visible!important}.archive-person-print-title{display:block!important}</style>';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Darbuotojų archyvas</title>${styles}${printOverrides}</head><body>${clone.outerHTML}</body></html>`;
-}
-
 function resourceForDatabase(resource) {
   const databaseResource = { ...resource };
   delete databaseResource.image;
@@ -850,7 +838,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [archiveDetailRecordState, setArchiveDetailRecord] = useState(null);
   const [archiveDetailsLoading, setArchiveDetailsLoading] = useState(false);
   const [archiveDetailsError, setArchiveDetailsError] = useState('');
-  const [archivePrintMode, setArchivePrintMode] = useState(null);
+  const [archivePdfLoading, setArchivePdfLoading] = useState(false);
   const [archiveSearch, setArchiveSearch] = useState('');
   const [archivePage, setArchivePage] = useState(1);
   const [archivePageData, setArchivePageData] = useState({ organizationId: '', search: '', page: 0, records: [], totalCount: 0, loading: false, error: '' });
@@ -911,7 +899,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const employeeAssignmentRpcInFlightRef = useRef(false);
   const commissionRevocationInFlightRef = useRef(new Set());
   const previewFrameRef = useRef(null);
-  const archiveDownloadModeRef = useRef(null);
   const resourceHtmlCacheRef = useRef(new Map());
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
@@ -1133,25 +1120,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       frame.closest('section')?.classList.toggle('worker-signed-preview', Boolean(previewResource?.workerSignedPreview));
     }
   }, [previewResource, userRole]);
-
-  useEffect(() => {
-    if (!archivePrintMode) return undefined;
-    if (archiveDownloadModeRef.current === archivePrintMode) return undefined;
-    archiveDownloadModeRef.current = archivePrintMode;
-    const target = document.querySelector('.archive-print-target');
-    if (!target) {
-      archiveDownloadModeRef.current = null;
-      return undefined;
-    }
-    const title = target.querySelector('h1, h2')?.textContent?.trim() || 'Darbuotoju_archyvas';
-    printPdfHtml(createArchivePdfHtml(target), title)
-      .catch((error) => setNotice(`Archyvo PDF atsisiųsti nepavyko: ${error.message}`))
-      .finally(() => {
-        archiveDownloadModeRef.current = null;
-        setArchivePrintMode(null);
-      });
-    return undefined;
-  }, [archivePrintMode]);
 
   useEffect(() => {
     if (!cloudMode || !selectedOrgId || !canManageSelectedWorkspace) return undefined;
@@ -4003,6 +3971,89 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       && batch.employeeIds.includes(signature.employeeId));
     openResourcePreview(resource, { employeeId: signature.employeeId, previewSignature: signature, protocolBatchId: protocolBatch?.id, archivedRecord: record });
   };
+  const downloadArchivedEmployeeDocuments = async (record) => {
+    if (archivePdfLoading) return;
+    setArchivePdfLoading(true);
+    try {
+      const workerSignatures = record.signatures.filter((signature) => signature.role === 'Darbuotojas'
+        && signature.employeeId === record.employee.id);
+      const signedResourceIds = [...new Set(workerSignatures.map((signature) => signature.resourceId))];
+      const archivedResources = [...(record.resources ?? []), ...data.resources]
+        .filter((resource, index, resources) => resources.findIndex((candidate) => candidate.id === resource.id) === index);
+      const resourcesById = new Map(archivedResources.map((resource) => [resource.id, resource]));
+      const signedResources = signedResourceIds
+        .map((resourceId) => resourcesById.get(resourceId))
+        .filter(Boolean)
+        .sort((left, right) => {
+          const signedAt = (resourceId) => Math.min(...workerSignatures
+            .filter((signature) => signature.resourceId === resourceId)
+            .map((signature) => new Date(signature.signedAt).getTime())
+            .filter(Number.isFinite));
+          return signedAt(left.id) - signedAt(right.id);
+        });
+      if (!signedResources.length) {
+        setNotice('Šio darbuotojo archyve nėra pasirašytų dokumentų, kuriuos būtų galima įtraukti į PDF.');
+        return;
+      }
+
+      const signatures = await hydrateSignatureImages(record.signatures);
+      const employee = record.employee;
+      const organization = { ...currentOrg, ...record.organization };
+      const documentParts = [];
+      const documentStyles = new Set();
+      for (const resource of signedResources) {
+        const loadedResource = await getResourceWithHtml(resource, { useCache: false });
+        const companySettings = organization?.resourceSettings?.[resource.id] ?? {};
+        const configuredResource = {
+          ...loadedResource,
+          defaultSettings: { ...loadedResource.defaultSettings, ...companySettings },
+          requiredSigners: companySettings.requiredSigners ?? loadedResource.requiredSigners,
+          validityMonths: companySettings.validityMonths ?? loadedResource.validityMonths,
+        };
+        const employeeForDocument = {
+          ...employee,
+          sequenceNumber: getEmployeeResourceSequenceNumber(employee, configuredResource, [employee]),
+        };
+        const documentResource = {
+          ...configuredResource,
+          templateOnly: false,
+          previewEmployees: [employeeForDocument],
+          previewResources: archivedResources,
+          previewSpecialists: data.specialists,
+          previewCommissionAssignments: data.commissionAssignments ?? [],
+          previewProtocolCommissionSignatures: data.protocolCommissionSignatures ?? [],
+          protocolDateText: '',
+          protocolNumber: '',
+        };
+        let html;
+        if (configuredResource.type === 'Testas') {
+          const result = (employee.testResults ?? [])
+            .filter((item) => item.resourceId === configuredResource.id)
+            .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
+          html = `<!doctype html><html lang="lt"><head><meta charset="utf-8"><title>${escapeHtml(configuredResource.title)}</title><style>body{font:14px/1.5 Arial,sans-serif;color:#17202a;padding:20px}.test-result{max-width:760px;margin:0 auto;border:1px solid #cbd5e1;padding:28px}h1{text-align:center;font-size:20px}.result{margin-top:24px;padding:18px;background:#f1f5f9} .signature-audit{max-width:760px;margin:24px auto}</style></head><body><main class="test-result"><h1>${escapeHtml(configuredResource.title)}</h1><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><div class="result">${result ? `<p><strong>Rezultatas:</strong> ${Number(result.score) || 0}%</p><p><strong>Įvertinimas:</strong> ${result.passed ? 'Išlaikė' : 'Neišlaikė'}</p><p><strong>Atlikta:</strong> ${escapeHtml(new Date(result.completedAt).toLocaleString('lt-LT'))}</p>` : '<p>Testo rezultato archyve nėra.</p>'}</div></main></body></html>`;
+          html = appendSignatureAudit(html, { ...documentResource, previewEmployees: [employeeForDocument] }, employeeForDocument, organization, signatures, data.specialists);
+        } else {
+          html = buildResourcePreviewHtml(documentResource, employeeForDocument, organization, signatures, archivedResources);
+        }
+        html = addRecordPageBreaks(prepareResourcePrintHtml(html, configuredResource.title));
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        [...parsed.head.querySelectorAll('style, link[rel="stylesheet"]')].forEach((style) => documentStyles.add(style.outerHTML));
+        documentParts.push(`<section class="archive-export-document">${parsed.body.innerHTML}</section>`);
+      }
+
+      if (!documentParts.length) {
+        setNotice('Pasirašytų dokumentų PDF paruošti nepavyko: archyve nerasti jų šablonai.');
+        return;
+      }
+      const archiveDate = record.archivedAt ? new Date(record.archivedAt).toLocaleDateString('lt-LT') : '';
+      const html = `<!doctype html><html lang="lt"><head><meta charset="utf-8"><title>${escapeHtml(employee.name)} · pasirašyti dokumentai</title>${[...documentStyles].join('\n')}<style>*{box-sizing:border-box}.archive-export-cover{min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;page-break-after:always;break-after:page;font:14px/1.5 Arial,sans-serif;color:#17202a}.archive-export-cover h1{font-size:26px}.archive-export-cover p{margin:5px}.archive-export-document{break-before:page;page-break-before:always}.archive-export-document:first-of-type{break-before:auto;page-break-before:auto}@media print{body{margin:0;background:#fff}}</style></head><body><header class="archive-export-cover"><h1>${escapeHtml(employee.name)}</h1><p>${escapeHtml(organization?.name ?? '')}</p><p>${escapeHtml(employee.position || 'Darbuotojas')}${employee.contractNumber ? ` · Sutarties Nr. ${escapeHtml(employee.contractNumber)}` : ''}</p><p>Archyvuota: ${escapeHtml(archiveDate)}</p><p>Pasirašytų dokumentų: ${documentParts.length}</p></header>${documentParts.join('\n')}</body></html>`;
+      await printPdfHtml(html, `${employee.name} - pasirašyti dokumentai`);
+    } catch (error) {
+      setNotice(`Darbuotojo pasirašytų dokumentų PDF paruošti nepavyko: ${error.message}`);
+    } finally {
+      setArchivePdfLoading(false);
+    }
+  };
   const openArchiveDetails = (recordId) => {
     setArchiveDetailRecord(null);
     setArchiveDetailsError('');
@@ -4612,7 +4663,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {filteredArchivedEmployees > archivePageSize && <div className="archive-print-controls flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">Rodoma {(Math.min(archivePage, archivePageCount) - 1) * archivePageSize + 1}–{Math.min(archivePage, archivePageCount) * archivePageSize} iš {filteredArchivedEmployees}</p><div className="flex items-center gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={archivePage <= 1 || archivePageData.loading} onClick={() => setArchivePage((page) => Math.max(1, page - 1))}>Ankstesnis</button><span className="text-sm text-slate-500">{Math.min(archivePage, archivePageCount)} / {archivePageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={archivePage >= archivePageCount || archivePageData.loading} onClick={() => setArchivePage((page) => Math.min(archivePageCount, page + 1))}>Kitas</button></div></div>}
           </section>}
 
-          {archiveDetailsId && <div className={`fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 ${archivePrintMode === `record:${archiveDetailsId}` ? 'archive-print-target' : 'archive-print-controls'}`}><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div>{archiveDetailRecord && <><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></>}</div><div className="flex flex-wrap justify-end gap-2">{archiveDetailRecord && canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchiveDetailRecord(null); setArchivePrintMode(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}{archiveDetailRecord && <button type="button" className={buttonClass} onClick={() => setArchivePrintMode(`record:${archiveDetailRecord.id}`)}><Download size={16} />Atsisiųsti PDF</button>}{creatorReadOnlyPreview && archiveDetailRecord && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => { setArchiveDetailsId(null); setArchiveDetailRecord(null); setArchiveDetailsError(''); }}><X size={18} /></button></div></div>{archiveDetailsLoading && <p role="status" className="py-8 text-center text-sm text-slate-600">Įkeliamas darbuotojo archyvas…</p>}{archiveDetailsError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Darbuotojo archyvo įkelti nepavyko: {archiveDetailsError}</p>}{!archiveDetailsLoading && !archiveDetailsError && !archiveDetailRecord && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Šio darbuotojo archyvo įrašo rasti nepavyko.</p>}{archiveDetailRecord && <ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} onPreviewSignature={(signature) => previewArchivedSignature(archiveDetailRecord, signature)} />}</section></div>}
+          {archiveDetailsId && <div className="archive-print-controls fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div>{archiveDetailRecord && <><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></>}</div><div className="flex flex-wrap justify-end gap-2">{archiveDetailRecord && canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchiveDetailRecord(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}{archiveDetailRecord && <button type="button" className={buttonClass} disabled={archivePdfLoading || archiveDetailsLoading} onClick={() => downloadArchivedEmployeeDocuments(archiveDetailRecord)}><Download size={16} />{archivePdfLoading ? 'Ruošiamas PDF…' : 'Atsisiųsti pasirašytus dokumentus PDF'}</button>}{creatorReadOnlyPreview && archiveDetailRecord && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => { setArchiveDetailsId(null); setArchiveDetailRecord(null); setArchiveDetailsError(''); }}><X size={18} /></button></div></div>{archiveDetailsLoading && <p role="status" className="py-8 text-center text-sm text-slate-600">Įkeliamas darbuotojo archyvas…</p>}{archiveDetailsError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Darbuotojo archyvo įkelti nepavyko: {archiveDetailsError}</p>}{!archiveDetailsLoading && !archiveDetailsError && !archiveDetailRecord && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Šio darbuotojo archyvo įrašo rasti nepavyko.</p>}{archiveDetailRecord && <ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} onPreviewSignature={(signature) => previewArchivedSignature(archiveDetailRecord, signature)} />}</section></div>}
 
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
