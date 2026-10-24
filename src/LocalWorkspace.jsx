@@ -792,7 +792,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [archivePageData, setArchivePageData] = useState({ organizationId: '', search: '', page: 0, records: [], totalCount: 0, loading: false, error: '' });
   const [reportArchiveData, setReportArchiveData] = useState({ organizationId: '', employees: [], loading: false, error: '' });
   const [rehireArchiveLookup, setRehireArchiveLookup] = useState({ organizationId: '', email: '', status: 'idle', record: null, error: '' });
-  const [reportTypeFilter, setReportTypeFilter] = useState('visos');
+  const [reportTypeFilter, setReportTypeFilter] = useState('Žurnalas');
   const [reportAapSearch, setReportAapSearch] = useState('');
   const [reportAapPage, setReportAapPage] = useState(1);
   const [protocolSearch, setProtocolSearch] = useState('');
@@ -1359,9 +1359,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   [cloudMode, creatorReadOnlyPreview, reportArchiveData, currentOrg?.id, archivedOrgEmployees]);
   const reportEmployees = useMemo(() => [...orgEmployees, ...reportArchivedEmployees], [orgEmployees, reportArchivedEmployees]);
   const selectedOrgResources = useMemo(() => data.resources.filter((resource) => currentOrg?.resources.includes(resource.id)), [data.resources, currentOrg?.resources]);
-  const reportSignatures = useMemo(() => data.signatures.filter((signature) => signature.orgId === currentOrg?.id && currentOrg?.resources.includes(signature.resourceId) && (reportTypeFilter === 'visos' || data.resources.find((resource) => resource.id === signature.resourceId)?.type === reportTypeFilter)), [data.signatures, currentOrg?.id, currentOrg?.resources, reportTypeFilter, data.resources]);
+  const reportSignatures = useMemo(() => activeTab === 'ataskaitos'
+    ? data.signatures.filter((signature) => signature.orgId === currentOrg?.id && currentOrg?.resources.includes(signature.resourceId) && data.resources.find((resource) => resource.id === signature.resourceId)?.type === reportTypeFilter)
+    : [], [activeTab, data.signatures, currentOrg?.id, currentOrg?.resources, reportTypeFilter, data.resources]);
   const reportResourceGroups = ['Žurnalas', 'Kortelė', 'Protokolas']
-    .filter((type) => reportTypeFilter === 'visos' || reportTypeFilter === type)
+    .filter((type) => reportTypeFilter === type)
     .map((type) => ({
       type,
       title: resourceTypeDisplayNames[type],
@@ -1372,7 +1374,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const reportJournalGroups = reportResourceGroups.filter((group) => group.type === 'Žurnalas');
   const reportCardGroups = reportResourceGroups.filter((group) => group.type === 'Kortelė');
   const reportAapResource = selectedOrgResources.find((resource) => resource.id === 'res-aap');
-  const reportAapEmployees = useMemo(() => reportEmployees.filter((employee) => employee.resourceIds?.includes('res-aap')), [reportEmployees]);
+  const reportAapEmployees = useMemo(() => activeTab === 'ataskaitos' && reportTypeFilter === 'Kortelė'
+    ? reportEmployees.filter((employee) => employee.resourceIds?.includes('res-aap'))
+    : [], [activeTab, reportEmployees, reportTypeFilter]);
   const reportAapSearchIndex = useMemo(() => reportAapEmployees
     .map((employee) => ({
       employee,
@@ -1391,7 +1395,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     .slice((currentReportAapPage - 1) * reportAapPageSize, currentReportAapPage * reportAapPageSize),
   [filteredReportAapEmployees, currentReportAapPage]);
   const protocolResources = selectedOrgResources.filter((resource) => resource.templateKind === 'knowledge-assessment-protocol');
-  const visibleProtocolBatches = (data.protocolBatches ?? [])
+  const visibleProtocolBatches = activeTab === 'ataskaitos' && reportTypeFilter === 'Protokolas' ? (data.protocolBatches ?? [])
     .filter((batch) => batch.orgId === currentOrg?.id)
     .map((batch) => ({
       batch,
@@ -1399,7 +1403,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       employees: (batch.employeeIds ?? []).map((employeeId) => reportEmployees.find((employee) => employee.id === employeeId)).filter(Boolean),
     }))
     .filter(({ batch, resource, employees }) => {
-      if (!resource || (reportTypeFilter !== 'visos' && reportTypeFilter !== 'Protokolas')) return false;
+      if (!resource) return false;
       const ready = isProtocolBatchReady(batch, employees, resource);
       const status = ready ? 'ready' : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'collecting' : 'waiting';
       const query = `${resource.title} ${batch.periodStart} ${batch.periodEnd} ${employees.map((employee) => employee.name).join(' ')}`.toLocaleLowerCase('lt');
@@ -1407,12 +1411,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         && (protocolStatusFilter === 'visos' || status === protocolStatusFilter)
         && query.includes(protocolSearch.trim().toLocaleLowerCase('lt'));
     })
-    .sort((left, right) => (right.batch.periodStart ?? '').localeCompare(left.batch.periodStart ?? '') || right.batch.number - left.batch.number);
+    .sort((left, right) => (right.batch.periodStart ?? '').localeCompare(left.batch.periodStart ?? '') || right.batch.number - left.batch.number) : [];
   const protocolPageSize = 10;
   const protocolPageCount = Math.max(1, Math.ceil(visibleProtocolBatches.length / protocolPageSize));
   const currentProtocolPage = Math.min(protocolPage, protocolPageCount);
   const paginatedProtocolBatches = visibleProtocolBatches.slice((currentProtocolPage - 1) * protocolPageSize, currentProtocolPage * protocolPageSize);
-  const protocolRegistryPanel = (reportTypeFilter === 'visos' || reportTypeFilter === 'Protokolas') ? <Panel title="Periodinių protokolų registras">
+  const protocolRegistryPanel = reportTypeFilter === 'Protokolas' ? <Panel title="Periodinių protokolų registras">
     <div className="mb-4 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1.5fr)_minmax(14rem,1fr)_minmax(12rem,0.8fr)_auto]">
       <label className="block text-sm font-medium">Ieškoti darbuotojo<div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={protocolSearch} onChange={(event) => { setProtocolSearch(event.target.value); setProtocolPage(1); }} placeholder="Vardas, pavardė" /></div></label>
       <label className="text-sm font-medium">Mokymo programa<select className={`${inputClass} mt-1`} value={protocolProgramFilter} onChange={(event) => { setProtocolProgramFilter(event.target.value); setProtocolPage(1); }}><option value="visos">Visos programos</option>{protocolResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label>
@@ -1424,16 +1428,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const status = ready ? 'Paruoštas'
         : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas'
           : resource.relatedTestId ? 'Laukia testo' : 'Laukia datos';
-      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <div className="flex flex-wrap gap-2"><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} disabled={!ready} onClick={() => openResourcePreview(resource, { autoPrint: true, protocolBatchId: batch.id })}><Download size={15} />PDF</button></div>];
+      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} />Peržiūrėti</button>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
-    if (activeTab !== 'ataskaitos') return [];
+    if (activeTab !== 'ataskaitos' || reportTypeFilter !== 'Testas') return [];
     return reportEmployees.flatMap((employee) => (employee.testResults ?? []).map((result) => ({ employee, result, resource: data.resources.find((resource) => resource.id === result.resourceId) })))
     .filter(({ employee, resource }) => resource?.type === 'Testas' && currentOrg?.resources.includes(resource.id) && employee.resourceIds?.includes(resource.id))
     .sort((left, right) => new Date(right.result.completedAt) - new Date(left.result.completedAt));
-  }, [activeTab, reportEmployees, data.resources, currentOrg?.resources]);
-  const reportTestResources = selectedOrgResources.filter((resource) => resource.type === 'Testas' && (reportTypeFilter === 'visos' || reportTypeFilter === 'Testas'));
+  }, [activeTab, reportTypeFilter, reportEmployees, data.resources, currentOrg?.resources]);
+  const reportTestResources = reportTypeFilter === 'Testas' ? selectedOrgResources.filter((resource) => resource.type === 'Testas') : [];
   const reportTestTarget = reportTestResources.find((resource) => resource.id === reportTestTargetId);
   const selectedTestResults = reportTestResults.filter(({ resource }) => resource.id === reportTestTarget?.id);
   const employeeDetails = data.employees.find((employee) => employee.id === employeeDetailsId);
@@ -4434,22 +4438,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           /></Panel></section>}
 
           {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
-            <div className="flex flex-wrap items-end justify-between gap-3"><PageTitle title="Ataskaitos" subtitle="Dokumentų eiga, darbuotojų testų rezultatai ir užfiksuoti parašai." /><div className="flex flex-wrap items-end gap-3"><label className="text-sm font-medium">Turinio tipas<select className={`${inputClass} mt-1 min-w-48`} value={reportTypeFilter} onChange={(event) => { setReportTypeFilter(event.target.value); setReportTestTargetId(null); }}><option value="visos">Visi turinio tipai</option>{data.resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeDisplayNames[type] ?? type}</option>)}</select></label><button className={`${buttonClass} print:hidden`} onClick={() => window.print()}><FileText size={16} />Spausdinti ataskaitą</button></div></div>
+            <div className="flex flex-wrap items-end justify-between gap-3"><PageTitle title="Ataskaitos" subtitle="Dokumentų eiga, darbuotojų testų rezultatai ir užfiksuoti parašai." /></div>
+            <ReportCategoryFilters resources={selectedOrgResources} selectedType={reportTypeFilter} onTypeChange={(type) => { setReportTypeFilter(type); setReportTestTargetId(null); }} />
             {cloudMode && !creatorReadOnlyPreview && reportArchiveData.organizationId !== currentOrg?.id && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Įkeliami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && !creatorReadOnlyPreview && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.loading && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Atnaujinami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && !creatorReadOnlyPreview && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Archyvuotų darbuotojų ataskaitų duomenų įkelti nepavyko: {reportArchiveData.error}</p>}
             {reportTestTarget ? <section className="space-y-3"><button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => setReportTestTargetId(null)}><ChevronLeft size={17} />Grįžti į testus</button><Panel title={reportTestTarget.title}><DataTable headers={['Vardas', 'Pavardė', 'Rezultatas', 'Išlaikė', 'Data ir laikas', 'IP adresas']} rows={selectedTestResults.map(({ employee, result }) => { const [firstName, ...lastNameParts] = employee.name.trim().split(/\s+/); return [firstName ?? '', lastNameParts.join(' '), `${result.score}%`, result.passed ? 'Taip' : 'Ne', new Date(result.completedAt).toLocaleString('lt-LT'), result.ip ?? 'Nenurodytas']; })} empty="Darbuotojai šio testo dar nesprendė." /></Panel></section> : <>
-              {reportTypeFilter !== 'Testas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
+              {reportTypeFilter === 'Žurnalas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
               {reportTestResources.length > 0 && <section className="space-y-3"><div><h2 className="font-bold">Testai</h2><p className="mt-1 text-sm text-slate-500">Pasirinkite testą ir peržiūrėkite darbuotojų rezultatus.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{reportTestResources.map((resource) => { const attempts = reportTestResults.filter((entry) => entry.resource.id === resource.id); return <ReportTestCard key={resource.id} resource={resource} attemptCount={attempts.length} passedCount={attempts.filter(({ result }) => result.passed).length} onSelect={() => setReportTestTargetId(resource.id)} />; })}</div></section>}
               {reportTypeFilter === 'Testas' && reportTestResources.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Įmonė testų dar nepriskyrė.</p>}
-              {reportTypeFilter !== 'Testas' && <div className="space-y-6">{reportCardGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
-              {(reportTypeFilter === 'visos' || reportTypeFilter === 'Kortelė') && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Ieškokite darbuotojo ir peržiūrėkite jo AAP kortelę. Atsisiuntimas pasiekiamas atidarius kortelės peržiūrą.</p></div><Panel title="AAP pagal darbuotoją">
+              {reportTypeFilter === 'Kortelė' && <div className="space-y-6">{reportCardGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
+              {reportTypeFilter === 'Kortelė' && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Ieškokite darbuotojo ir peržiūrėkite jo AAP kortelę. Atsisiuntimas pasiekiamas atidarius kortelės peržiūrą.</p></div><Panel title="AAP pagal darbuotoją">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="block w-full max-w-xl text-sm font-medium">Ieškoti darbuotojo<div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={reportAapSearch} onChange={(event) => { setReportAapSearch(event.target.value); setReportAapPage(1); }} placeholder="Vardas, pavardė, pareigos arba sutarties Nr." /></div></label>{reportAapSearch && <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => { setReportAapSearch(''); setReportAapPage(1); }}>Išvalyti paiešką</button>}</div>
                 <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm text-slate-500"><span>Darbuotojai: <strong className="text-slate-800">{filteredReportAapEmployees.length}</strong></span></div>
                 {filteredReportAapEmployees.length ? <div className="divide-y divide-slate-100">{paginatedReportAapEmployees.map((employee) => <div key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-48 flex-1"><p className="font-semibold text-slate-900">{employee.name}</p><p className="mt-0.5 text-sm text-slate-500">{employee.position || 'Darbuotojas'}{employee.contractNumber ? ` · Sutartis ${employee.contractNumber}` : ''}</p></div><span className={`text-xs font-semibold ${hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'text-emerald-700' : 'text-amber-700'}`}>{hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'AAP kortelė pasirašyta' : 'Laukia darbuotojo parašo'}</span><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(reportAapResource, { employeeId: employee.id })}><Eye size={15} />Peržiūrėti</button></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">{reportAapEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'AAP kortelės dar nepriskirtos darbuotojams.'}</p>}
                 {filteredReportAapEmployees.length > reportAapPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentReportAapPage - 1) * reportAapPageSize + 1}–{Math.min(currentReportAapPage * reportAapPageSize, filteredReportAapEmployees.length)} iš {filteredReportAapEmployees.length}</p><nav className="flex items-center gap-2" aria-label="AAP darbuotojų puslapiavimas"><button type="button" aria-label="Ankstesnis AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage <= 1} onClick={() => setReportAapPage(Math.max(1, currentReportAapPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentReportAapPage} / {reportAapPageCount}</span><button type="button" aria-label="Kitas AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage >= reportAapPageCount} onClick={() => setReportAapPage(Math.min(reportAapPageCount, currentReportAapPage + 1))}><ChevronRight size={17} /></button></nav></div>}
               </Panel></section>}
-              {reportTypeFilter !== 'Testas' && <div className="space-y-6">{reportProtocolGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div></section>)}</div>}
+              {reportTypeFilter === 'Protokolas' && <div className="space-y-6">{reportProtocolGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} />)}</div></section>)}</div>}
             </>}
             {!reportTestTarget && protocolRegistryPanel}
           </section>}
@@ -5489,6 +5494,24 @@ function LibraryFilters({ resources, resourceTypes = defaultResourceTypes, selec
   </div>;
 }
 
+function ReportCategoryFilters({ resources, selectedType, onTypeChange }) {
+  const categories = [
+    { value: 'Žurnalas', label: 'Žurnalai' },
+    { value: 'Testas', label: 'Testai' },
+    { value: 'Kortelė', label: 'Kortelės' },
+    { value: 'Protokolas', label: 'Protokolai' },
+  ];
+  return <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Ataskaitų kategorijos">
+    {categories.map(({ value, label }) => {
+      const count = resources.filter((resource) => resource.type === value).length;
+      const isSelected = selectedType === value;
+      return <button key={value} type="button" aria-pressed={isSelected} onClick={() => onTypeChange(value)} className={`inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${isSelected ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
+        {label}<span className={`text-xs tabular-nums ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>{count}</span>
+      </button>;
+    })}
+  </div>;
+}
+
 function ReportTestCard({ resource, attemptCount, passedCount, onSelect }) {
   return <article className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
     {resource.image && <img src={resource.image} alt="" className="h-32 w-full object-cover" />}
@@ -5499,7 +5522,7 @@ function ReportTestCard({ resource, attemptCount, passedCount, onSelect }) {
 function ReportResourceCard({ resource, employeeCount, signatureCount, onPreview, onDownload }) {
   return <article className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
     {resource.image ? <img src={resource.image} alt="" className="h-36 w-full object-cover" /> : <div className="grid h-36 place-items-center bg-slate-100 text-slate-500"><BookOpen size={28} /></div>}
-    <div className="flex flex-1 flex-col gap-3 p-4"><div><p className="text-xs font-semibold text-emerald-800">{resource.category} · {resource.type}</p><h3 className="mt-2 font-bold leading-snug">{resource.title}</h3></div><p className="text-xs text-slate-500">{employeeCount} darbuotojų · {signatureCount} parašų įrašų</p><div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-3"><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={onPreview}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={onDownload}><Download size={15} />Atsisiųsti PDF</button></div></div>
+    <div className="flex flex-1 flex-col gap-3 p-4"><div><p className="text-xs font-semibold text-emerald-800">{resource.category} · {resource.type}</p><h3 className="mt-2 font-bold leading-snug">{resource.title}</h3></div><p className="text-xs text-slate-500">{employeeCount} darbuotojų · {signatureCount} parašų įrašų</p><div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-3"><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={onPreview}><Eye size={15} />Peržiūrėti</button>{onDownload && <button type="button" className={buttonClass} onClick={onDownload}><Download size={15} />Atsisiųsti PDF</button>}</div></div>
   </article>;
 }
 
