@@ -2670,11 +2670,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
       ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
       : (data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id && item.employee.resourceIds?.includes(resource.id)).map((item) => item.employee);
-    const organizationEmployees = [
-      ...data.employees.filter((item) => item.orgId === currentOrg?.id),
-      ...(data.archivedEmployees ?? []).filter((item) => item.orgId === currentOrg?.id).map((item) => item.employee),
-    ];
-    const employeeSequenceNumbers = new Map(organizationEmployees.map((item, index) => [item.id, index + 1]));
+    const sequenceEmployees = [...new Map([...activeEmployees, ...archivedEmployees].map((person) => [person.id, person])).values()]
+      .map((person, index) => ({ person, index }))
+      .sort((left, right) => {
+        const registrationDate = (person) => new Date(person.invitedAt ?? person.createdAt ?? 0).getTime() || 0;
+        return registrationDate(left.person) - registrationDate(right.person) || left.index - right.index;
+      });
+    const employeeSequenceNumbers = new Map(sequenceEmployees.map(({ person }, index) => [person.id, index + 1]));
     const previewSignatureSource = archivedRecord?.signatures ?? data.signatures;
     const previewSignatureResourceIds = new Set([resource.id]);
     if (resource.templateKind === 'internal-documents-register') {
@@ -2697,7 +2699,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         };
         return activityDate(right) - activityDate(left) || left.name.localeCompare(right.name, 'lt');
       })
-      .map((person) => ({ ...person, sequenceNumber: person.sequenceNumber ?? employeeSequenceNumbers.get(person.id) ?? '' }));
+      .map((person) => ({ ...person, sequenceNumber: employeeSequenceNumbers.get(person.id) ?? '' }));
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
@@ -4929,8 +4931,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
-  const configuredRowCount = Number(resource.defaultSettings?.rowCount) || rows.length;
-  const rowCount = Math.max(configuredRowCount, employees.length);
+  const rowCount = resource.templateKind === 'fire-safety-journal' ? 1 : employees.length;
   const tableBody = table?.tBodies[0];
   if (tableBody && rows[0]) {
     while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
@@ -4941,11 +4942,6 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     const expectedCellCount = table?.tHead?.rows[2]?.cells.length ?? 0;
     rows.forEach((row) => {
       while (row.cells.length < expectedCellCount) row.insertCell();
-    });
-  }
-  if (['familiarization-card', 'work-rules-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'chemical-safety-instruction-card', 'medical-examination-schedule'].includes(resource.templateKind)) {
-    rows.forEach((row, index) => {
-      if (row.cells[0]) row.cells[0].textContent = String(index + 1);
     });
   }
   const dateFormatter = new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -5001,7 +4997,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       if (resource.templateKind === 'medical-examination-schedule') {
         const settings = resource.defaultSettings ?? {};
         writeRow(row, [
-          String(index + 1),
+          String(item.sequenceNumber ?? ''),
           escapeHtml(item.name),
           escapeHtml(item.position || 'Darbuotojas'),
           escapeHtml(settings.periodicity || '1 kartą per 2 metus'),
@@ -5010,9 +5006,9 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           workerProof,
         ]);
       } else if (resource.templateKind === 'familiarization-card') {
-        writeRow(row, [String(index + 1), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
       } else if (resource.templateKind === 'work-rules-journal') {
-        writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
       } else if (resource.templateKind === 'intro-dss-journal') {
         writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), instructorNames, instructors.map((entry) => escapeHtml(entry.role)).join('<br>'), workerProof, instructorProofs]);
       } else if (resource.templateKind === 'workplace-dss-journal') {
@@ -5021,7 +5017,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(settings.instructionNumber ?? ''), escapeHtml(settings.instructionTitle || resource.title), instructors.map((entry) => `${escapeHtml(entry.role)} · ${nameFor(entry)}`).join('<br>'), instructorProofs, workerProof, proof(item, manager)]);
       } else if (resource.templateKind === 'job-description-journal') {
         const settings = resource.defaultSettings ?? {};
-        writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(settings.regulationNumber ?? ''), workerDate, workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(settings.regulationNumber ?? ''), workerDate, workerProof]);
       } else if (resource.templateKind === 'internal-documents-register') {
         const related = getInternalRegisterRelatedResources(resource, allResources);
         const relatedSignature = (linkedResource, role) => linkedResource && signatures
@@ -5075,7 +5071,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       } else if (resource.templateKind === 'knowledge-assessment-protocol') {
         const result = getLatestPassedProtocolTestResult(item, resource) ?? getLatestProtocolTestResult(item, resource);
         const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : resource.relatedTestId ? 'Testo rezultato nėra' : '';
-        writeRow(row, [String(index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
         const testResult = (item.testResults ?? [])
           .filter((result) => result.resourceId === resource.relatedTestId)
@@ -5096,7 +5092,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const hasCardAssignment = item.resourceIds?.includes(resource.id);
         const instructionDate = workerSignature?.signedAt ?? testResult?.completedAt;
         writeRow(row, [
-          String(index + 1),
+          String(item.sequenceNumber ?? ''),
           formatDate(instructionDate),
           escapeHtml(item.name),
           escapeHtml(item.position || 'Darbuotojas'),
@@ -5402,8 +5398,14 @@ function numberDocumentSequenceColumn(html) {
 
   const heading = table.tHead?.rows[0]?.cells[0];
   if (heading) heading.textContent = 'Eil. Nr.';
-  [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
-    if (row.cells[0]) row.cells[0].textContent = String(index + 1);
+  [...table.tBodies].forEach((body) => {
+    [...body.rows].forEach((row) => {
+      const hasRecord = [...row.cells].slice(1).some((cell) => cell.textContent.trim() || cell.querySelector('img, svg, canvas'));
+      if (!hasRecord) row.remove();
+    });
+    [...body.rows].forEach((row, index) => {
+      if (row.cells[0] && !row.cells[0].textContent.trim()) row.cells[0].textContent = String(index + 1);
+    });
   });
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
@@ -5557,7 +5559,7 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     changedInstruction: 'Instrukcija pakeista į',
     validityMonths: 'Galiojimas (mėnesiais)',
   };
-  const textFields = Object.entries(settings).filter(([key, value]) => key !== 'requiredSigners' && typeof value !== 'boolean');
+  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount'].includes(key) && typeof value !== 'boolean');
   const booleanFields = Object.entries(settings).filter(([, value]) => typeof value === 'boolean');
 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div><fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset><div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
