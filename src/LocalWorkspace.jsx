@@ -224,6 +224,70 @@ const expandProtocolResourceAssignments = (resourceIds, resources) => {
   });
   return [...assignedIds];
 };
+const isEmployeeAssignedForSequence = (employee, resource) => (Number.isInteger(Number(employee.sequenceNumbersByResource?.[resource.id]))
+  && Number(employee.sequenceNumbersByResource[resource.id]) > 0)
+  || (employee.resourceIds ?? []).includes(resource.id)
+  || (resource.templateKind === 'knowledge-assessment-protocol'
+    && resource.relatedTestId
+    && (employee.resourceIds ?? []).includes(resource.relatedTestId));
+const getEmployeeResourceSequenceNumber = (employee, resource, employees) => {
+  const savedNumber = Number(employee.sequenceNumbersByResource?.[resource.id]);
+  if (Number.isInteger(savedNumber) && savedNumber > 0) return savedNumber;
+  const eligibleEmployees = [...new Map(employees.map((person) => [person.id, person])).values()]
+    .filter((person) => isEmployeeAssignedForSequence(person, resource))
+    .map((person, index) => ({ person, index }))
+    .sort((left, right) => {
+      const registrationDate = (person) => new Date(person.invitedAt ?? person.createdAt ?? 0).getTime() || 0;
+      return registrationDate(left.person) - registrationDate(right.person) || left.index - right.index;
+    });
+  const sequenceByEmployeeId = new Map();
+  const usedNumbers = new Set();
+  eligibleEmployees.forEach(({ person }) => {
+    const number = Number(person.sequenceNumbersByResource?.[resource.id]);
+    if (Number.isInteger(number) && number > 0) {
+      sequenceByEmployeeId.set(person.id, number);
+      usedNumbers.add(number);
+    }
+  });
+  for (const { person } of eligibleEmployees) {
+    if (sequenceByEmployeeId.has(person.id)) continue;
+    let number = 1;
+    while (usedNumbers.has(number)) number += 1;
+    sequenceByEmployeeId.set(person.id, number);
+    usedNumbers.add(number);
+  }
+  return sequenceByEmployeeId.get(employee.id) ?? '';
+};
+const assignEmployeeResourceSequenceNumbers = (employee, employees, resourceIds, resources, previouslyAssignedIds = employee.resourceIds ?? []) => {
+  const allEmployees = [...new Map([...employees, employee].map((person) => [person.id, person])).values()];
+  const previouslyAssignedEmployee = { ...employee, resourceIds: previouslyAssignedIds };
+  const employeesBeforeAssignment = [...new Map([
+    ...employees.filter((person) => person.id !== employee.id),
+    previouslyAssignedEmployee,
+  ].map((person) => [person.id, person])).values()];
+  const sequenceNumbersByResource = { ...(employee.sequenceNumbersByResource ?? {}) };
+  const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
+  const numberedResourceIds = new Set([
+    ...resourceIds,
+    ...previouslyAssignedIds,
+    ...resources.filter((resource) => isEmployeeAssignedForSequence(employee, resource)).map((resource) => resource.id),
+  ]);
+
+  for (const resourceId of numberedResourceIds) {
+    const resource = resourceById.get(resourceId);
+    if (!resource || Number.isInteger(Number(sequenceNumbersByResource[resourceId])) && Number(sequenceNumbersByResource[resourceId]) > 0) continue;
+    if (isEmployeeAssignedForSequence(previouslyAssignedEmployee, resource)) {
+      const existingNumber = getEmployeeResourceSequenceNumber(previouslyAssignedEmployee, resource, employeesBeforeAssignment);
+      if (existingNumber) sequenceNumbersByResource[resourceId] = existingNumber;
+      continue;
+    }
+    const highestNumber = allEmployees
+      .filter((person) => person.id !== employee.id && isEmployeeAssignedForSequence(person, resource))
+      .reduce((highest, person) => Math.max(highest, Number(getEmployeeResourceSequenceNumber(person, resource, allEmployees)) || 0), 0);
+    sequenceNumbersByResource[resourceId] = highestNumber + 1;
+  }
+  return { ...employee, sequenceNumbersByResource };
+};
 const isProtocolBatchReady = (batch, employees, resource) => Boolean(batch.protocolDate)
   && employees.length > 0
   && employees.every((employee) => hasPassedProtocolTest(employee, resource));
@@ -2657,12 +2721,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ...activeEmployees,
       ...archivedEmployees,
     ].map((person) => [person.id, person])).values()]
-      .map((person, index) => ({ person, index }))
-      .sort((left, right) => {
-        const registrationDate = (person) => new Date(person.invitedAt ?? person.createdAt ?? 0).getTime() || 0;
-        return registrationDate(left.person) - registrationDate(right.person) || left.index - right.index;
-      });
-    const employeeSequenceNumbers = new Map(sequenceEmployees.map(({ person }, index) => [person.id, index + 1]));
     const previewSignatureSource = archivedRecord?.signatures ?? data.signatures;
     const previewSignatureResourceIds = new Set([resource.id]);
     if (resource.templateKind === 'internal-documents-register') {
@@ -2685,7 +2743,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         };
         return activityDate(right) - activityDate(left) || left.name.localeCompare(right.name, 'lt');
       })
-      .map((person) => ({ ...person, sequenceNumber: employeeSequenceNumbers.get(person.id) ?? '' }));
+      .map((person) => ({
+        ...person,
+        sequenceNumber: getEmployeeResourceSequenceNumber(person, resource, sequenceEmployees),
+      }));
     const previewEmployeeIds = new Set(previewEmployees.map((person) => person.id));
     let previewSignatures = [];
     if (!templateOnly) {
@@ -2795,8 +2856,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       medicalCertificateReminderDate: getMedicalCertificateReminderDate(employeeForm.medicalCertificateValidUntil),
       resourceIds: assignedResourceIds, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, progressByResource: {}, testResults: [], pin: rehireRecord?.employee.pin ?? '',
     };
-    const { batches, resourceIds } = addEmployeeToProtocolBatches(data, invitedEmployee);
-    const employeeToInvite = { ...invitedEmployee, resourceIds };
+    const organizationEmployees = [
+      ...data.employees.filter((person) => person.orgId === currentOrg.id),
+      ...(data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg.id).map((record) => record.employee),
+    ];
+    const organizationResources = data.resources.filter((resource) => currentOrg.resources.includes(resource.id));
+    const numberedInvitedEmployee = assignEmployeeResourceSequenceNumbers(
+      invitedEmployee,
+      organizationEmployees,
+      assignedResourceIds,
+      organizationResources,
+      [],
+    );
+    const { batches, resourceIds } = addEmployeeToProtocolBatches(data, numberedInvitedEmployee);
+    const employeeToInvite = assignEmployeeResourceSequenceNumbers(
+      { ...numberedInvitedEmployee, resourceIds },
+      organizationEmployees,
+      resourceIds,
+      organizationResources,
+      [],
+    );
     setInviteSubmitting(true);
     if (cloudMode) {
       setPendingEmployeeInvites((current) => [...current, { ...employeeToInvite, invitePending: true }]);
@@ -2804,6 +2883,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployeePage(Math.ceil((managerDashboardEmployees.length + 1) / employeePageSize));
       inviteDialog?.close();
     }
+    let sequenceSaveError = null;
     try {
       if (cloudMode) {
         if (rehireRecord) {
@@ -2814,6 +2894,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             input_protocol_batches: batches,
           });
           if (error) throw error;
+          const { error: numberError } = await supabase.rpc('save_organization_employee_sequence_numbers', {
+            input_organization_id: currentOrg.id,
+            input_employee_id: employeeToInvite.id,
+            input_sequence_numbers: employeeToInvite.sequenceNumbersByResource,
+          });
+          sequenceSaveError = numberError;
         } else {
           const { error } = await supabase.functions.invoke('invite-employee', {
             body: {
@@ -2842,9 +2928,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
       setEmployeeSearch('');
       setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
-      setNotice(rehireRecord
-        ? `${name} atkurtas kaip naujas darbuotojas. Prisijungimo paskyra, slaptažodis ir PIN išsaugoti; archyvo įrašas nepakeistas.`
-        : cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
+      setNotice(sequenceSaveError
+        ? `${name} atkurtas, tačiau dokumentų eilės numerių išsaugoti nepavyko: ${sequenceSaveError.message}`
+        : rehireRecord
+          ? `${name} atkurtas kaip naujas darbuotojas. Prisijungimo paskyra, slaptažodis ir PIN išsaugoti; archyvo įrašas nepakeistas.`
+          : cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
       inviteDialog?.close();
     } catch (error) {
       setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
@@ -3021,13 +3109,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!employee) return;
     const updatedEmployee = { ...employee, position, resourceIds, requiredSignersByResource };
     const { batches, resourceIds: protocolResourceIds } = addEmployeeToProtocolBatches(data, updatedEmployee);
+    const employeesForSequence = [
+      ...data.employees.filter((person) => person.orgId === currentOrg.id),
+      ...(data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg.id).map((record) => record.employee),
+    ];
+    const resourcesForSequence = data.resources.filter((resource) => availableResourceIds.has(resource.id));
+    const numberedEmployee = assignEmployeeResourceSequenceNumbers(
+      { ...updatedEmployee, resourceIds: protocolResourceIds },
+      employeesForSequence,
+      protocolResourceIds,
+      resourcesForSequence,
+      employee.resourceIds ?? [],
+    );
     const currentBatchesById = new Map((data.protocolBatches ?? []).map((batch) => [batch.id, batch]));
     const changedProtocolBatches = batches.filter((batch) => batch.employeeIds.includes(employee.id)
       && JSON.stringify(currentBatchesById.get(batch.id)) !== JSON.stringify(batch));
     const applyAssignmentsToWorkspace = (current) => ({
       ...current,
       employees: current.employees.map((item) => item.id === employee.id
-        ? { ...item, position, resourceIds: protocolResourceIds, requiredSignersByResource }
+        ? { ...item, position, resourceIds: protocolResourceIds, requiredSignersByResource, sequenceNumbersByResource: numberedEmployee.sequenceNumbersByResource }
         : item),
       protocolBatches: changedProtocolBatches.reduce((currentBatches, changedBatch) => {
         const existingBatch = currentBatches.find((batch) => batch.id === changedBatch.id);
@@ -3049,6 +3149,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       employeeAssignmentRpcInFlightRef.current = true;
       try {
         const previousAutosaveError = await workspaceAutosaveRequestRef.current;
+        const { error: sequenceError } = await supabase.rpc('save_organization_employee_sequence_numbers', {
+          input_organization_id: currentOrg.id,
+          input_employee_id: employee.id,
+          input_sequence_numbers: numberedEmployee.sequenceNumbersByResource,
+        });
+        if (sequenceError) {
+          setNotice(`Darbuotojo eilės numerių išsaugoti nepavyko: ${sequenceError.message}`);
+          return;
+        }
         const { error } = await supabase.rpc('save_organization_employee', {
           input_organization_id: currentOrg.id,
           input_employee_id: employee.id,

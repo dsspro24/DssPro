@@ -78,8 +78,33 @@ Deno.serve(async (request) => {
   if (resourceIds.some((resourceId) => !allowedResourceIds.has(resourceId))) {
     return response(400, { error: 'Employee assignment contains a document not available to this organization' });
   }
+  const requestedSequenceNumbers = employee.sequenceNumbersByResource;
+  if (requestedSequenceNumbers !== undefined
+    && (typeof requestedSequenceNumbers !== 'object' || requestedSequenceNumbers === null || Array.isArray(requestedSequenceNumbers))) {
+    return response(400, { error: 'Employee document sequence numbers are invalid' });
+  }
+  const sequenceNumbersByResource: Record<string, number> = {};
+  for (const [resourceId, value] of Object.entries(requestedSequenceNumbers ?? {})) {
+    if (!allowedResourceIds.has(resourceId) || typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+      return response(400, { error: 'Employee document sequence numbers are invalid' });
+    }
+    sequenceNumbersByResource[resourceId] = value;
+  }
 
   const employees = Array.isArray(workspace.data.employees) ? workspace.data.employees : [];
+  const archivedEmployees = Array.isArray(workspace.data.archivedEmployees) ? workspace.data.archivedEmployees : [];
+  const hasSequenceCollision = (existing: Record<string, unknown>) => Object.entries(sequenceNumbersByResource).some(
+    ([resourceId, value]) => Number((existing.sequenceNumbersByResource as Record<string, unknown> | undefined)?.[resourceId]) === value,
+  );
+  const hasArchivedSequenceCollision = (record: Record<string, unknown>) => {
+    const archivedEmployee = record.employee;
+    return typeof archivedEmployee === 'object' && archivedEmployee !== null && !Array.isArray(archivedEmployee)
+      && hasSequenceCollision(archivedEmployee as Record<string, unknown>);
+  };
+  if (employees.some((item: Record<string, unknown>) => hasSequenceCollision(item))
+    || archivedEmployees.some((record: Record<string, unknown>) => hasArchivedSequenceCollision(record))) {
+    return response(409, { error: 'A document sequence number is already assigned to another employee. Refresh the workspace and try again.' });
+  }
   const contractNumber = String(employee.contractNumber ?? '').trim();
   if (employees.some((item: Record<string, unknown>) => String(item.email ?? '').toLowerCase() === email)) {
     return response(409, { error: 'This email is already listed in the organization' });
@@ -100,6 +125,7 @@ Deno.serve(async (request) => {
     invitedAt: new Date().toISOString(),
     medicalCertificateValidUntil: String(employee.medicalCertificateValidUntil ?? ''),
     resourceIds,
+    sequenceNumbersByResource,
     sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' },
     progressByResource: {},
     testResults: [],
