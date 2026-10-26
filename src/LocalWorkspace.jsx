@@ -1726,6 +1726,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return matchesFilter && `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(taskSearch.trim().toLocaleLowerCase('lt'));
   });
   const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
+    || isCompanyCreatedProtocol(resource, currentOrg?.id)
     || creatorReadOnlyPreview && resource.organizationId === currentOrg?.id);
   const filteredLibraryResources = visibleLibraryResources.filter((resource) => {
     const matchesType = libraryTypeFilter === 'visos' || resource.type === libraryTypeFilter;
