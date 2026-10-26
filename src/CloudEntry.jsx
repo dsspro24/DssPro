@@ -211,6 +211,8 @@ async function loadManagerWorkspace(user) {
     if (catalogResult.error) throw catalogResult.error;
     if (invitationsResult.error) throw invitationsResult.error;
     if (requestsResult.error) throw requestsResult.error;
+    const { data: commissionInvitations, error: commissionInvitationsError } = await supabase.rpc('get_account_commission_invitations');
+    if (commissionInvitationsError) throw commissionInvitationsError;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const organizations = (organizationsResult.data ?? []).map((organization) => {
       const membership = dssMemberships.find((item) => item.organization_id === organization.id);
@@ -231,6 +233,7 @@ async function loadManagerWorkspace(user) {
         organizations,
         dssInvitations: invitationsResult.data ?? [],
         dssOrganizationRequests: requestsResult.data ?? [],
+        commissionInvitations: commissionInvitations ?? [],
         employees: [],
         archivedEmployees: [],
         protocolBatches: [],
