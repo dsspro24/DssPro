@@ -2649,7 +2649,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (userRole === 'vadovas' && activeTab === 'biblioteka') } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
     if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview) {
       if (reportArchiveData.organizationId !== currentOrg?.id || reportArchiveData.loading) {
         setNotice('Palaukite, kol bus įkelti archyvuotų darbuotojų ataskaitų duomenys.');
@@ -2671,7 +2671,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(`HTML šablono įkelti nepavyko: ${error.message}`);
       return;
     }
-    const aapCatalogPreview = resource.id === 'res-aap' && userRole === 'vadovas' && activeTab === 'biblioteka';
+    const aapCatalogPreview = resource.id === 'res-aap' && ['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka';
     const companySettings = templateOnly ? {} : currentOrg?.resourceSettings?.[resource.id] ?? {};
     const configuredResource = {
       ...resource,
