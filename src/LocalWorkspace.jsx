@@ -6222,7 +6222,7 @@ function ResourceSelectionList({ resources, selectedIds, onChange, renderSelecte
             ? selectedIds.filter((id) => !groupedResources.some((resource) => resource.id === id))
             : [...new Set([...selectedIds, ...groupedResources.map((resource) => resource.id)])];
           onChange(nextIds);
-        }}>{groupSelected ? `Atžymėti ${type.toLocaleLowerCase('lt')}` : `Pažymėti ${type.toLocaleLowerCase('lt')}`}</button>}
+        }} aria-label={`${groupSelected ? 'Atžymėti' : 'Pažymėti'} visus: ${type.toLocaleLowerCase('lt')}`}>{groupSelected ? 'Atžymėti visus' : 'Pažymėti visus'}</button>}
       </fieldset>;
     })}
     {!resources.length && <p className="text-sm text-slate-500">Dokumentų šiai įmonei dar nepriskirta.</p>}
