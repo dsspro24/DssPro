@@ -333,7 +333,7 @@ async function loadManagerWorkspace(user) {
   const { data: catalogData, error: catalogError } = await supabase
     .from('creator_workspace_data').select('data').eq('id', true).maybeSingle();
   if (catalogError) throw catalogError;
-  const [savedWorkspace, invitationsResult, requestsResult] = await Promise.all([
+  const [savedWorkspace, invitationsResult, requestsResult, organizationSettingsResult] = await Promise.all([
     loadOrganizationWorkspace(organizationId, catalogData?.data?.resources ?? []),
     supabase.from('dss_specialist_invitations')
       .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
@@ -345,11 +345,17 @@ async function loadManagerWorkspace(user) {
       .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
+    supabase.from('organizations')
+      .select('dss_requests_enabled')
+      .eq('id', organizationId)
+      .single(),
   ]);
   const { data: dssInvitations, error: dssInvitationsError } = invitationsResult;
   if (dssInvitationsError) throw dssInvitationsError;
   const { data: dssOrganizationRequests, error: dssOrganizationRequestsError } = requestsResult;
   if (dssOrganizationRequestsError) throw dssOrganizationRequestsError;
+  const { data: organizationSettings, error: organizationSettingsError } = organizationSettingsResult;
+  if (organizationSettingsError) throw organizationSettingsError;
   const savedOrganization = savedWorkspace?.organizations?.find((item) => item.id === organizationId);
   const organization = {
     id: organizationId,
@@ -368,7 +374,14 @@ async function loadManagerWorkspace(user) {
     organization,
     managerName,
     catalog: hydratedCatalog,
-    data: { ...hydratedManagerWorkspace, dssInvitations: dssInvitations ?? [], dssOrganizationRequests: dssOrganizationRequests ?? [] },
+    data: {
+      ...hydratedManagerWorkspace,
+      organizations: (hydratedManagerWorkspace.organizations ?? []).map((item) => item.id === organizationId
+        ? { ...item, dssRequestsEnabled: organizationSettings.dss_requests_enabled }
+        : item),
+      dssInvitations: dssInvitations ?? [],
+      dssOrganizationRequests: dssOrganizationRequests ?? [],
+    },
   };
 }
 

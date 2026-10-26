@@ -906,6 +906,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssOrganizationSearchResults, setDssOrganizationSearchResults] = useState([]);
   const [dssOrganizationSearchSubmitting, setDssOrganizationSearchSubmitting] = useState(false);
   const [dssOrganizationRequestSubmittingId, setDssOrganizationRequestSubmittingId] = useState('');
+  const [dssRequestVisibilitySaving, setDssRequestVisibilitySaving] = useState(false);
   const [dssOrganizationLeaveSubmitting, setDssOrganizationLeaveSubmitting] = useState(false);
   const [dssRevokeSubmittingId, setDssRevokeSubmittingId] = useState('');
   const [dssRefreshSubmitting, setDssRefreshSubmitting] = useState(false);
@@ -1246,6 +1247,45 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'vadovas' || creatorReadOnlyPreview || !currentOrg?.id) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshDssOrganizationRequests = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const { data: requests, error } = await supabase.from('dss_organization_requests')
+          .select('id, organization_id, organization_name, specialist_user_id, specialist_name, specialist_email, status, created_at')
+          .eq('organization_id', currentOrg.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        if (active) setData((current) => ({
+          ...current,
+          dssOrganizationRequests: [
+            ...(current.dssOrganizationRequests ?? []).filter((request) => request.organization_id !== currentOrg.id),
+            ...(requests ?? []),
+          ],
+        }));
+      } catch (error) {
+        if (active) setNotice(`DSS specialistų prašymų atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshDssOrganizationRequests();
+    const intervalId = window.setInterval(refreshDssOrganizationRequests, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshDssOrganizationRequests();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, userRole, creatorReadOnlyPreview, currentOrg?.id]);
   const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
   useEffect(() => {
@@ -1799,6 +1839,31 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(`DSS specialisto teisės pakeisti nepavyko: ${error.message}`);
     } finally {
       setDssManagementSavingId('');
+    }
+  };
+
+  const setDssRequestVisibility = async (enabled) => {
+    if (!cloudMode || userRole !== 'vadovas' || creatorReadOnlyPreview || !currentOrg) return;
+    setDssRequestVisibilitySaving(true);
+    try {
+      const { error } = await supabase.rpc('set_organization_dss_request_visibility', {
+        input_organization_id: currentOrg.id,
+        input_enabled: enabled,
+      });
+      if (error) throw error;
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((organization) => organization.id === currentOrg.id
+          ? { ...organization, dssRequestsEnabled: enabled }
+          : organization),
+      }));
+      setNotice(enabled
+        ? 'Įmonė vėl rodoma DSS specialistų paieškoje.'
+        : 'Įmonė paslėpta nuo naujų DSS specialistų prašymų.');
+    } catch (error) {
+      setNotice(`DSS prašymų matomumo pakeisti nepavyko: ${error.message}`);
+    } finally {
+      setDssRequestVisibilitySaving(false);
     }
   };
 
@@ -4071,6 +4136,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             description: `${task.role} · protokolas Nr. ${task.batchNumber}`,
             commissionTask: task,
           })),
+          ...(data.dssOrganizationRequests ?? [])
+            .filter((request) => request.organization_id === currentOrg?.id && request.status === 'pending')
+            .map((request) => ({
+              id: `dss-organization-request-${request.id}`,
+              title: 'DSS specialisto prašymas',
+              description: `${request.specialist_name || request.specialist_email} nori tapti šios įmonės DSS specialistu.`,
+              dssOrganizationRequest: request,
+            })),
           ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).map((resourceId) => {
             const resource = data.resources.find((item) => item.id === resourceId);
             const managerCanInstruct = resource?.templateKind === 'intro-dss-journal'
@@ -4361,6 +4434,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       setSignatureInk('');
                       setWorkerSignPin('');
                       setCommissionActionError('');
+                    } else if (userRole === 'vadovas' && item.dssOrganizationRequest) {
+                      setActiveTab('imone');
                     } else if (userRole === 'vadovas' && item.employee && item.resource && item.commissionMember) {
                       requestCommissionSign(item.employee, item.resource, item.commissionMember);
                     } else if (userRole === 'vadovas' && item.commissionAcceptance) {
@@ -4681,6 +4756,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p></Panel>
               <Panel title="DSS specialistai">
                 {cloudMode && <div className="mb-3 flex justify-end"><button type="button" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={dssRefreshSubmitting} onClick={refreshDssAssignments}>{dssRefreshSubmitting ? 'Atnaujinama…' : 'Atnaujinti sąrašą'}</button></div>}
+                {userRole === 'vadovas' && cloudMode && !creatorReadOnlyPreview && <label className="mb-3 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={currentOrg?.dssRequestsEnabled !== false} disabled={dssRequestVisibilitySaving} onChange={(event) => setDssRequestVisibility(event.target.checked)} /><span>Leisti DSS specialistams rasti šią įmonę ir siųsti priežiūros prašymus<small className="mt-0.5 block font-normal text-slate-500">Išjungus nauji specialistų prašymai nebus priimami. Esami prašymai ir paskirti DSS specialistai nebus pakeisti.</small></span></label>}
                 {userRole === 'vadovas' && <p className="mb-3 text-xs text-slate-600">Suteikus tvarkymo teisę DSS specialistas galės valdyti darbuotojus, dokumentus ir komisiją, bet negalės pasirašyti vadovo vardu. Teisę galite bet kada atšaukti.</p>}
                 <div className="space-y-2">{currentOrg?.dss.map((id) => data.specialists.find((person) => person.id === id)).filter(Boolean).map((person) => {
                   const management = dssManagementOrganizationId === currentOrg?.id
