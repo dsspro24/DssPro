@@ -547,16 +547,16 @@ const initialData = {
     { id: manualHandlingTestId, title: 'Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programos testas', type: 'Testas', category: 'Krovinių kėlimas rankomis', image: '/courses/construction-ppe.jpg', duration: '19 klausimų', html: '<h2>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programa</h2><p>Atsakykite į visus 19 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: manualHandlingQuestions },
     { id: knowledgeAssessmentProtocolId, title: 'Mokymo programos žinių patikrinimo protokolas', type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true },
     ...defaultCompanyProtocolTemplates.map(({ id, title, testId }) => ({ id, title, type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', html: knowledgeAssessmentProtocolTemplate, templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true })),
-    { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 20, populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
+    { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
-    { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 15, populateEmployees: true, regulationNumber: '' } },
-    { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 20, populateEmployees: true, date: '', instructorName: '' } },
-    { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 15, populateEmployees: true, date: '', instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
-    { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 15, populateEmployees: true, instructorName: '', instructorPosition: '' } },
-    { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 15, populateEmployees: true, date: '' } },
-    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { rowCount: 12, populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
+    { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, regulationNumber: '' } },
+    { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructorName: '' } },
+    { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
+    { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructorName: '', instructorPosition: '' } },
+    { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, date: '' } },
+    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
     { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { date: '', instructionNumber: '', instructionTitle: '', instructorPosition: '', changedInstruction: '' } },
-    { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { rowCount: 20, populateEmployees: true } },
+    { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', html: aapTemplate, requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
   signatures: [
@@ -2148,7 +2148,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     event.preventDefault();
     if (!currentOrg || !resourceSettingsTarget) return;
     const settings = { ...resourceSettingsDraft, requiredSigners: [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])] };
-    if (settings.rowCount !== undefined) settings.rowCount = Math.max(1, Number(settings.rowCount) || 1);
+    delete settings.rowCount;
     if (settings.validityMonths !== undefined) settings.validityMonths = Math.max(1, Number(settings.validityMonths) || 12);
     setData((current) => {
       const updated = {
@@ -2770,7 +2770,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewEmployee = archivedRecord
       ? previewEmployees.find((person) => person.id === employeeId)
       : currentEmployee;
-    previewDocument.printHtml = addRecordPageBreaks(prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title));
+    previewDocument.printHtml = prepareResourcePrintLayout(prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title));
     const firstPreviewPage = getRecordPreviewPage(previewDocument.printHtml, 0);
     previewDocument.previewHtml = firstPreviewPage.html;
     previewDocument.previewPageCount = firstPreviewPage.pageCount;
@@ -4035,7 +4035,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         } else {
           html = buildResourcePreviewHtml(documentResource, employeeForDocument, organization, signatures, archivedResources);
         }
-        html = addRecordPageBreaks(prepareResourcePrintHtml(html, configuredResource.title));
+        html = prepareResourcePrintLayout(prepareResourcePrintHtml(html, configuredResource.title));
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         [...parsed.head.querySelectorAll('style, link[rel="stylesheet"]')].forEach((style) => documentStyles.add(style.outerHTML));
         documentParts.push(`<section class="archive-export-document">${parsed.body.innerHTML}</section>`);
@@ -5113,11 +5113,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   let rows = [...(table?.tBodies[0]?.rows ?? [])];
   const assignedEmployees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
-  const configuredRowCount = Number(resource.defaultSettings?.rowCount) || rows.length;
+  const templateRowCount = rows.length;
   const rowCount = resource.templateKind === 'fire-safety-journal'
     ? 1
-    : Math.max(configuredRowCount, employees.length);
+    : Math.max(templateRowCount, employees.length);
   const tableBody = table?.tBodies[0];
+  if (table) table.dataset.pageSize = String(resource.templateKind === 'fire-safety-journal' ? 1 : templateRowCount);
   if (tableBody && rows[0]) {
     while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
     while (tableBody.rows.length < rowCount) tableBody.append(rows[0].cloneNode(true));
@@ -5617,24 +5618,70 @@ function numberDocumentSequenceColumn(html) {
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 
-function addRecordPageBreaks(html) {
+function prepareResourcePrintLayout(html) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const style = parsed.createElement('style');
-  style.textContent = '@media print{.journal-page .journal-table tbody tr:nth-child(20n + 1):not(:first-child),.protocol-table tbody tr:nth-child(20n + 1):not(:first-child),.card-page .card-table tbody tr:nth-child(20n + 1):not(:first-child),.card-container table tbody tr:nth-child(20n + 1):not(:first-child){break-before:page;page-break-before:always}}';
+  const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
+  const header = table?.closest('.journal-page, .protocol-container, .card-page, .card-container, .document-page')
+    ?.querySelector('.journal-header, .header, .card-header, .doc-header');
+  const tableHead = table?.tHead;
+  const headingText = header?.textContent?.replace(/\s+/g, ' ').trim();
+  if (tableHead && headingText) {
+    header.classList.add('print-original-document-heading');
+    const headingRow = parsed.createElement('tr');
+    headingRow.className = 'print-document-heading';
+    const headingCell = parsed.createElement('th');
+    headingCell.colSpan = Math.max(...[...tableHead.rows].map((row) =>
+      [...row.cells].reduce((columnCount, cell) => columnCount + cell.colSpan, 0)));
+    headingCell.textContent = headingText;
+    headingRow.append(headingCell);
+    tableHead.prepend(headingRow);
+  }
+  style.textContent = `
+    .print-document-heading { display: none; }
+    @media print {
+      .print-document-heading { display: table-row; }
+      .print-original-document-heading { display: none; }
+      .cover-page { break-after: page; page-break-after: always; }
+      .journal-page, .protocol-container, .card-page, .card-container, .document-page {
+        display: block;
+        min-height: 0;
+        overflow: visible;
+        break-after: auto;
+        page-break-after: auto;
+      }
+      .journal-page table, .protocol-container table, .card-page table, .card-container table, .document-page table {
+        width: 100%;
+        break-inside: auto;
+        page-break-inside: auto;
+      }
+      .journal-page thead, .protocol-container thead, .card-page thead, .card-container thead, .document-page thead {
+        display: table-header-group;
+      }
+      .journal-page tbody, .protocol-container tbody, .card-page tbody, .card-container tbody, .document-page tbody {
+        display: table-row-group;
+      }
+      .journal-page tbody tr, .protocol-container tbody tr, .card-page tbody tr, .card-container tbody tr, .document-page tbody tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  `;
   parsed.head.append(style);
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 
-function getRecordPreviewPage(html, pageIndex, pageSize = 20) {
+function getRecordPreviewPage(html, pageIndex, fallbackPageSize = 20) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table');
+  const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
   const body = table?.tBodies[0];
+  const pageSize = Number(table?.dataset.pageSize) || fallbackPageSize;
   if (!body || body.rows.length <= pageSize) return { html, pageCount: 1 };
 
   const rows = [...body.rows];
   const pageCount = Math.ceil(rows.length / pageSize);
   const pageDocument = new DOMParser().parseFromString(html, 'text/html');
-  const pageBody = pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table')?.tBodies[0];
+  const pageBody = pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table')?.tBodies[0];
   if (!pageBody) return { html, pageCount: 1 };
   const start = pageIndex * pageSize;
   const pageRows = rows.slice(start, start + pageSize);
@@ -5761,7 +5808,6 @@ function ProtocolSettingsDialog({ resource, settings, onChange, onSave, onClose 
 
 function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
   const labels = {
-    rowCount: 'Eilučių skaičius',
     populateEmployees: 'Automatiškai pildyti darbuotojus',
     periodicity: 'Medicininės apžiūros periodiškumas',
     directorName: 'Direktoriaus vardas, pavardė',
