@@ -73,6 +73,27 @@ async function hydrateWorkspaceAssets(workspace) {
   };
 }
 
+function scopeWorkspaceToOrganization(workspace, organizationId) {
+  if (!workspace || !organizationId) return workspace;
+  const organizations = (workspace.organizations ?? []).filter((organization) => organization.id === organizationId);
+  const specialistIds = new Set(organizations.flatMap((organization) => organization.dss ?? []));
+  return {
+    ...workspace,
+    organizations,
+    employees: (workspace.employees ?? []).filter((employee) => employee.orgId === organizationId),
+    signatures: (workspace.signatures ?? []).filter((signature) => signature.orgId === organizationId),
+    protocolBatches: (workspace.protocolBatches ?? []).filter((batch) => batch.orgId === organizationId),
+    aapIssuances: (workspace.aapIssuances ?? []).filter((issuance) => issuance.orgId === organizationId),
+    commissionAssignments: (workspace.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === organizationId),
+    commissionInvitations: (workspace.commissionInvitations ?? []).filter((invitation) => invitation.organizationId === organizationId),
+    protocolCommissionSignatures: (workspace.protocolCommissionSignatures ?? []).filter((signature) => signature.orgId === organizationId),
+    subscriptions: (workspace.subscriptions ?? []).filter((subscription) => subscription.orgId === organizationId),
+    specialists: (workspace.specialists ?? []).filter((specialist) => specialistIds.has(specialist.id)),
+    dssInvitations: (workspace.dssInvitations ?? []).filter((invitation) => invitation.organization_id === organizationId),
+    dssOrganizationRequests: (workspace.dssOrganizationRequests ?? []).filter((request) => request.organization_id === organizationId),
+  };
+}
+
 async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
   const [
     { data: workspace, error: workspaceError },
@@ -108,9 +129,10 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
     sharedCatalogResources = mapDocuments(sharedDocuments ?? []);
   }
 
-  return workspace
+  const scopedWorkspace = scopeWorkspaceToOrganization(workspace, organizationId);
+  return scopedWorkspace
     ? {
-      ...workspace,
+      ...scopedWorkspace,
       resources: [
         ...sharedCatalogResources,
         ...mapDocuments(organizationDocuments ?? [], organizationId),

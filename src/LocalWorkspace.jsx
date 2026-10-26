@@ -591,15 +591,21 @@ function createInitialCloudWorkspace(organization, managerName = '') {
     dssInvitations: [],
     employeeAssignmentPresets: [],
     resourceSettings: {},
-    resources: initialData.resources.map((resource) => resource.id),
+    resources: [],
   };
 
   return {
     ...initialData,
     organizations: [cloudOrganization],
+    resources: [],
     employees: [],
     archivedEmployees: [],
     protocolBatches: [],
+    aapIssuances: [],
+    commissionAssignments: [],
+    commissionInvitations: [],
+    commissionTasks: [],
+    protocolCommissionSignatures: [],
     specialists: [],
     signatures: [],
     subscriptions: [{
@@ -610,7 +616,6 @@ function createInitialCloudWorkspace(organization, managerName = '') {
       price: planCode === 'pro' ? 79 : 29,
       endsAt: '',
     }],
-    resources: initialData.resources.map((resource) => ({ ...resource, type: normalizeResourceType(resource) })),
   };
 }
 
@@ -721,8 +726,28 @@ const dssSignatureBatchSize = 10;
 export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
+    const cloudDefaults = cloudMode && cloudOrganization
+      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName)
+      : null;
     const loadedData = initialCloudData
-      ? { ...initialData, ...initialCloudData }
+      ? {
+        ...(cloudDefaults ?? initialData),
+        ...initialCloudData,
+        organizations: initialCloudData.organizations?.length
+          ? initialCloudData.organizations
+          : cloudDefaults?.organizations ?? [],
+        resources: initialCloudData.resources ?? [],
+        resourceTypes: initialCloudData.resourceTypes ?? creatorCatalog?.resourceTypes ?? ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'],
+        employees: initialCloudData.employees ?? [],
+        archivedEmployees: initialCloudData.archivedEmployees ?? [],
+        signatures: initialCloudData.signatures ?? [],
+        protocolBatches: initialCloudData.protocolBatches ?? [],
+        commissionAssignments: initialCloudData.commissionAssignments ?? [],
+        commissionInvitations: initialCloudData.commissionInvitations ?? [],
+        commissionTasks: initialCloudData.commissionTasks ?? [],
+        protocolCommissionSignatures: initialCloudData.protocolCommissionSignatures ?? [],
+        subscriptions: initialCloudData.subscriptions ?? [],
+      }
       : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData();
     const workspaceData = {
       ...loadedData,
@@ -797,7 +822,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-  const [selectedOrgId, setSelectedOrgId] = useState(initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
+  const [selectedOrgId, setSelectedOrgId] = useState(cloudMode && userRole === 'vadovas'
+    ? cloudOrganization?.id ?? initialCloudData?.organizations[0]?.id ?? ''
+    : initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
@@ -1510,7 +1537,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const aapIssueEmployee = data.employees.find((employee) => employee.id === aapIssueEmployeeId);
   const aapIssueOrganization = data.organizations.find((org) => org.id === aapIssueEmployee?.orgId);
   const employeeBeingEdited = data.employees.find((employee) => employee.id === editingEmployeeId);
-  const accessibleOrganizations = userRole === 'dss' ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) : data.organizations;
+  const accessibleOrganizations = userRole === 'dss'
+    ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId))
+    : cloudMode && userRole === 'vadovas' && cloudOrganization?.id
+      ? data.organizations.filter((organization) => organization.id === cloudOrganization.id)
+      : data.organizations;
   const activeNavigation = userRole === 'dss'
     ? dssOrganizationIsOpen
       ? [
@@ -1676,7 +1707,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const matchesFilter = taskFilter === 'visos' || (taskFilter === 'atliktinos' && !['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status)) || (taskFilter === 'baigtos' && ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status));
     return matchesFilter && `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(taskSearch.trim().toLocaleLowerCase('lt'));
   });
-  const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId || (canManageSelectedWorkspace && resource.organizationId === currentOrg?.id));
+  const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
+    || creatorReadOnlyPreview && resource.organizationId === currentOrg?.id);
   const filteredLibraryResources = visibleLibraryResources.filter((resource) => {
     const matchesType = libraryTypeFilter === 'visos' || resource.type === libraryTypeFilter;
     const matchesSearch = `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(librarySearch.trim().toLocaleLowerCase('lt'));
