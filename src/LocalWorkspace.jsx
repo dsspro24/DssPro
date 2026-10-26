@@ -6184,30 +6184,32 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
 }
 
 function ResourceSelectionList({ resources, selectedIds, onChange, renderSelected }) {
+  const availableIds = new Set(resources.map((resource) => resource.id));
+  const validSelectedIds = selectedIds.filter((id) => availableIds.has(id));
   const typeGroups = [...new Set(resources.map((resource) => resource.type))].map((type) => ({
     type,
     resources: resources.filter((resource) => resource.type === type),
   }));
-  const allSelected = resources.length > 0 && resources.every((resource) => selectedIds.includes(resource.id));
+  const allSelected = resources.length > 0 && resources.every((resource) => validSelectedIds.includes(resource.id));
 
   const toggleResource = (resourceId, checked) => onChange(checked
-    ? [...new Set([...selectedIds, resourceId])]
-    : selectedIds.filter((id) => id !== resourceId));
+    ? [...new Set([...validSelectedIds, resourceId])]
+    : validSelectedIds.filter((id) => id !== resourceId));
 
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
-      <p className="text-xs font-medium text-slate-600">Pasirinkta dokumentų: {selectedIds.filter((id) => resources.some((resource) => resource.id === id)).length} / {resources.length}</p>
+      <p className="text-xs font-medium text-slate-600">Pasirinkta dokumentų: {validSelectedIds.length} / {resources.length}</p>
       <button type="button" className="text-xs font-semibold text-emerald-800 hover:underline" onClick={() => onChange(allSelected ? [] : resources.map((resource) => resource.id))} disabled={!resources.length}>
         {allSelected ? 'Atžymėti visus' : 'Pažymėti visus'}
       </button>
     </div>
     {typeGroups.map(({ type, resources: groupedResources }) => {
-      const groupSelected = groupedResources.every((resource) => selectedIds.includes(resource.id));
+      const groupSelected = groupedResources.every((resource) => validSelectedIds.includes(resource.id));
       return <fieldset className="rounded-md border border-slate-200 p-3" key={type}>
-        <legend className="px-1 text-xs font-semibold text-slate-700">{type} · {groupedResources.filter((resource) => selectedIds.includes(resource.id)).length}/{groupedResources.length}</legend>
+        <legend className="px-1 text-xs font-semibold text-slate-700">{type} · {groupedResources.filter((resource) => validSelectedIds.includes(resource.id)).length}/{groupedResources.length}</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {groupedResources.map((resource) => {
-            const selected = selectedIds.includes(resource.id);
+            const selected = validSelectedIds.includes(resource.id);
             return <div className="min-w-0 rounded-md bg-slate-50 p-2" key={resource.id}>
               <label className="flex min-w-0 items-start gap-2 text-sm">
                 <input className="mt-0.5 shrink-0" type="checkbox" checked={selected} onChange={(event) => toggleResource(resource.id, event.target.checked)} />
@@ -6219,8 +6221,8 @@ function ResourceSelectionList({ resources, selectedIds, onChange, renderSelecte
         </div>
         {groupedResources.length > 1 && <button type="button" className="mt-2 text-xs font-semibold text-slate-600 hover:underline" onClick={() => {
           const nextIds = groupSelected
-            ? selectedIds.filter((id) => !groupedResources.some((resource) => resource.id === id))
-            : [...new Set([...selectedIds, ...groupedResources.map((resource) => resource.id)])];
+            ? validSelectedIds.filter((id) => !groupedResources.some((resource) => resource.id === id))
+            : [...new Set([...validSelectedIds, ...groupedResources.map((resource) => resource.id)])];
           onChange(nextIds);
         }} aria-label={`${groupSelected ? 'Atžymėti' : 'Pažymėti'} visus: ${type.toLocaleLowerCase('lt')}`}>{groupSelected ? 'Atžymėti visus' : 'Pažymėti visus'}</button>}
       </fieldset>;
