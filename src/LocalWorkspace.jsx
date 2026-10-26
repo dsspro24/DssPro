@@ -348,6 +348,11 @@ const defaultResourceTypes = ['Testas', 'Žurnalas', 'Kortelė', 'Protokolas'];
 const jobDescriptionJournalId = 'res-job-description-journal';
 const internalDocumentsRegisterId = 'res-internal-documents-register';
 const chemicalSafetyInstructionCardId = 'res-chemical-safety-instruction-card';
+const dateEnteredPerRecordTemplateKinds = new Set([
+  'fire-safety-journal',
+  'work-rules-journal',
+  'workplace-dss-journal',
+]);
 const knowledgeAssessmentProtocolId = 'res-knowledge-assessment-protocol';
 const defaultCompanyProtocolTemplates = [
   { id: 'res-protocol-fire-safety', title: 'Gaisrinės saugos žinių patikrinimo protokolas', testId: 'res-fire-knowledge-test' },
@@ -551,11 +556,11 @@ const initialData = {
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, regulationNumber: '' } },
     { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructorName: '' } },
-    { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
+    { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
     { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructorName: '', instructorPosition: '' } },
-    { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, date: '' } },
+    { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true } },
     { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
-    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { date: '', instructionNumber: '', instructionTitle: '', instructorPosition: '', changedInstruction: '' } },
+    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', instructorPosition: '', changedInstruction: '' } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', html: aapTemplate, requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
@@ -2128,8 +2133,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         }
       });
     }
-    setResourceSettingsTarget(resource);
-    setResourceSettingsDraft({
+    const settingsDraft = {
       ...defaults,
       ...saved,
       ...(resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule'
@@ -2141,7 +2145,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : saved.requiredSigners ?? [...new Set(defaultRequiredSigners)],
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { commissionSignerOverrides } : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { protocolCadence: saved.protocolCadence ?? defaults.protocolCadence ?? 'weekly-friday' } : {}),
-    });
+    };
+    if (dateEnteredPerRecordTemplateKinds.has(resource.templateKind)) delete settingsDraft.date;
+    setResourceSettingsTarget(resource);
+    setResourceSettingsDraft(settingsDraft);
   };
 
   const saveResourceSettings = (event) => {
@@ -2149,6 +2156,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!currentOrg || !resourceSettingsTarget) return;
     const settings = { ...resourceSettingsDraft, requiredSigners: [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])] };
     delete settings.rowCount;
+    if (dateEnteredPerRecordTemplateKinds.has(resourceSettingsTarget.templateKind)) delete settings.date;
     if (settings.validityMonths !== undefined) settings.validityMonths = Math.max(1, Number(settings.validityMonths) || 12);
     setData((current) => {
       const updated = {
@@ -5166,7 +5174,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const approval = signature
         ? `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeFormatter.format(new Date(signature.signedAt)))}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`
         : `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>`;
-      writeRow(row, [escapeHtml(settings.instructionNumber ?? ''), escapeHtml(settings.instructionTitle || resource.title), formatDate(signature?.signedAt || settings.date), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, escapeHtml(settings.changedInstruction ?? '')]);
+      writeRow(row, [escapeHtml(settings.instructionNumber ?? ''), escapeHtml(settings.instructionTitle || resource.title), formatDate(signature?.signedAt), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, escapeHtml(settings.changedInstruction ?? '')]);
       row.cells[3].innerHTML = `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${signature ? escapeHtml(signature.signer) : escapeHtml(signerName)}<br>${approval}`;
     }
   } else {
@@ -5831,6 +5839,7 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     validityMonths: 'Galiojimas (mėnesiais)',
   };
   const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount'].includes(key)
+    && !(dateEnteredPerRecordTemplateKinds.has(resource.templateKind) && key === 'date')
     && !(resource.templateKind === 'intro-dss-journal' && key === 'date')
     && typeof value !== 'boolean');
   if ((resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule')
