@@ -4543,7 +4543,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </dialog>}
               {canManageSelectedWorkspace && <dialog id="assignment-presets-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Darbuotojų priskyrimų ruošiniai</h2><p className="mt-1 text-sm text-slate-500">Išsaugokite dažnai naudojamus kursų ir dokumentų rinkinius šiai įmonei.</p></div><button type="button" aria-label="Uždaryti ruošinių langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] }); document.getElementById('assignment-presets-dialog')?.close(); }}><X size={20} /></button></div>
-                  <form onSubmit={saveAssignmentPreset} className="space-y-4 rounded-lg border border-slate-200 p-4"><label className="block text-sm font-medium">Ruošinio pavadinimas<input className={`${inputClass} mt-1`} value={assignmentPresetDraft.name} onChange={(event) => setAssignmentPresetDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pvz., Sandėlio darbuotojas" required /></label><fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami kursai ir dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id)).map((resource) => <label className="flex items-start gap-2 text-sm" key={resource.id}><input type="checkbox" checked={assignmentPresetDraft.resourceIds.includes(resource.id)} onChange={(event) => setAssignmentPresetDraft((current) => ({ ...current, resourceIds: event.target.checked ? [...new Set([...current.resourceIds, resource.id])] : current.resourceIds.filter((id) => id !== resource.id) }))} /><span>{resource.title}<small className="block text-slate-500">{resource.type}</small></span></label>)}</div>{!currentOrg?.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</fieldset><div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={() => setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] })}>Išvalyti formą</button><button type="submit" className={buttonClass} disabled={!assignmentPresetDraft.name.trim() || !assignmentPresetDraft.resourceIds.length}><Check size={16} />{assignmentPresetDraft.id ? 'Išsaugoti pakeitimus' : 'Išsaugoti ruošinį'}</button></div></form>
+                  <form onSubmit={saveAssignmentPreset} className="space-y-4 rounded-lg border border-slate-200 p-4"><label className="block text-sm font-medium">Ruošinio pavadinimas<input className={`${inputClass} mt-1`} value={assignmentPresetDraft.name} onChange={(event) => setAssignmentPresetDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pvz., Sandėlio darbuotojas" required /></label><fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami kursai ir dokumentai</legend><ResourceSelectionList resources={data.resources.filter((resource) => currentOrg?.resources.includes(resource.id))} selectedIds={assignmentPresetDraft.resourceIds} onChange={(resourceIds) => setAssignmentPresetDraft((current) => ({ ...current, resourceIds }))} /></fieldset><div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={() => setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] })}>Išvalyti formą</button><button type="submit" className={buttonClass} disabled={!assignmentPresetDraft.name.trim() || !assignmentPresetDraft.resourceIds.length}><Check size={16} />{assignmentPresetDraft.id ? 'Išsaugoti pakeitimus' : 'Išsaugoti ruošinį'}</button></div></form>
                   <div><h3 className="mb-2 font-semibold">Išsaugoti ruošiniai</h3>{(currentOrg?.employeeAssignmentPresets ?? []).length ? <div className="divide-y divide-slate-100">{currentOrg.employeeAssignmentPresets.map((preset) => <div key={preset.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-40 flex-1"><p className="font-semibold">{preset.name}</p><p className="mt-0.5 text-sm text-slate-500">{preset.resourceIds.map((id) => data.resources.find((resource) => resource.id === id)?.title).filter(Boolean).join(' · ') || 'Dokumentų nėra'}</p></div><div className="flex gap-2"><button type="button" title={`Redaguoti ruošinį ${preset.name}`} aria-label={`Redaguoti ruošinį ${preset.name}`} className="rounded-md border border-slate-300 p-2 text-slate-600 hover:bg-slate-50" onClick={() => setAssignmentPresetDraft({ ...preset, resourceIds: [...preset.resourceIds] })}><Pencil size={16} /></button><button type="button" title={`Pašalinti ruošinį ${preset.name}`} aria-label={`Pašalinti ruošinį ${preset.name}`} className="rounded-md border border-rose-300 p-2 text-rose-700 hover:bg-rose-50" onClick={() => deleteAssignmentPreset(preset)}><Trash2 size={16} /></button></div></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">Ruošinių dar nėra. Pasirinkite dokumentus ir išsaugokite pirmą ruošinį.</p>}</div>
                 </div>
               </dialog>}
@@ -4574,20 +4574,29 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {canManageSelectedWorkspace && <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
                   <label className="block text-sm font-medium">Darbuotojo pareigos<input className={`${inputClass} mt-1`} value={employeePositionDraft} onChange={(event) => setEmployeePositionDraft(event.target.value)} placeholder="Darbuotojas" /></label>
-                  <div className="space-y-3">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => {
-                    const isAssigned = employeeResourceDraft.includes(resource.id);
-                    const selectedRoles = employeeSignerDraft[resource.id] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited);
-                    return <div className="rounded-md border border-slate-200 p-3" key={resource.id}>
-                      <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={isAssigned} onChange={(event) => {
-                        setEmployeeResourceDraft((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id));
-                        if (event.target.checked) setEmployeeSignerDraft((current) => ({ ...current, [resource.id]: current[resource.id] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited) }));
-                      }} /><span className="font-semibold">{resource.title}<small className="block font-normal text-slate-500">{resource.type}</small></span></label>
-                      {isAssigned && <fieldset className="mt-3 border-t border-slate-100 pt-3"><legend className="mb-2 text-xs font-semibold text-slate-500">Kas turi pasirašyti</legend><div className="flex flex-wrap gap-x-4 gap-y-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={selectedRoles.includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => setEmployeeSignerDraft((current) => {
+                  <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai ir pasirašantieji</legend><ResourceSelectionList
+                    resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))}
+                    selectedIds={employeeResourceDraft}
+                    onChange={(selectedIds) => {
+                      setEmployeeResourceDraft(selectedIds);
+                      setEmployeeSignerDraft((current) => {
+                        const next = { ...current };
+                        selectedIds.forEach((resourceId) => {
+                          if (next[resourceId]) return;
+                          const resource = data.resources.find((item) => item.id === resourceId);
+                          next[resourceId] = getRequiredSigners(resource, currentOrg, employeeBeingEdited);
+                        });
+                        return next;
+                      });
+                    }}
+                    renderSelected={(resource) => {
+                      const selectedRoles = employeeSignerDraft[resource.id] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited);
+                      return <details className="mt-2 border-t border-slate-200 pt-2"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Kas pasirašo? · {selectedRoles.length} vaidmenys</summary><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={value === 'Darbuotojas' || selectedRoles.includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => setEmployeeSignerDraft((current) => {
                         const roles = current[resource.id] ?? selectedRoles;
                         return { ...current, [resource.id]: event.target.checked ? [...new Set([...roles, value])] : roles.filter((role) => role !== value) };
-                      })} />{label}</label>)}</div></fieldset>}
-                    </div>;
-                  })}</div>
+                      })} />{label}</label>)}</div></details>;
+                    }}
+                  /></fieldset>
                   <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={closeEmployeeEditor} disabled={employeeAssignmentSaving}>Atšaukti</button><button type="button" className={buttonClass} onClick={saveEmployeeAssignments} disabled={employeeAssignmentSaving}>{employeeAssignmentSaving ? 'Išsaugoma…' : 'Išsaugoti priskyrimus'}</button></div>
                 </div>}
               </dialog>}
@@ -4649,7 +4658,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="text-sm font-medium">Pareigos<input className={`${inputClass} mt-1`} value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })} placeholder="Darbuotojas" /></label>
                   <label className="text-sm font-medium">Med. pažymėjimas · galioja iki<input className={`${inputClass} mt-1`} type="date" value={employeeForm.medicalCertificateValidUntil} onChange={(event) => setEmployeeForm({ ...employeeForm, medicalCertificateValidUntil: event.target.value })} /></label>
                 </div>
-                <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><div className="grid gap-2 sm:grid-cols-2">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => <label className="flex items-center gap-2 text-sm" key={resource.id}><input type="checkbox" checked={inviteResourceIds.includes(resource.id)} onChange={(event) => setInviteResourceIds((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id))} />{resource.title}</label>)}{!currentOrg.resources.length && <p className="text-sm text-slate-500">Pirmiausia pridėkite šablonų į įmonės biblioteką.</p>}</div></fieldset>
+                  <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><ResourceSelectionList resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))} selectedIds={inviteResourceIds} onChange={(selectedIds) => { setSelectedAssignmentPresetId(''); setInviteResourceIds(selectedIds); }} /></fieldset>
                 <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
               </form>
             </dialog>
@@ -6104,6 +6113,52 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
   const booleanFields = Object.entries(settings).filter(([, value]) => typeof value === 'boolean');
 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{resource.templateKind !== 'intro-dss-journal' && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
+}
+
+function ResourceSelectionList({ resources, selectedIds, onChange, renderSelected }) {
+  const typeGroups = [...new Set(resources.map((resource) => resource.type))].map((type) => ({
+    type,
+    resources: resources.filter((resource) => resource.type === type),
+  }));
+  const allSelected = resources.length > 0 && resources.every((resource) => selectedIds.includes(resource.id));
+
+  const toggleResource = (resourceId, checked) => onChange(checked
+    ? [...new Set([...selectedIds, resourceId])]
+    : selectedIds.filter((id) => id !== resourceId));
+
+  return <div className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+      <p className="text-xs font-medium text-slate-600">Pasirinkta dokumentų: {selectedIds.filter((id) => resources.some((resource) => resource.id === id)).length} / {resources.length}</p>
+      <button type="button" className="text-xs font-semibold text-emerald-800 hover:underline" onClick={() => onChange(allSelected ? [] : resources.map((resource) => resource.id))} disabled={!resources.length}>
+        {allSelected ? 'Atžymėti visus' : 'Pažymėti visus'}
+      </button>
+    </div>
+    {typeGroups.map(({ type, resources: groupedResources }) => {
+      const groupSelected = groupedResources.every((resource) => selectedIds.includes(resource.id));
+      return <fieldset className="rounded-md border border-slate-200 p-3" key={type}>
+        <legend className="px-1 text-xs font-semibold text-slate-700">{type} · {groupedResources.filter((resource) => selectedIds.includes(resource.id)).length}/{groupedResources.length}</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {groupedResources.map((resource) => {
+            const selected = selectedIds.includes(resource.id);
+            return <div className="min-w-0 rounded-md bg-slate-50 p-2" key={resource.id}>
+              <label className="flex min-w-0 items-start gap-2 text-sm">
+                <input className="mt-0.5 shrink-0" type="checkbox" checked={selected} onChange={(event) => toggleResource(resource.id, event.target.checked)} />
+                <span className="min-w-0 break-words">{resource.title}</span>
+              </label>
+              {selected && renderSelected?.(resource)}
+            </div>;
+          })}
+        </div>
+        {groupedResources.length > 1 && <button type="button" className="mt-2 text-xs font-semibold text-slate-600 hover:underline" onClick={() => {
+          const nextIds = groupSelected
+            ? selectedIds.filter((id) => !groupedResources.some((resource) => resource.id === id))
+            : [...new Set([...selectedIds, ...groupedResources.map((resource) => resource.id)])];
+          onChange(nextIds);
+        }}>{groupSelected ? `Atžymėti ${type.toLocaleLowerCase('lt')}` : `Pažymėti ${type.toLocaleLowerCase('lt')}`}</button>}
+      </fieldset>;
+    })}
+    {!resources.length && <p className="text-sm text-slate-500">Dokumentų šiai įmonei dar nepriskirta.</p>}
+  </div>;
 }
 
 function ResourceCard({ resource, selected, workflowStatus, onToggle, onSettings, onPreview, onComplete, onDelete }) {
