@@ -2212,7 +2212,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openResourceSettings = (resource) => {
-    const defaults = resource.defaultSettings ?? {};
+    const builtInDefaults = initialData.resources.find((item) => item.id === resource.id)?.defaultSettings ?? {};
+    const defaults = { ...builtInDefaults, ...resource.defaultSettings };
     const saved = currentOrg?.resourceSettings?.[resource.id] ?? {};
     const defaultRequiredSigners = resource.templateKind === 'intro-dss-journal'
       ? ['Darbuotojas']
