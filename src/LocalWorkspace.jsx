@@ -631,7 +631,7 @@ const assistantCreatedResourceIds = new Set(initialData.resources
 const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadovas: 'Įmonės vadovas', kurejas: 'Turinio kūrėjas' };
 const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
-  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Istorija', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
+  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
@@ -937,6 +937,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssHistoryView, setDssHistoryView] = useState('specialist');
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
+  const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady);
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerAapBothPagesConfirmed, setWorkerAapBothPagesConfirmed] = useState(false);
   const [workerSignPin, setWorkerSignPin] = useState('');
@@ -1282,7 +1283,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     page: archivePage,
   };
   useEffect(() => {
-    if (!cloudMode || userRole !== 'vadovas' || activeTab !== 'archyvas' || !archivePageRequest.organizationId) return undefined;
+    if (!cloudMode || !canViewCompanyArchive || activeTab !== 'archyvas' || !archivePageRequest.organizationId) return undefined;
     let active = true;
     const timeoutId = window.setTimeout(() => {
       setArchivePageData((current) => ({ ...current, loading: true, error: '' }));
@@ -1320,9 +1321,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [cloudMode, userRole, activeTab, archivePageRequest.organizationId, archivePageRequest.search, archivePageRequest.page]);
+  }, [cloudMode, canViewCompanyArchive, activeTab, archivePageRequest.organizationId, archivePageRequest.search, archivePageRequest.page]);
   useEffect(() => {
-    if (!archiveDetailsId || !cloudMode) return undefined;
+    if (!archiveDetailsId || !cloudMode || !canViewCompanyArchive) return undefined;
     let active = true;
     supabase.rpc('get_archived_employee_record', {
       input_organization_id: currentOrg?.id,
@@ -1337,7 +1338,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (active) setArchiveDetailsLoading(false);
     });
     return () => { active = false; };
-  }, [archiveDetailsId, cloudMode, currentOrg?.id]);
+  }, [archiveDetailsId, cloudMode, canViewCompanyArchive, currentOrg?.id]);
   useEffect(() => {
     if (!cloudMode || userRole !== 'vadovas' || activeTab !== 'ataskaitos' || !currentOrg?.id || creatorReadOnlyPreview) return undefined;
     let active = true;
@@ -1486,7 +1487,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ? dssOrganizationIsOpen
       ? [
         ...roleNavigation.dss.filter(([id]) => id !== 'paskyra'),
-        ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis') : []),
+        ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis' && id !== 'archyvas') : []),
       ]
       : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
     : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
@@ -4637,7 +4638,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {!reportTestTarget && protocolRegistryPanel}
           </section>}
 
-          {activeTab === 'archyvas' && canManageSelectedWorkspace && <section className="archive-page space-y-5">
+          {activeTab === 'archyvas' && canViewCompanyArchive && <section className="archive-page space-y-5">
             <div className="archive-print-controls flex flex-wrap items-end justify-between gap-3"><PageTitle title="Archyvas" subtitle="Atleisti darbuotojai ir jų nekintama pasirašymo istorija." />{creatorReadOnlyPreview && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40" disabled={!archivedOrgEmployees.length} onClick={() => deleteCreatorArchivedEmployees(currentOrg)}><Trash2 size={16} />Ištrinti visą archyvą</button>}</div>
             <p className="archive-print-controls text-sm text-slate-500">Archyvo įrašai skirti tik peržiūrai: pasirašymo datos ir kiti duomenys nekoreguojami.</p>
             {(cloudMode || archivedOrgEmployees.length > 0) && <div className="archive-print-controls space-y-4">
