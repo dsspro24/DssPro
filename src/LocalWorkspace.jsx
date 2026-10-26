@@ -5921,7 +5921,7 @@ function CommissionEditor({ org, employees = [], assignments = [], onInvite, onR
   return <div className="space-y-4">
     <form className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={invite}>
       <label className="text-sm font-medium">Darbuotojas<select className={`${inputClass} mt-1`} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required><option value="">Pasirinkite darbuotoją</option>{availableEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
-      <label className="text-sm font-medium">Komisijos pareigos<select className={`${inputClass} mt-1`} value={role} onChange={(event) => { setRole(event.target.value); setEmployeeId(''); }}><option value="Komisijos narys">Komisijos narys</option><option value="Komisijos pirmininkas" disabled={activeAssignments.some((assignment) => assignment.role === 'Komisijos pirmininkas')}>Komisijos pirmininkas</option></select></label>
+      <label className="text-sm font-medium">Komisijos pareigos<select className={`${inputClass} mt-1`} value={role} onChange={(event) => setRole(event.target.value)}><option value="Komisijos narys">Komisijos narys</option><option value="Komisijos pirmininkas" disabled={activeAssignments.some((assignment) => assignment.role === 'Komisijos pirmininkas')}>Komisijos pirmininkas</option></select></label>
       <button className={`${buttonClass} self-end`} disabled={!availableEmployees.length}><UserPlus size={16} />Kviesti</button>
     </form>
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
