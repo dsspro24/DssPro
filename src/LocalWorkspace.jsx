@@ -924,6 +924,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [editingResourceId, setEditingResourceId] = useState(null);
   const [protocolSource, setProtocolSource] = useState(null);
   const [protocolTitle, setProtocolTitle] = useState('');
+  const [protocolSaving, setProtocolSaving] = useState(false);
   const [protocolRelatedTestId, setProtocolRelatedTestId] = useState('');
   const [protocolRelatedJournalId, setProtocolRelatedJournalId] = useState('');
   const [resourceSettingsTarget, setResourceSettingsTarget] = useState(null);
@@ -2721,10 +2722,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     await onCreatorOrganizationDeleted();
   };
 
-  const saveCompanyProtocol = (event) => {
+  const saveCompanyProtocol = async (event) => {
     event.preventDefault();
     const title = protocolTitle.trim();
-    if (!protocolSource || !currentOrg || !title) return;
+    if (protocolSaving || !protocolSource || !currentOrg || !title) return;
     const availableResourceIds = new Set(currentOrg.resources);
     const protocol = {
       ...protocolSource,
@@ -2739,19 +2740,43 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       signatures: true,
       isProtocolTemplate: false,
     };
-    setData((current) => ({
-      ...current,
-      resources: [protocol, ...current.resources],
-      organizations: current.organizations.map((org) => org.id === currentOrg.id
+    const nextData = {
+      ...data,
+      resources: [protocol, ...data.resources],
+      organizations: data.organizations.map((org) => org.id === currentOrg.id
         ? { ...org, resources: [...new Set([...org.resources, protocol.id])] }
         : org),
-    }));
-    setProtocolSource(null);
-    setProtocolTitle('');
-    setProtocolRelatedTestId('');
-    setProtocolRelatedJournalId('');
-    setNotice(`Protokolas „${title}“ išsaugotas įmonės bibliotekoje.`);
+    };
+    setProtocolSaving(true);
+    try {
+      if (cloudMode) {
+        if (workspaceAutosaveTimeoutRef.current !== null) {
+          window.clearTimeout(workspaceAutosaveTimeoutRef.current);
+          workspaceAutosaveTimeoutRef.current = null;
+        }
+        await workspaceAutosaveRequestRef.current;
+        const { error } = await supabase.from('organization_data').upsert({
+          organization_id: currentOrg.id,
+          data: workspaceForDatabase(nextData),
+          updated_by: cloudUserId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'organization_id' });
+        if (error) throw error;
+        skipNextWorkspaceAutosaveRef.current = true;
+      }
+      setData(nextData);
+      setProtocolSource(null);
+      setProtocolTitle('');
+      setProtocolRelatedTestId('');
+      setProtocolRelatedJournalId('');
+      setNotice(`Protokolas „${title}“ išsaugotas įmonės bibliotekoje.`);
+    } catch (error) {
+      setNotice(`Protokolo „${title}“ išsaugoti nepavyko: ${error.message}`);
+    } finally {
+      setProtocolSaving(false);
+    }
   };
+  {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" disabled={protocolSaving} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-50" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required disabled={protocolSaving} className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><label className="mt-4 block text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} disabled={protocolSaving} value={protocolRelatedTestId} onChange={(event) => setProtocolRelatedTestId(event.target.value)}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Testas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><label className="mt-4 block text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} disabled={protocolSaving} value={protocolRelatedJournalId} onChange={(event) => setProtocolRelatedJournalId(event.target.value)}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Žurnalas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><p className="mt-2 text-xs text-slate-500">Protokolas bus sukurtas šiai įmonei ir automatiškai įtrauktas į jos biblioteką.</p><div className="mt-6 flex justify-end gap-2"><button type="button" disabled={protocolSaving} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => setProtocolSource(null)}>Atšaukti</button><button className={buttonClass} disabled={protocolSaving}><Check size={16} />{protocolSaving ? 'Kuriama…' : 'Išsaugoti protokolą'}</button></div></form></div>}
 
   const openCompanyProtocolForm = (resource) => {
     setProtocolSource(resource);
