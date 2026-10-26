@@ -748,6 +748,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           subscriptions: (sourceData?.subscriptions ?? []).filter((subscription) => subscription.orgId === creatorPreview.organizationId),
         };
         return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
+          key={`creator-preview-${creatorPreview.organizationId}-${creatorPreview.role}`}
           userRole={creatorPreview.role}
           onRoleChange={() => {}}
           onExit={signOut}
@@ -764,6 +765,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       }
     }
     return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
+        key={workspace.creator ? 'creator-workspace' : 'signed-in-workspace'}
       userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'}
       onRoleChange={() => {}}
       onExit={signOut}
