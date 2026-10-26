@@ -903,6 +903,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [taskFilter, setTaskFilter] = useState('atliktinos');
   const [taskSearch, setTaskSearch] = useState('');
   const [specialistQuery, setSpecialistQuery] = useState('');
+  const [inviteDssCanManageWorkspace, setInviteDssCanManageWorkspace] = useState(true);
   const [employeeForm, setEmployeeForm] = useState({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const openInviteForRehire = useRef(false);
@@ -3322,7 +3323,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const inviteSpecialist = async (specialist) => {
     if (cloudMode) {
       const { data: invitation, error } = await supabase.functions.invoke('invite-dss-specialist', {
-        body: { organizationId: currentOrg.id, email: specialist.email, redirectTo: window.location.origin },
+        body: {
+          organizationId: currentOrg.id,
+          email: specialist.email,
+          redirectTo: window.location.origin,
+          canManageWorkspace: inviteDssCanManageWorkspace,
+        },
       });
       if (error) {
         let message = error.message;
@@ -3349,6 +3355,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ],
       }));
       setSpecialistQuery('');
+      setInviteDssCanManageWorkspace(true);
       setNotice(invitation.invited
         ? `Kvietimo nuoroda išsiųsta ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`
         : `Kvietimas pateiktas ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`);
@@ -4665,6 +4672,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>)}
                 {userRole === 'vadovas' && (data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
                 {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
+                {userRole === 'vadovas' && cloudMode && <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={inviteDssCanManageWorkspace} onChange={(event) => setInviteDssCanManageWorkspace(event.target.checked)} /><span>Gali tvarkyti įmonės darbo sritį<small className="mt-0.5 block font-normal text-slate-500">Pažymėta pagal nutylėjimą. Teisę vėliau galėsite pakeisti prie priskirto DSS specialisto.</small></span></label>}
                 {userRole === 'vadovas' && <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
                 </label>}

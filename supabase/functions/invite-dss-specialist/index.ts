@@ -39,6 +39,7 @@ Deno.serve(async (request) => {
   const organizationId = String(body.organizationId ?? '');
   const email = String(body.email ?? '').trim().toLowerCase();
   const redirectTo = String(body.redirectTo ?? '');
+  const canManageWorkspace = body.canManageWorkspace === true;
   let redirectUrl: URL;
   try {
     redirectUrl = new URL(redirectTo);
@@ -146,6 +147,7 @@ Deno.serve(async (request) => {
     invited_email: email,
     invited_name: fullName,
     invited_by: manager.id,
+    can_manage_workspace: canManageWorkspace,
     status: 'pending',
   }).select('id').single();
   if (invitationError) {
@@ -159,6 +161,7 @@ Deno.serve(async (request) => {
     fullName,
     email,
     organizationName: String(organization.name ?? ''),
+    canManageWorkspace,
     invited,
     status: 'pending',
   });
