@@ -636,7 +636,7 @@ const assistantCreatedResourceIds = new Set(initialData.resources
 const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadovas: 'Įmonės vadovas', kurejas: 'Turinio kūrėjas' };
 const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
-  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi žurnalai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
+  dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
