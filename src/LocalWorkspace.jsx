@@ -810,6 +810,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTabState] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
   const setActiveTab = (tab) => {
+    if (tab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive) tab = 'skydelis';
     if (tab === activeTab) return;
     const currentState = window.history.state;
     window.history.pushState({
@@ -828,12 +829,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   useEffect(() => {
     const handlePopState = (event) => {
       if (typeof event.state?.dssProWorkspaceTab === 'string') {
-        setActiveTabState(event.state.dssProWorkspaceTab);
+        const requestedTab = event.state.dssProWorkspaceTab;
+        setActiveTabState(requestedTab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive ? 'skydelis' : requestedTab);
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [canViewCompanyArchive, userRole]);
   const [selectedOrgId, setSelectedOrgId] = useState(cloudMode && userRole === 'vadovas'
     ? cloudOrganization?.id ?? initialCloudData?.organizations[0]?.id ?? ''
     : initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
@@ -978,7 +980,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssHistoryView, setDssHistoryView] = useState('specialist');
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
-  const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady);
+  const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady
+    && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerAapBothPagesConfirmed, setWorkerAapBothPagesConfirmed] = useState(false);
   const [workerSignPin, setWorkerSignPin] = useState('');
@@ -1559,7 +1562,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const activeNavigation = userRole === 'dss'
     ? dssOrganizationIsOpen
       ? [
-        ...roleNavigation.dss.filter(([id]) => id !== 'paskyra'),
+        ...roleNavigation.dss.filter(([id]) => id !== 'paskyra' && (id !== 'archyvas' || canViewCompanyArchive)),
         ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis' && id !== 'archyvas') : []),
       ]
       : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
