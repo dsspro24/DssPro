@@ -921,6 +921,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssManagementSavingId, setDssManagementSavingId] = useState('');
   const [employeePositionDraft, setEmployeePositionDraft] = useState('');
   const [inviteResourceIds, setInviteResourceIds] = useState(['res-fire', 'res-height', 'res-aap']);
+  const [inviteSignerDraft, setInviteSignerDraft] = useState({});
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
   const [assignmentPresetDraft, setAssignmentPresetDraft] = useState({ id: '', name: '', resourceIds: [] });
   const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
@@ -2971,11 +2972,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)),
       data.resources,
     ).filter((resourceId) => currentOrg.resources.includes(resourceId));
+    const requiredSignersByResource = Object.fromEntries(assignedResourceIds.map((resourceId) => {
+      const resource = data.resources.find((item) => item.id === resourceId);
+      const roles = inviteSignerDraft[resourceId] ?? getRequiredSigners(resource, currentOrg, null);
+      return [resourceId, [...new Set(['Darbuotojas', ...roles])]];
+    }));
     const invitedEmployee = {
       id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: rehireRecord ? 'Aktyvus' : 'Pakviestas', inviteCount: 1, invitedAt,
       medicalCertificateValidUntil: employeeForm.medicalCertificateValidUntil || '',
       medicalCertificateReminderDate: getMedicalCertificateReminderDate(employeeForm.medicalCertificateValidUntil),
-      resourceIds: assignedResourceIds, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, progressByResource: {}, testResults: [], pin: rehireRecord?.employee.pin ?? '',
+      resourceIds: assignedResourceIds, requiredSignersByResource, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, progressByResource: {}, testResults: [], pin: rehireRecord?.employee.pin ?? '',
     };
     const organizationEmployees = [
       ...data.employees.filter((person) => person.orgId === currentOrg.id),
@@ -3047,6 +3053,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }));
       setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
       setEmployeeForm({ firstName: '', lastName: '', email: '', contractNumber: '', position: '', medicalCertificateValidUntil: '' });
+      setInviteSignerDraft({});
       setEmployeeSearch('');
       setEmployeePage(Math.ceil((orgEmployees.length + 1) / employeePageSize));
       setNotice(sequenceSaveError
@@ -4659,7 +4666,33 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="text-sm font-medium">Pareigos<input className={`${inputClass} mt-1`} value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })} placeholder="Darbuotojas" /></label>
                   <label className="text-sm font-medium">Med. pažymėjimas · galioja iki<input className={`${inputClass} mt-1`} type="date" value={employeeForm.medicalCertificateValidUntil} onChange={(event) => setEmployeeForm({ ...employeeForm, medicalCertificateValidUntil: event.target.value })} /></label>
                 </div>
-                  <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai</legend><ResourceSelectionList resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))} selectedIds={inviteResourceIds} onChange={(selectedIds) => { setSelectedAssignmentPresetId(''); setInviteResourceIds(selectedIds); }} /></fieldset>
+                  <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai ir pasirašantieji</legend><ResourceSelectionList
+                    resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))}
+                    selectedIds={inviteResourceIds}
+                    onChange={(selectedIds) => {
+                      setSelectedAssignmentPresetId('');
+                      setInviteResourceIds(selectedIds);
+                      setInviteSignerDraft((current) => {
+                        const next = { ...current };
+                        selectedIds.forEach((resourceId) => {
+                          if (next[resourceId]) return;
+                          const resource = data.resources.find((item) => item.id === resourceId);
+                          next[resourceId] = getRequiredSigners(resource, currentOrg, null);
+                        });
+                        return next;
+                      });
+                    }}
+                    renderSelected={(resource) => {
+                      const selectedRoles = inviteSignerDraft[resource.id] ?? getRequiredSigners(resource, currentOrg, null);
+                      const selectedInstructorRoles = selectedRoles.filter((role) => ['Vadovas', 'DSS specialistas'].includes(role));
+                      return <details className="mt-2 border-t border-slate-200 pt-2"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Kas pasirašo? · {selectedRoles.length} vaidmenys</summary><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={value === 'Darbuotojas' || selectedRoles.includes(value)} disabled={value === 'Darbuotojas' || resource.templateKind === 'intro-dss-journal' && ['Vadovas', 'DSS specialistas'].includes(value) && selectedRoles.includes(value) && selectedInstructorRoles.length === 1} onChange={(event) => setInviteSignerDraft((current) => {
+                        const roles = current[resource.id] ?? selectedRoles;
+                        const nextRoles = event.target.checked ? [...new Set([...roles, value])] : roles.filter((role) => role !== value);
+                        if (resource.templateKind === 'intro-dss-journal' && !nextRoles.some((role) => ['Vadovas', 'DSS specialistas'].includes(role))) return current;
+                        return { ...current, [resource.id]: nextRoles };
+                      })} />{label}</label>)}</div></details>;
+                    }}
+                  /></fieldset>
                 <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
               </form>
             </dialog>
