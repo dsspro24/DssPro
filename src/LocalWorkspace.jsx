@@ -1554,26 +1554,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? employee.progressByResource?.[resource.id] === 'completed' || ['signed', 'unsigned'].includes(status.key)
       : status.key === 'signed');
     const unresolvedEntries = entries.filter(({ status }) => status.key !== 'signed');
-    const waitingSignatureKeys = ['awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'];
-    const waitingSignerKeys = [...new Set(unresolvedEntries
-      .map(({ status }) => status.key)
-      .filter((key) => waitingSignatureKeys.includes(key)))];
-    const onlyWaitingForSignatures = unresolvedEntries.length > 0
-      && unresolvedEntries.every(({ status }) => waitingSignatureKeys.includes(status.key));
     const label = isTest
       ? completed ? 'Išlaikyta' : 'Neišlaikyta'
-      : completed ? pinSignedStatusLabel
-        : onlyWaitingForSignatures
-          ? waitingSignerKeys.length === 1
-            ? unresolvedEntries.find(({ status }) => status.key === waitingSignerKeys[0]).status.label
-            : 'Laukia parašų'
-          : unresolvedEntries.every(({ status }) => status.key === 'unsigned')
-            ? 'Užbaigta, nepasirašyta'
-            : unresolvedEntries.every(({ status }) => status.key === 'todo')
-              ? 'Nepradėta'
-              : unresolvedEntries.every(({ status }) => status.key === 'started')
-                ? 'Vyksta'
-                : 'Yra neužbaigtų dokumentų';
+      : completed ? 'Pasirašyta'
+        : unresolvedEntries.some(({ status }) => status.key === 'awaitingDss')
+          ? 'Laukiama DSS'
+          : unresolvedEntries.every(({ status }) => status.key === 'todo')
+            ? 'Nepradėta'
+            : 'Neužbaigta';
     const Icon = completed ? CircleCheck : isTest ? CircleX : CircleAlert;
     const tone = completed ? 'bg-emerald-100 text-emerald-800' : isTest ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800';
     const title = entries.map(({ resource, status }) => {
@@ -1590,27 +1578,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
   const getEmployeeDashboardBadge = (employee, resources) => {
     const statuses = resources.map((resource) => getTaskStatus(employee, resource).key);
-    if (statuses.length && statuses.every((status) => status === 'signed')) return { label: pinSignedStatusLabel, cls: 'bg-emerald-100 text-emerald-800', Icon: CircleCheck };
+    if (statuses.length && statuses.every((status) => status === 'signed')) return { label: 'Pasirašyta', cls: 'bg-emerald-100 text-emerald-800', Icon: CircleCheck };
     const awaitingDss = statuses.includes('awaitingDss');
-    const awaitingEmployer = statuses.includes('awaitingEmployer');
-    const awaitingCommission = statuses.includes('awaitingCommission');
-    if (awaitingDss || awaitingEmployer || awaitingCommission) {
-      const waitingFor = [
-        ...(awaitingEmployer ? ['vadovo'] : []),
-        ...(awaitingDss ? ['DSS specialisto'] : []),
-        ...(awaitingCommission ? ['komisijos'] : []),
-      ];
-      const label = waitingFor.length > 1
-        ? `Laukia ${waitingFor.slice(0, -1).join(', ')} ir ${waitingFor.at(-1)} parašų`
-        : `Laukia ${waitingFor[0]} parašo`;
-      return { label, cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
-    }
-    if (statuses.includes('unsigned')) return { label: 'Nepasirašyta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
-    if (statuses.some((status) => ['todo', 'expired'].includes(status))) return { label: 'Neatlikta', cls: 'bg-orange-100 text-orange-800', Icon: CircleX };
-    if (statuses.includes('awaitingSignatures')) return { label: 'Laukia parašų', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
-    if (statuses.includes('started')) return { label: 'Vyksta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
-    if (employee.status === 'Pakviestas') return { label: 'Pakviestas', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
-    return { label: 'Nepriskirta', cls: 'bg-slate-100 text-slate-600', Icon: CircleAlert };
+    if (awaitingDss) return { label: 'Laukiama DSS', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
+    if (statuses.length && statuses.every((status) => status === 'todo')) return { label: 'Nepradėta', cls: 'bg-orange-100 text-orange-800', Icon: CircleX };
+    if (!statuses.length) return { label: 'Nepradėta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
+    return { label: 'Neužbaigta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
   };
   const filteredOrgEmployees = useMemo(() => managerDashboardEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'))), [managerDashboardEmployees, employeeSearch]);
   const employeePageCount = Math.max(1, Math.ceil(filteredOrgEmployees.length / employeePageSize));
@@ -4279,13 +4252,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>
                 </div>
                 <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <span className="font-semibold text-slate-800">{filteredOrgEmployees.length}</span></span></div>
-                <div className="space-y-3 lg:hidden">{paginatedOrgEmployees.map((employee) => {
+                <div className="space-y-3 xl:hidden">{paginatedOrgEmployees.map((employee) => {
                   const assignedResources = employee.invitePending ? [] : (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
                   const medicalDate = employee.medicalCertificateValidUntil;
                   const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                   const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
                   const needsReminder = !employee.invitePending && (employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key)));
-                  const badge = employee.invitePending ? { label: 'Siunčiamas kvietimas', cls: 'bg-sky-100 text-sky-800', Icon: CircleAlert } : getEmployeeDashboardBadge(employee, assignedResources);
+                  const badge = getEmployeeDashboardBadge(employee, assignedResources);
                   const BadgeIcon = badge.Icon;
                   return <article className="rounded-lg border border-slate-200 bg-white p-3" key={employee.id}>
                     <div className="flex items-start justify-between gap-2"><h3 className="min-w-0 break-words text-sm font-semibold text-slate-900">{employee.name}</h3><span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${badge.cls}`}>{badge.label}<BadgeIcon size={13} /></span></div>
@@ -4302,14 +4275,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <div inert={employee.invitePending} className={`mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={17} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={17} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1.5 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={17} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={17} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1.5 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={17} /></button>}</div>
                   </article>;
                 })}</div>
-                <div className="hidden w-full overflow-x-auto lg:block"><table className="w-full min-w-max text-left text-[13px]"><thead><tr className="border-y border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
-                  <th rowSpan={2} className="min-w-40 px-3 py-3"><span className="pl-1">Darbuotojas</span></th>
-                  <th colSpan={dashboardResourceGroups.length} className="px-2 py-2 text-center">Turinio tipai</th>
-                  {renderEmployeeSortHeader('medical', <>Med. pažymėjimo<br />galiojimas</>, 'min-w-32', 'Med. pažymėjimo galiojimas', 2)}
-                  {renderEmployeeSortHeader('status', 'Būsena', 'min-w-28', 'Būsena', 2)}
-                  <th rowSpan={2} className="min-w-28 px-2 py-3 text-center">Veiksmai</th>
+                <div className="hidden w-full xl:block"><table className="w-full table-fixed text-left text-xs"><colgroup>
+                  <col style={{ width: '17%' }} />
+                  {dashboardResourceGroups.map((group) => <col key={group.key} style={{ width: `${44 / dashboardResourceGroups.length}%` }} />)}
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup><thead><tr className="border-y border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
+                  <th rowSpan={2} className="px-2 py-3"><span className="pl-1">Darbuotojas</span></th>
+                  <th colSpan={dashboardResourceGroups.length} className="px-1 py-2 text-center">Turinio tipai</th>
+                  {renderEmployeeSortHeader('medical', <>Med. pažymėjimo<br />galiojimas</>, 'px-1 text-center', 'Med. pažymėjimo galiojimas', 2)}
+                  {renderEmployeeSortHeader('status', 'Būsena', 'px-1 text-center', 'Būsena', 2)}
+                  <th rowSpan={2} className="px-1 py-3 text-center">Veiksmai</th>
                 </tr><tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
-                  {dashboardResourceGroups.map((group) => renderEmployeeSortHeader(group.key, group.label, 'min-w-36', group.label))}
+                  {dashboardResourceGroups.map((group) => renderEmployeeSortHeader(group.key, group.label, 'px-1 py-2', group.label))}
                 </tr></thead>
                   <tbody className="divide-y divide-slate-100">{paginatedOrgEmployees.map((employee) => {
                     const assignedResources = employee.invitePending ? [] : (employee.resourceIds ?? []).filter((id) => currentOrg.resources.includes(id)).map((id) => data.resources.find((resource) => resource.id === id)).filter(Boolean);
@@ -4317,21 +4296,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     const medicalDateExpired = isDateExpired(medicalDate, validityCheckTime);
                     const MedicalIcon = !medicalDate ? CircleAlert : medicalDateExpired ? CircleX : CircleCheck;
                     const needsReminder = !employee.invitePending && (employee.status === 'Pakviestas' || assignedResources.some((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(employee, resource).key)));
-                    const dashboardBadge = employee.invitePending ? { label: 'Siunčiamas kvietimas', cls: 'bg-sky-100 text-sky-800', Icon: CircleAlert } : getEmployeeDashboardBadge(employee, assignedResources);
+                    const dashboardBadge = getEmployeeDashboardBadge(employee, assignedResources);
                     return <tr className="border-b border-slate-200 last:border-0 hover:bg-slate-50/80" key={employee.id}>
-                      <td className="break-words px-3 py-3 align-middle font-medium text-slate-900">{employee.name}</td>
+                      <td className="break-words px-2 py-3 align-middle font-medium text-slate-900">{employee.name}</td>
                       {dashboardResourceGroups.map((group) => {
                         const summary = getDashboardGroupSummary(employee, assignedResources, group);
                         const SummaryIcon = summary?.Icon ?? CircleAlert;
-                        return <td className="px-2 py-3 align-middle" key={group.key}>{summary ? <div className="flex justify-center"><span title={summary.title} className={`inline-flex max-w-full items-center justify-center gap-1.5 truncate rounded-full px-2 py-1 text-[13px] font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={14} className="shrink-0" /></span></div> : <span title="Šio tipo dokumentas darbuotojui nepriskirtas" className="flex items-center justify-center gap-1 text-[13px] text-slate-400">Netaikoma<CircleAlert size={14} /></span>}</td>;
+                        return <td className="px-1 py-2 align-middle" key={group.key}>{summary ? <div className="flex justify-center"><span title={summary.title} className={`inline-flex max-w-full items-center justify-center gap-1 truncate rounded-full px-1.5 py-1 text-[11px] font-semibold ${summary.tone}`}><span className="truncate">{summary.label}</span><SummaryIcon size={12} className="shrink-0" /></span></div> : <span title="Šio tipo dokumentas darbuotojui nepriskirtas" className="flex items-center justify-center gap-1 text-[11px] text-slate-400">Netaikoma<CircleAlert size={12} /></span>}</td>;
                       })}
-                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" disabled={employee.invitePending} className={`w-28 min-w-0 rounded-md border px-1 py-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
+                      <td className="px-1 py-2 align-middle"><div className="flex items-center justify-center gap-1"><input type="date" aria-label={`Sveikatos pažymėjimo galiojimas: ${employee.name}`} title="Įrašykite arba pakeiskite galiojimo datą" disabled={employee.invitePending} className={`min-w-0 flex-1 rounded-md border px-0.5 py-1.5 text-[11px] tabular-nums outline-none focus:ring-2 focus:ring-blue-100 ${medicalDate ? medicalDateExpired ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`} value={medicalDate ?? ''} onChange={(event) => updateMedicalCertificateDate(employee.id, event.target.value)} /><MedicalIcon size={13} className={`shrink-0 ${medicalDate ? medicalDateExpired ? 'text-rose-600' : 'text-emerald-600' : 'text-slate-400'}`} title={!medicalDate ? 'Data nenurodyta' : medicalDateExpired ? 'Pažymėjimas nebegalioja' : 'Pažymėjimas galioja'} /></div></td>
                       <td className="px-2 py-3 align-middle">{(() => {
                         const badge = dashboardBadge;
                         const BadgeIcon = badge.Icon;
-                        return <span title="Bendra darbuotojo užduočių būsena" className={`inline-flex w-full items-center justify-center gap-1 rounded-md px-1 py-1 text-[13px] font-semibold ${badge.cls}`}><span>{badge.label}</span><BadgeIcon size={13} /></span>;
+                        return <span title={badge.label} className={`inline-flex w-full items-center justify-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold ${badge.cls}`}><span className="truncate">{badge.label}</span><BadgeIcon size={12} className="shrink-0" /></span>;
                       })()}</td>
-                      <td className="px-1 py-2 align-middle"><div inert={employee.invitePending} className={`flex justify-center gap-0.5 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={16} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={16} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={16} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={16} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={16} /></button>}</div></td>
+                      <td className="px-1 py-2 align-middle"><div inert={employee.invitePending} className={`flex justify-center gap-0.5 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={14} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={14} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={14} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={14} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={14} /></button>}</div></td>
                     </tr>;
                   })}</tbody></table></div>
                 {filteredOrgEmployees.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Darbuotojų pagal pasirinktus filtrus nerasta.</p>}
