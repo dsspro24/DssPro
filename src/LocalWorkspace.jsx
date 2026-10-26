@@ -560,7 +560,7 @@ const initialData = {
     { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructorName: '', instructorPosition: '', instructorCanManager: false, instructorCanDss: true } },
     { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true } },
     { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
-    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instrukcijų registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', instructorPosition: '', changedInstruction: '' } },
+    { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instruktavimų darbo vietoje registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', approvalDate: '', instructorName: '', instructorPosition: '', changedInstruction: '' } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', html: aapTemplate, requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
@@ -752,6 +752,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const workspaceData = {
       ...loadedData,
       resources: (loadedData.resources ?? []).map((resource) => {
+        if (resource.id === 'res-fire-safety-journal') {
+          const defaults = initialData.resources.find((item) => item.id === resource.id);
+          return {
+            ...defaults,
+            ...resource,
+            title: defaults.title,
+            html: fireSafetyJournalTemplate,
+            htmlUrl: undefined,
+            templateKind: 'fire-safety-journal',
+            defaultSettings: { ...defaults.defaultSettings, ...resource.defaultSettings },
+          };
+        }
         if (resource.id !== 'res-medical-examination-schedule') return resource;
         const defaults = initialData.resources.find((item) => item.id === resource.id);
         return {
@@ -2468,12 +2480,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const getResourceWithHtml = async (resource, { useCache = true } = {}) => {
-    if (resource.id === 'res-medical-examination-schedule' || resource.id === 'res-work-rules-journal') {
+    if (resource.id === 'res-fire-safety-journal' || resource.id === 'res-medical-examination-schedule' || resource.id === 'res-work-rules-journal') {
       const defaultResource = initialData.resources.find((item) => item.id === resource.id);
       resource = {
         ...defaultResource,
         ...resource,
-        html: defaultResource?.html || resource.html,
+        title: resource.id === 'res-fire-safety-journal' ? defaultResource?.title : resource.title,
+        html: resource.id === 'res-fire-safety-journal' ? fireSafetyJournalTemplate : defaultResource?.html || resource.html,
+        htmlUrl: resource.id === 'res-fire-safety-journal' ? undefined : resource.htmlUrl,
         templateKind: resource.templateKind ?? defaultResource?.templateKind,
         requiredSigners: resource.requiredSigners ?? defaultResource?.requiredSigners,
         defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
@@ -5307,7 +5321,9 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : resource.templateKind === 'medical-examination-schedule' ? parsed.querySelector('.document-page .journal-table') : parsed.querySelector('.journal-page .journal-table');
+  const journalTables = parsed.querySelectorAll('.journal-page .journal-table');
+  const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : resource.templateKind === 'medical-examination-schedule' ? parsed.querySelector('.document-page .journal-table') : journalTables[0];
+  const fireSafetyEmployeeTable = resource.templateKind === 'fire-safety-journal' ? journalTables[1] : null;
   if (resource.templateKind === 'internal-documents-register') {
     parsed.querySelectorAll('[data-setting]').forEach((element) => {
       const value = resource.defaultSettings?.[element.dataset.setting];
@@ -5323,14 +5339,26 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   const employees = resource.defaultSettings?.populateEmployees === false ? [] : assignedEmployees;
   const templateRowCount = rows.length;
   const rowCount = resource.templateKind === 'fire-safety-journal'
-    ? 1
+    ? templateRowCount
     : Math.max(templateRowCount, employees.length);
   const tableBody = table?.tBodies[0];
-  if (table) table.dataset.pageSize = String(resource.templateKind === 'fire-safety-journal' ? 1 : templateRowCount);
+  if (table) table.dataset.pageSize = String(templateRowCount);
   if (tableBody && rows[0]) {
     while (tableBody.rows.length > rowCount) tableBody.deleteRow(tableBody.rows.length - 1);
     while (tableBody.rows.length < rowCount) tableBody.append(rows[0].cloneNode(true));
     rows = [...tableBody.rows];
+  }
+  let fireSafetyEmployeeRows = [...(fireSafetyEmployeeTable?.tBodies[0]?.rows ?? [])];
+  if (fireSafetyEmployeeTable?.tBodies[0] && fireSafetyEmployeeRows[0]) {
+    const employeeRowCount = Math.max(fireSafetyEmployeeRows.length, employees.length);
+    while (fireSafetyEmployeeTable.tBodies[0].rows.length > employeeRowCount) {
+      fireSafetyEmployeeTable.tBodies[0].deleteRow(fireSafetyEmployeeTable.tBodies[0].rows.length - 1);
+    }
+    while (fireSafetyEmployeeTable.tBodies[0].rows.length < employeeRowCount) {
+      fireSafetyEmployeeTable.tBodies[0].append(fireSafetyEmployeeRows[0].cloneNode(true));
+    }
+    fireSafetyEmployeeRows = [...fireSafetyEmployeeTable.tBodies[0].rows];
+    fireSafetyEmployeeTable.dataset.pageSize = '15';
   }
   if (resource.templateKind === 'internal-documents-register') {
     const expectedCellCount = table?.tHead?.rows[2]?.cells.length ?? 0;
@@ -5366,17 +5394,35 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   parsed.head.append(style);
 
   if (resource.templateKind === 'fire-safety-journal') {
+    const settings = resource.defaultSettings ?? {};
     const row = rows[0];
     if (row) {
-      const settings = resource.defaultSettings ?? {};
-      const signature = signatures.filter((item) => item.resourceId === resource.id && item.role === 'DSS specialistas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
-      const signerName = specialists.find((person) => org?.dss?.includes(person.id))?.name ?? 'DSS specialistas';
-      const approval = signature
-        ? `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeFormatter.format(new Date(signature.signedAt)))}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`
-        : `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>`;
-      writeRow(row, [escapeHtml(settings.instructionNumber ?? ''), escapeHtml(settings.instructionTitle || resource.title), formatDate(signature?.signedAt), `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${escapeHtml(signature?.signer ?? signerName)}`, escapeHtml(settings.changedInstruction ?? '')]);
-      row.cells[3].innerHTML = `${escapeHtml(settings.instructorPosition || 'DSS specialistas')}<br>${signature ? escapeHtml(signature.signer) : escapeHtml(signerName)}<br>${approval}`;
+      writeRow(row, [
+        escapeHtml(settings.instructionNumber ?? ''),
+        escapeHtml(settings.instructionTitle || resource.title),
+        formatDate(settings.approvalDate),
+        [settings.instructorPosition, settings.instructorName].filter(Boolean).map(escapeHtml).join('<br>'),
+        escapeHtml(settings.changedInstruction ?? ''),
+      ]);
     }
+    employees.slice(0, fireSafetyEmployeeRows.length).forEach((item, index) => {
+      const employeeRow = fireSafetyEmployeeRows[index];
+      const entries = entriesFor(item);
+      const worker = entries.find((entry) => entry.role === 'Darbuotojas');
+      const instructor = entries.find((entry) => entry.role === 'DSS specialistas');
+      const instructorName = instructor?.signedBy ?? instructor?.name ?? settings.instructorName ?? 'DSS specialistas';
+      writeRow(employeeRow, [
+        formatDate(worker?.signedAt ?? instructor?.signedAt),
+        escapeHtml(item.name),
+        escapeHtml(item.position || 'Darbuotojas'),
+        escapeHtml(settings.instructionNumber ?? ''),
+        escapeHtml(settings.instructionTitle || resource.title),
+        [settings.instructorPosition || 'DSS specialistas', instructorName].filter(Boolean).map(escapeHtml).join('<br>'),
+        proof(item, instructor),
+        proof(item, worker),
+        '',
+      ]);
+    });
   } else {
     employees.slice(0, rows.length).forEach((item, index) => {
       const row = rows[index];
@@ -5881,7 +5927,8 @@ function prepareResourcePrintLayout(html) {
 
 function getRecordPreviewPage(html, pageIndex, fallbackPageSize = 20) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
+  const table = parsed.querySelector('.employee-instruction-table')
+    ?? parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
   const body = table?.tBodies[0];
   const pageSize = Number(table?.dataset.pageSize) || fallbackPageSize;
   if (!body || body.rows.length <= pageSize) return { html, pageCount: 1 };
@@ -5889,12 +5936,18 @@ function getRecordPreviewPage(html, pageIndex, fallbackPageSize = 20) {
   const rows = [...body.rows];
   const pageCount = Math.ceil(rows.length / pageSize);
   const pageDocument = new DOMParser().parseFromString(html, 'text/html');
-  const pageBody = pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table')?.tBodies[0];
+  const pageBody = (pageDocument.querySelector('.employee-instruction-table')
+    ?? pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table'))?.tBodies[0];
   if (!pageBody) return { html, pageCount: 1 };
   const start = pageIndex * pageSize;
   const pageRows = rows.slice(start, start + pageSize);
   pageBody.replaceChildren(...pageRows.map((row) => pageDocument.importNode(row, true)));
-  if (pageIndex > 0) pageDocument.querySelector('.cover-page')?.remove();
+  if (pageIndex > 0) {
+    pageDocument.querySelector('.cover-page')?.remove();
+    [...pageDocument.querySelectorAll('.journal-page')]
+      .find((journalPage) => !journalPage.querySelector('.employee-instruction-table'))
+      ?.remove();
+  }
   if (pageIndex < pageCount - 1) pageDocument.querySelector('.signature-audit')?.remove();
   return { html: `<!DOCTYPE html>\n${pageDocument.documentElement.outerHTML}`, pageCount };
 }
@@ -6020,6 +6073,7 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     periodicity: 'Medicininės apžiūros periodiškumas',
     directorName: 'Direktoriaus vardas, pavardė',
     date: 'Data',
+    approvalDate: 'Instrukcijos tvirtinimo data',
     instructionNumber: 'Instrukcijos Nr.',
     instructionTitle: 'Instrukcijos pavadinimas',
     instructorName: 'Instruktuojančiojo vardas, pavardė',

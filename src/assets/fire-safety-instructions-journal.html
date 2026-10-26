@@ -177,6 +177,15 @@
         .col-4 { width: 28%; } /* Instrukciją tvirtino (pareigos, vardas, pavardė) */
         .col-5 { width: 17%; } /* Instrukcija pakeista į */
 
+        .p3-col-1 { width: 9%; }
+        .p3-col-2 { width: 18%; }
+        .p3-col-3 { width: 15%; }
+        .p3-col-4 { width: 10%; }
+        .p3-col-5 { width: 12%; }
+        .p3-col-6 { width: 18%; }
+        .p3-col-7 { width: 9%; }
+        .p3-col-8 { width: 9%; }
+
         /* Spausdinimo nustatymai naršyklėje */
         @media print {
             body {
@@ -190,9 +199,15 @@
                 margin: 0;
                 max-width: 100%;
                 min-height: auto;
-                page-break-after: always;
             }
             .journal-page {
+                break-before: page;
+                page-break-before: always;
+                break-after: page;
+                page-break-after: always;
+            }
+            .journal-page:last-child {
+                break-after: avoid;
                 page-break-after: avoid;
             }
         }
@@ -263,6 +278,61 @@
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ================= 3 PUSLAPIS: DARBUOTOJŲ INSTRUKTAVIMO REGISTRACIJA (LANDSCAPE) ================= -->
+<div class="journal-page">
+    <div class="journal-header">
+        <div class="company-name">{{ COMPANY_NAME }}</div>
+        <div class="doc-name">GAISRINĖS SAUGOS INSTRUKTAŽŲ DARBO VIETOJE REGISTRACIJA</div>
+    </div>
+
+    <table class="journal-table employee-instruction-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="p3-col-1">Data</th>
+                <th rowspan="2" class="p3-col-2">Instruktuojamo asmens<br>vardas, pavardė</th>
+                <th rowspan="2" class="p3-col-3">Instruktuojamo asmens<br>pareigos</th>
+                <th rowspan="2" class="p3-col-4">Instrukcijos<br>Nr.</th>
+                <th rowspan="2" class="p3-col-5">Instruktažo<br>pavadinimas</th>
+                <th rowspan="2" class="p3-col-6">Instruktuojančio asmens pareigos,<br>vardas, pavardė</th>
+                <th colspan="2">Parašai</th>
+                <th rowspan="2">Leidusio savarankiškai dirbti asmens parašas, data (stažuotės atveju)</th>
+            </tr>
+            <tr>
+                <th class="p3-col-7">Instruktuojančio<br>asmens</th>
+                <th class="p3-col-8">Instruktuojamo<br>asmens</th>
+            </tr>
+            <tr>
+                <th class="th-num">1</th>
+                <th class="th-num">2</th>
+                <th class="th-num">3</th>
+                <th class="th-num">4</th>
+                <th class="th-num">5</th>
+                <th class="th-num">6</th>
+                <th class="th-num">7</th>
+                <th class="th-num">8</th>
+                <th class="th-num">9</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
         </tbody>
     </table>
 </div>
