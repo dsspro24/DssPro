@@ -826,16 +826,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       dssProWorkspaceTab: activeTab,
     }, '');
   }, [activeTab]);
-  useEffect(() => {
-    const handlePopState = (event) => {
-      if (typeof event.state?.dssProWorkspaceTab === 'string') {
-        const requestedTab = event.state.dssProWorkspaceTab;
-        setActiveTabState(requestedTab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive ? 'skydelis' : requestedTab);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [canViewCompanyArchive, userRole]);
   const [selectedOrgId, setSelectedOrgId] = useState(cloudMode && userRole === 'vadovas'
     ? cloudOrganization?.id ?? initialCloudData?.organizations[0]?.id ?? ''
     : initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
@@ -982,6 +972,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (typeof event.state?.dssProWorkspaceTab === 'string') {
+        const requestedTab = event.state.dssProWorkspaceTab;
+        setActiveTabState(requestedTab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive ? 'skydelis' : requestedTab);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [canViewCompanyArchive, userRole]);
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerAapBothPagesConfirmed, setWorkerAapBothPagesConfirmed] = useState(false);
   const [workerSignPin, setWorkerSignPin] = useState('');
