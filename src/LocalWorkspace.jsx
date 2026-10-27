@@ -4715,14 +4715,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   })}
                 </div>
               </Panel>}
-              {(userRole === 'vadovas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) || userRole === 'dss' && dssOrganizationIsOpen && pendingCommissionInvitations.length > 0) && <Panel title="Komisijos veiksmai">
+              {(userRole === 'vadovas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0) || userRole === 'dss' && dssOrganizationIsOpen && pendingCommissionInvitations.length > 0) && <Panel title="Komisijos veiksmai">
                 <div className="space-y-3">
                   {pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><p className="font-semibold">Kvietimas · {invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">Komisijos narys</p></div><button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button></div>)}
                   {userRole === 'vadovas' && pendingCommissionTasks.map((task) => {
                     const resource = data.resources.find((item) => item.id === task.resourceId);
                     return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"><div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div></div>;
                   })}
-                  {userRole === 'vadovas' && completedCommissionTasks.map((task) => <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4"><p className="text-sm text-emerald-900">{task.resourceTitle} · protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>)}
                 </div>
               </Panel>}
               {userRole === 'dss' && !dssOrganizationIsOpen && <Panel title="Prižiūrimos įmonės">
