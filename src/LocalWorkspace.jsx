@@ -5307,8 +5307,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   resource?.title ?? 'Dokumentas',
                   task.signedAt ? new Date(task.signedAt).toLocaleString('lt-LT') : '—',
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={15} />{resource ? getResourcePreviewActionLabel(resource) : 'Peržiūrėti dokumentą'}</button>
-                    <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => requestManagerSign([task])}>Pasirašyti</button>
+                    <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={14} className="shrink-0" />{resource ? getResourcePreviewActionLabel(resource) : 'Peržiūrėti dokumentą'}</button>
+                    <button type="button" className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => requestManagerSign([task])}>Pasirašyti</button>
                   </div>,
                 ];
               })} empty="Vadovui pasirašytinų dokumentų nėra." />
@@ -5334,8 +5334,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 resource?.title ?? 'Dokumentas',
                 new Date(task.signedAt).toLocaleString('lt-LT'),
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={15} />{resource ? getResourcePreviewActionLabel(resource) : 'Peržiūrėti dokumentą'}</button>
-                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => requestDssSign([task])}>Pasirašyti</button>
+                  <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => resource && openResourcePreview(resource, { employeeId: task.employeeId, protocolBatchId: protocolBatch?.id })}><Eye size={14} className="shrink-0" />{resource ? getResourcePreviewActionLabel(resource) : 'Peržiūrėti dokumentą'}</button>
+                  <button type="button" className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => requestDssSign([task])}>Pasirašyti</button>
                 </div>,
               ];
             })} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
