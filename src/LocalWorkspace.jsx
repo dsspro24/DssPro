@@ -363,6 +363,28 @@ const workplaceDssSignatureFieldDefaults = {
   employee: 'Darbuotojas',
   independentWorkPermit: 'niekas',
 };
+const fireSafetyInstructionDefaults = {
+  instructionNumber: '',
+  instructionTitle: '',
+  approvalDate: '',
+  approverRole: 'DSS specialistas',
+  approverName: '',
+  changedInstruction: '',
+};
+function getFireSafetyInstructionRows(settings = {}) {
+  if (Array.isArray(settings.fireSafetyInstructions)) {
+    return settings.fireSafetyInstructions.map((instruction) => ({ ...fireSafetyInstructionDefaults, ...instruction }));
+  }
+  return [{
+    ...fireSafetyInstructionDefaults,
+    instructionNumber: settings.instructionNumber ?? '',
+    instructionTitle: settings.instructionTitle ?? '',
+    approvalDate: settings.approvalDate ?? '',
+    approverRole: settings.approverRole ?? settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas',
+    approverName: settings.instructorName ?? '',
+    changedInstruction: settings.changedInstruction ?? '',
+  }];
+}
 const chemicalSafetyInstructionCardId = 'res-chemical-safety-instruction-card';
 const dateEnteredPerRecordTemplateKinds = new Set([
   'fire-safety-journal',
@@ -2482,13 +2504,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         fieldRoles.employee,
         fieldRoles.independentWorkPermit,
       ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
-    } else if (['intro-dss-journal', 'fire-safety-journal'].includes(resourceSettingsTarget.templateKind)) {
+    } else if (resourceSettingsTarget.templateKind === 'fire-safety-journal') {
+      const instructionRows = getFireSafetyInstructionRows(settings);
+      const approverRoles = instructionRows.map((instruction) => instruction.approverRole);
+      settings.fireSafetyInstructions = instructionRows;
+      settings.requiredSigners = [...new Set([
+        'Darbuotojas',
+        ...(approverRoles.length ? approverRoles : settings.requiredSigners ?? ['DSS specialistas']),
+      ])];
+    } else if (resourceSettingsTarget.templateKind === 'intro-dss-journal') {
       const instructorRole = settings.requiredSigners.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
       settings.requiredSigners = [...new Set(['Darbuotojas', instructorRole])];
-      if (resourceSettingsTarget.templateKind === 'intro-dss-journal') {
-        settings.instructorCanManager = instructorRole === 'Vadovas';
-        settings.instructorCanDss = instructorRole === 'DSS specialistas';
-      }
+      settings.instructorCanManager = instructorRole === 'Vadovas';
+      settings.instructorCanDss = instructorRole === 'DSS specialistas';
     }
     delete settings.rowCount;
     delete settings.populateEmployees;
@@ -5722,6 +5750,18 @@ function getRequiredSigners(resource, org, employee) {
     ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
   }
   const organizationRequiredSigners = org?.resourceSettings?.[resource?.id]?.requiredSigners;
+  if (resource?.templateKind === 'fire-safety-journal') {
+    const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
+    const instructionRoles = getFireSafetyInstructionRows(savedSettings)
+      .map((instruction) => instruction.approverRole)
+      .filter((role) => ['Vadovas', 'DSS specialistas'].includes(role));
+    const configuredRoles = instructionRoles.length
+      ? instructionRoles
+      : Array.isArray(organizationRequiredSigners)
+        ? organizationRequiredSigners
+        : resource.requiredSigners ?? ['DSS specialistas'];
+    return [...new Set(['Darbuotojas', ...configuredRoles])];
+  }
   if (resource?.templateKind === 'internal-documents-register' && Array.isArray(organizationRequiredSigners)) {
     return [...new Set(['Darbuotojas', ...organizationRequiredSigners])];
   }
@@ -5913,30 +5953,62 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
 
   if (resource.templateKind === 'fire-safety-journal') {
     const settings = resource.defaultSettings ?? {};
-    const row = rows[0];
-    if (row) {
-      writeRow(row, [
-        escapeHtml(settings.instructionNumber ?? ''),
-        escapeHtml(settings.instructionTitle || resource.title),
-        formatDate(settings.approvalDate),
-        [settings.instructorPosition, settings.instructorName].filter(Boolean).map(escapeHtml).join('<br>'),
-        escapeHtml(settings.changedInstruction ?? ''),
-      ]);
+    const instructionRows = getFireSafetyInstructionRows(settings);
+    const instructionBody = table?.tBodies[0];
+    if (instructionBody && rows[0]) {
+      const desiredRowCount = Math.max(templateRowCount, instructionRows.length);
+      while (instructionBody.rows.length < desiredRowCount) instructionBody.append(rows[0].cloneNode(true));
+      rows = [...instructionBody.rows];
     }
+    const assignedSpecialistNames = (org?.dss ?? [])
+      .map((id) => specialists.find((specialist) => specialist.id === id)?.name)
+      .filter(Boolean);
+    rows.forEach((row, index) => {
+      const instruction = instructionRows[index];
+      if (!instruction) {
+        writeRow(row, ['', '', '', '', '']);
+        return;
+      }
+      const approverName = instruction.approverName
+        || (instruction.approverRole === 'Vadovas'
+          ? org?.manager ?? ''
+          : assignedSpecialistNames[0] ?? '');
+      writeRow(row, [
+        escapeHtml(instruction.instructionNumber),
+        escapeHtml(instruction.instructionTitle),
+        formatDate(instruction.approvalDate),
+        [instruction.approverRole, approverName].filter(Boolean).map(escapeHtml).join('<br>'),
+        escapeHtml(instruction.changedInstruction),
+      ]);
+    });
     employees.slice(0, fireSafetyEmployeeRows.length).forEach((item, index) => {
       const employeeRow = fireSafetyEmployeeRows[index];
       const entries = entriesFor(item);
       const worker = entries.find((entry) => entry.role === 'Darbuotojas');
-      const instructor = entries.find((entry) => entry.role === 'DSS specialistas');
-      const instructorName = instructor?.signedBy ?? instructor?.name ?? settings.instructorName ?? 'DSS specialistas';
+      const instructors = entries.filter((entry) => entry.role !== 'Darbuotojas');
+      const instructorNames = instructors
+        .map((entry) => `${escapeHtml(entry.role)} · ${escapeHtml(entry.signedBy ?? entry.name)}`)
+        .join('<br>');
+      const instructorProofs = instructors.map((entry) => proof(item, entry)).join('');
+      const workerSignatures = signatures
+        .filter((signature) => signature.employeeId === item.id
+          && signature.resourceId === resource.id && signature.role === 'Darbuotojas')
+        .sort((left, right) => new Date(left.signedAt) - new Date(right.signedAt));
+      const previousWorkerSignature = workerSignatures.at(-2);
+      const latestWorkerSignature = workerSignatures.at(-1);
+      const periodicDueAt = previousWorkerSignature
+        ? new Date(previousWorkerSignature.validUntil ?? getValidityUntilFrom(previousWorkerSignature.signedAt, settings.validityMonths ?? resource.validityMonths))
+        : null;
+      const isPeriodic = periodicDueAt && latestWorkerSignature
+        && new Date(latestWorkerSignature.signedAt).getTime() >= periodicDueAt.getTime();
       writeRow(employeeRow, [
-        formatDate(worker?.signedAt ?? instructor?.signedAt),
+        formatDate(worker?.signedAt ?? instructors.find((entry) => entry.signedAt)?.signedAt),
         escapeHtml(item.name),
         escapeHtml(item.position || 'Darbuotojas'),
-        escapeHtml(settings.instructionNumber ?? ''),
-        escapeHtml(settings.instructionTitle || resource.title),
-        [settings.instructorPosition || 'DSS specialistas', instructorName].filter(Boolean).map(escapeHtml).join('<br>'),
-        proof(item, instructor),
+        escapeHtml(instructionRows.map((instruction) => instruction.instructionNumber).filter(Boolean).join(', ')),
+        isPeriodic ? 'Periodinis' : 'Pirminis',
+        instructorNames || escapeHtml(settings.instructorName ?? ''),
+        instructorProofs,
         proof(item, worker),
         '',
       ]);
@@ -6693,9 +6765,56 @@ function LegacyResourceSettingsDialog({ resource, settings, onChange, onSave, on
 }
 
 function ResourceSettingsDialog(props) {
-  return props.resource.templateKind === 'workplace-dss-journal'
-    ? <WorkplaceDssResourceSettingsDialog {...props} />
-    : <LegacyResourceSettingsDialog {...props} />;
+  if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
+  if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
+  return <LegacyResourceSettingsDialog {...props} />;
+}
+
+function FireSafetyResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
+  const instructions = getFireSafetyInstructionRows(settings);
+  const updateInstruction = (index, key, value) => {
+    const updatedInstructions = instructions.map((instruction, rowIndex) => rowIndex === index
+      ? { ...instruction, [key]: value }
+      : instruction);
+    onChange({ ...settings, fireSafetyInstructions: updatedInstructions });
+  };
+  const addInstruction = () => onChange({
+    ...settings,
+    fireSafetyInstructions: [...instructions, { ...fireSafetyInstructionDefaults }],
+  });
+  const removeInstruction = (index) => onChange({
+    ...settings,
+    fireSafetyInstructions: instructions.filter((_, rowIndex) => rowIndex !== index),
+  });
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+    <form onSubmit={onSave} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Nurodykite instrukcijas antrame puslapyje ir jų tvirtintojus. Šių instrukcijų numeriai bus pateikti darbuotojų registracijos puslapyje.</p></div>
+        <button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button>
+      </div>
+      <label className="block text-sm font-medium">Pakartotinio instruktavimo periodas (mėnesiais)
+        <input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={settings.validityMonths ?? resource.validityMonths ?? 12} onChange={(event) => onChange({ ...settings, validityMonths: event.target.value })} />
+        <span className="mt-1 block text-xs font-normal text-slate-500">„Periodinis“ bus rodomas, kai darbuotojo pakartotinis parašas atliktas praėjus šiam laikotarpiui.</span>
+      </label>
+      <div className="space-y-3">
+        {instructions.map((instruction, index) => <fieldset key={index} className="space-y-3 rounded-lg border border-slate-200 p-3">
+          <legend className="px-1 text-sm font-semibold">Instrukcija {index + 1}</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm font-medium">Instrukcijos Nr.<input className={`${inputClass} mt-1`} value={instruction.instructionNumber} onChange={(event) => updateInstruction(index, 'instructionNumber', event.target.value)} placeholder="GS1" /></label>
+            <label className="text-sm font-medium">Tvirtinimo data<input className={`${inputClass} mt-1`} type="date" value={instruction.approvalDate} onChange={(event) => updateInstruction(index, 'approvalDate', event.target.value)} /></label>
+            <label className="text-sm font-medium">Instrukcijos pavadinimas<input className={`${inputClass} mt-1`} value={instruction.instructionTitle} onChange={(event) => updateInstruction(index, 'instructionTitle', event.target.value)} /></label>
+            <label className="text-sm font-medium">Kas tvirtina?<select className={`${inputClass} mt-1`} value={instruction.approverRole} onChange={(event) => updateInstruction(index, 'approverRole', event.target.value)}><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option></select></label>
+            <label className="text-sm font-medium">Tvirtintojo vardas, pavardė (jei reikia patikslinti)<input className={`${inputClass} mt-1`} value={instruction.approverName} onChange={(event) => updateInstruction(index, 'approverName', event.target.value)} /></label>
+            <label className="text-sm font-medium">Instrukcija pakeista į<input className={`${inputClass} mt-1`} value={instruction.changedInstruction} onChange={(event) => updateInstruction(index, 'changedInstruction', event.target.value)} /></label>
+          </div>
+          <button type="button" className="text-sm font-semibold text-rose-700 hover:text-rose-900" onClick={() => removeInstruction(index)}>Pašalinti instrukciją</button>
+        </fieldset>)}
+      </div>
+      <button type="button" className="rounded-lg border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={addInstruction}>Pridėti instrukciją</button>
+      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+    </form>
+  </div>;
 }
 
 function WorkplaceDssResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
