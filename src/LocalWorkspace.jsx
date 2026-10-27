@@ -559,7 +559,7 @@ const initialData = {
     { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '' } },
     { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructorName: '', instructorPosition: '', instructorCanManager: false, instructorCanDss: true } },
     { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true } },
-    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
+    { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', html: internalDocumentsRegisterTemplate, templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', signatureFieldRoles: { dssInstructor: 'instruktavęs', dssEmployee: 'Darbuotojas', fireInstructor: 'instruktavęs', fireEmployee: 'Darbuotojas', workRules: 'Darbuotojas', jobDescription: 'Darbuotojas', riskAssessment: 'Darbuotojas', safetyDataSheet: 'Darbuotojas', registerConfirmation: 'Darbuotojas' }, jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
     { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instruktavimų darbo vietoje registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', html: fireSafetyJournalTemplate, templateKind: 'fire-safety-journal', requiredSigners: ['DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', approvalDate: '', instructorName: '', instructorPosition: '', changedInstruction: '' } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', html: chemicalSafetyInstructionCardTemplate, templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', html: aapTemplate, requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
@@ -713,6 +713,28 @@ const signerRoleOptions = [
   { value: 'DSS specialistas', label: 'DSS specialistas' },
   { value: 'Komisijos pirmininkas', label: 'Komisijos pirmininkas' },
   { value: 'Komisijos narys', label: 'Komisijos nariai' },
+];
+const internalRegisterSignatureFieldDefaults = {
+  dssInstructor: 'instruktavęs',
+  dssEmployee: 'Darbuotojas',
+  fireInstructor: 'instruktavęs',
+  fireEmployee: 'Darbuotojas',
+  workRules: 'Darbuotojas',
+  jobDescription: 'Darbuotojas',
+  riskAssessment: 'Darbuotojas',
+  safetyDataSheet: 'Darbuotojas',
+  registerConfirmation: 'Darbuotojas',
+};
+const internalRegisterSignatureFieldLabels = [
+  ['dssInstructor', '4 stulpelis · DSS įvadinio instruktavimo instruktuojančio asmens parašas'],
+  ['dssEmployee', '5 stulpelis · DSS įvadinio instruktavimo darbuotojo parašas'],
+  ['fireInstructor', '7 stulpelis · gaisrinės saugos instruktuojančio asmens parašas'],
+  ['fireEmployee', '8 stulpelis · gaisrinės saugos darbuotojo parašas'],
+  ['workRules', '10 stulpelis · darbo tvarkos taisyklių supažindinimo parašas'],
+  ['jobDescription', '13 stulpelis · pareiginių nuostatų supažindinimo parašas'],
+  ['riskAssessment', '16 stulpelis · profesinės rizikos dokumentų supažindinimo parašas'],
+  ['safetyDataSheet', '19 stulpelis · saugos duomenų lapų supažindinimo parašas'],
+  ['registerConfirmation', '21 stulpelis · patvirtinimo apie įrašą šiame žurnale parašas'],
 ];
 const protocolSignerRoleOptions = signerRoleOptions;
 const resourceStatusOrder = { signed: 0, awaitingDss: 1, awaitingEmployer: 1, awaitingCommission: 1, awaitingSignatures: 1, started: 2, unsigned: 3, todo: 4, expired: 5 };
@@ -2415,7 +2437,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const saveResourceSettings = (event) => {
     event.preventDefault();
     if (!currentOrg || !resourceSettingsTarget) return;
-    const settings = { ...resourceSettingsDraft, requiredSigners: [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])] };
+    const settings = {
+      ...resourceSettingsDraft,
+      requiredSigners: [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])],
+      ...(resourceSettingsTarget.templateKind === 'internal-documents-register'
+        ? { signatureFieldRoles: { ...internalRegisterSignatureFieldDefaults, ...(resourceSettingsDraft.signatureFieldRoles ?? {}) } }
+        : {}),
+    };
     if (resourceSettingsTarget.templateKind === 'intro-dss-journal'
       && !settings.requiredSigners.some((role) => ['Vadovas', 'DSS specialistas'].includes(role))) {
       settings.requiredSigners = [...settings.requiredSigners, 'DSS specialistas'];
@@ -5909,8 +5937,13 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           return `<span class="signature-proof"><strong>${escapeHtml(role)} · ${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const [dssResource, fireResource, rulesResource, positionResource, riskResource, sdsResource] = related;
-        const instructorRoleFor = (linkedResource) => {
+        const instructorRoleFor = (linkedResource, fieldKey) => {
           if (!linkedResource) return 'DSS specialistas';
+          const configuredRole = {
+            ...internalRegisterSignatureFieldDefaults,
+            ...(resource.defaultSettings?.signatureFieldRoles ?? {}),
+          }[fieldKey];
+          if (configuredRole === 'Vadovas' || configuredRole === 'DSS specialistas') return configuredRole;
           const workerSignedAt = relatedSignature(linkedResource, 'Darbuotojas')?.signedAt;
           const signedInstructor = signatures
             .filter((signature) => signature.employeeId === item.id
@@ -5920,20 +5953,37 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
               && (!signature.validUntil || new Date(signature.validUntil).getTime() >= Date.now()))
             .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
           return signedInstructor?.role
+            ?? org?.resourceSettings?.[linkedResource.id]?.requiredSigners?.find((role) => role === 'Vadovas' || role === 'DSS specialistas')
             ?? getRequiredSigners(linkedResource, org, item).find((role) => role === 'Vadovas' || role === 'DSS specialistas')
             ?? 'DSS specialistas';
         };
-        const dssInstructorRole = instructorRoleFor(dssResource);
-        const fireInstructorRole = instructorRoleFor(fireResource);
+        const signatureRoleFor = (fieldKey, linkedResource) => {
+          const configuredRole = {
+            ...internalRegisterSignatureFieldDefaults,
+            ...(resource.defaultSettings?.signatureFieldRoles ?? {}),
+          }[fieldKey];
+          return configuredRole === 'instruktavęs'
+            ? instructorRoleFor(linkedResource, fieldKey)
+            : configuredRole ?? 'Darbuotojas';
+        };
+        const dssInstructorRole = signatureRoleFor('dssInstructor', dssResource);
+        const dssEmployeeRole = signatureRoleFor('dssEmployee', dssResource);
+        const fireInstructorRole = signatureRoleFor('fireInstructor', fireResource);
+        const fireEmployeeRole = signatureRoleFor('fireEmployee', fireResource);
+        const workRulesRole = signatureRoleFor('workRules', rulesResource);
+        const jobDescriptionRole = signatureRoleFor('jobDescription', positionResource);
+        const riskAssessmentRole = signatureRoleFor('riskAssessment', riskResource);
+        const safetyDataSheetRole = signatureRoleFor('safetyDataSheet', sdsResource);
+        const registerConfirmationRole = signatureRoleFor('registerConfirmation', resource);
         const dssWorker = relatedSignature(dssResource, 'Darbuotojas');
         const dssInstructor = relatedSignature(dssResource, dssInstructorRole);
         const fireWorker = relatedSignature(fireResource, 'Darbuotojas');
         const fireInstructor = relatedSignature(fireResource, fireInstructorRole);
-        const rulesWorker = relatedSignature(rulesResource, 'Darbuotojas');
-        const positionWorker = relatedSignature(positionResource, 'Darbuotojas');
-        const riskWorker = relatedSignature(riskResource, 'Darbuotojas');
-        const sdsWorker = relatedSignature(sdsResource, 'Darbuotojas');
-        const registerWorker = relatedSignature(resource, 'Darbuotojas');
+        const rulesWorker = relatedSignature(rulesResource, workRulesRole);
+        const positionWorker = relatedSignature(positionResource, jobDescriptionRole);
+        const riskWorker = relatedSignature(riskResource, riskAssessmentRole);
+        const sdsWorker = relatedSignature(sdsResource, safetyDataSheetRole);
+        const registerWorker = relatedSignature(resource, registerConfirmationRole);
         const settingFor = (linkedResource, ...keys) => {
           const settings = { ...linkedResource?.defaultSettings, ...org?.resourceSettings?.[linkedResource?.id] };
           return keys.map((key) => settings[key]).find(Boolean) ?? '';
@@ -5943,23 +5993,23 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           escapeHtml(item.position || 'Darbuotojas'),
           formatDate(dssWorker?.signedAt ?? dssInstructor?.signedAt),
           relatedProof(dssResource, dssInstructor, dssInstructorRole),
-          relatedProof(dssResource, dssWorker, 'Darbuotojas'),
+          relatedProof(dssResource, dssWorker, dssEmployeeRole),
           formatDate(fireWorker?.signedAt ?? fireInstructor?.signedAt),
           relatedProof(fireResource, fireInstructor, fireInstructorRole),
-          relatedProof(fireResource, fireWorker, 'Darbuotojas'),
+          relatedProof(fireResource, fireWorker, fireEmployeeRole),
           formatDate(rulesWorker?.signedAt),
-          relatedProof(rulesResource, rulesWorker, 'Darbuotojas'),
+          relatedProof(rulesResource, rulesWorker, workRulesRole),
           formatDate(positionWorker?.signedAt),
           escapeHtml(resource.defaultSettings?.jobDescriptionNumber || settingFor(positionResource, 'regulationNumber')),
-          relatedProof(positionResource, positionWorker, 'Darbuotojas'),
+          relatedProof(positionResource, positionWorker, jobDescriptionRole),
           formatDate(riskWorker?.signedAt),
           escapeHtml(resource.defaultSettings?.riskAssessmentNumber || settingFor(riskResource, 'riskAssessmentNumber', 'cardNumber', 'documentNumber')),
-          relatedProof(riskResource, riskWorker, 'Darbuotojas'),
+          relatedProof(riskResource, riskWorker, riskAssessmentRole),
           formatDate(sdsWorker?.signedAt),
           escapeHtml(resource.defaultSettings?.safetyDataSheetNumber || settingFor(sdsResource, 'safetyDataSheetNumber', 'documentNumber')),
-          relatedProof(sdsResource, sdsWorker, 'Darbuotojas'),
+          relatedProof(sdsResource, sdsWorker, safetyDataSheetRole),
           formatDate(registerWorker?.signedAt),
-          relatedProof(resource, registerWorker, 'Darbuotojas'),
+          relatedProof(resource, registerWorker, registerConfirmationRole),
         ]);
       } else if (resource.templateKind === 'knowledge-assessment-protocol') {
         const result = getLatestPassedProtocolTestResult(item, resource) ?? getLatestProtocolTestResult(item, resource);
@@ -6546,7 +6596,7 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     changedInstruction: 'Instrukcija pakeista į',
     validityMonths: 'Galiojimas (mėnesiais)',
   };
-  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount'].includes(key)
+  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount', 'signatureFieldRoles'].includes(key)
     && !(dateEnteredPerRecordTemplateKinds.has(resource.templateKind) && key === 'date')
     && !(resource.templateKind === 'intro-dss-journal' && key === 'date')
     && typeof value !== 'boolean');
@@ -6558,7 +6608,7 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     && typeof value === 'boolean');
   const instructorRole = settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{resource.templateKind === 'internal-documents-register' && <fieldset className="mt-5 space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas pasirašo kiekviename žurnalo langelyje</legend><p className="text-xs text-slate-600">Pasirašyto asmens vardas, parašas, data, laikas ir IP bus rodomi nurodytoje žurnalo vietoje.</p>{internalRegisterSignatureFieldLabels.map(([key, label]) => <label key={key} className="block text-sm font-medium">{label}<select className={`${inputClass} mt-1`} value={(settings.signatureFieldRoles ?? internalRegisterSignatureFieldDefaults)[key] ?? 'Darbuotojas'} onChange={(event) => onChange({ ...settings, signatureFieldRoles: { ...internalRegisterSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}), [key]: event.target.value } })}><option value="Darbuotojas">Darbuotojas</option><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option>{['dssInstructor', 'fireInstructor'].includes(key) && <option value="instruktavęs">Instruktavęs asmuo (pagal atitinkamo žurnalo nustatymą)</option>}</select></label>)}</fieldset>}{['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
 }
 
 function ResourceSelectionList({ resources, selectedIds, onChange, renderSelected }) {
