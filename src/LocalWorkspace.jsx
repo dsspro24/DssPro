@@ -2420,7 +2420,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       && !settings.requiredSigners.some((role) => ['Vadovas', 'DSS specialistas'].includes(role))) {
       settings.requiredSigners = [...settings.requiredSigners, 'DSS specialistas'];
     }
-    if (['intro-dss-journal', 'workplace-dss-journal'].includes(resourceSettingsTarget.templateKind)) {
+    if (['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resourceSettingsTarget.templateKind)) {
       const instructorRole = settings.requiredSigners.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
       settings.requiredSigners = [...new Set(['Darbuotojas', instructorRole])];
       if (resourceSettingsTarget.templateKind === 'intro-dss-journal') {
@@ -4329,6 +4329,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ]
       : userRole === 'vadovas'
         ? [
+          ...currentManagerTasks.map((task) => ({
+            id: `manager-signature-${task.employeeId}-${task.resourceId}`,
+            title: data.resources.find((item) => item.id === task.resourceId)?.title ?? 'Dokumentas',
+            description: `${task.signer} · laukia vadovo parašo`,
+            managerTask: task,
+          })),
           ...pendingCommissionTasks.map((task) => ({
             id: `commission-task-${task.assignmentId}-${task.batchId}`,
             title: `Pasirašyti protokolą · ${task.resourceTitle}`,
@@ -4615,6 +4621,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         setActiveTab('zurnalai');
                         requestDssSign([item.task]);
                       }
+                    } else if (userRole === 'vadovas' && item.managerTask) {
+                      setActiveTab('zurnalai');
+                      requestManagerSign([item.managerTask]);
                     } else if (userRole === 'vadovas' && item.commissionTask) {
                       setProtocolCommissionTaskTarget(item.commissionTask);
                       setSignatureInk('');
@@ -5891,19 +5900,35 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const relatedSignature = (linkedResource, role) => linkedResource && signatures
           .filter((signature) => signature.employeeId === item.id && signature.resourceId === linkedResource.id && signature.role === role)
           .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
-        const relatedProof = (linkedResource, signature) => {
+        const relatedProof = (linkedResource, signature, role = 'Darbuotojas') => {
           if (!linkedResource) return '';
-          if (!signature) return item.resourceIds?.includes(linkedResource.id) ? '<span class="signature-pending">Laukia parašo</span>' : '';
+          if (!signature) return item.resourceIds?.includes(linkedResource.id) ? `<span class="signature-pending">Laukia ${role === 'Vadovas' ? 'vadovo' : role === 'DSS specialistas' ? 'DSS specialisto' : 'darbuotojo'} parašo</span>` : '';
           const date = formatDate(signature.signedAt);
           const time = new Date(signature.signedAt);
           const timeText = Number.isNaN(time.getTime()) ? '' : timeFormatter.format(time);
-          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+          return `<span class="signature-proof"><strong>${escapeHtml(role)} · ${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const [dssResource, fireResource, rulesResource, positionResource, riskResource, sdsResource] = related;
+        const instructorRoleFor = (linkedResource) => {
+          if (!linkedResource) return 'DSS specialistas';
+          const workerSignedAt = relatedSignature(linkedResource, 'Darbuotojas')?.signedAt;
+          const signedInstructor = signatures
+            .filter((signature) => signature.employeeId === item.id
+              && signature.resourceId === linkedResource.id
+              && ['Vadovas', 'DSS specialistas'].includes(signature.role)
+              && (!workerSignedAt || new Date(signature.signedAt) >= new Date(workerSignedAt))
+              && (!signature.validUntil || new Date(signature.validUntil).getTime() >= Date.now()))
+            .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
+          return signedInstructor?.role
+            ?? getRequiredSigners(linkedResource, org, item).find((role) => role === 'Vadovas' || role === 'DSS specialistas')
+            ?? 'DSS specialistas';
+        };
+        const dssInstructorRole = instructorRoleFor(dssResource);
+        const fireInstructorRole = instructorRoleFor(fireResource);
         const dssWorker = relatedSignature(dssResource, 'Darbuotojas');
-        const dssInstructor = relatedSignature(dssResource, 'DSS specialistas');
+        const dssInstructor = relatedSignature(dssResource, dssInstructorRole);
         const fireWorker = relatedSignature(fireResource, 'Darbuotojas');
-        const fireInstructor = relatedSignature(fireResource, 'DSS specialistas');
+        const fireInstructor = relatedSignature(fireResource, fireInstructorRole);
         const rulesWorker = relatedSignature(rulesResource, 'Darbuotojas');
         const positionWorker = relatedSignature(positionResource, 'Darbuotojas');
         const riskWorker = relatedSignature(riskResource, 'Darbuotojas');
@@ -5917,10 +5942,10 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           escapeHtml(item.name),
           escapeHtml(item.position || 'Darbuotojas'),
           formatDate(dssWorker?.signedAt ?? dssInstructor?.signedAt),
-          relatedProof(dssResource, dssInstructor, 'DSS specialistas'),
+          relatedProof(dssResource, dssInstructor, dssInstructorRole),
           relatedProof(dssResource, dssWorker, 'Darbuotojas'),
           formatDate(fireWorker?.signedAt ?? fireInstructor?.signedAt),
-          relatedProof(fireResource, fireInstructor, 'DSS specialistas'),
+          relatedProof(fireResource, fireInstructor, fireInstructorRole),
           relatedProof(fireResource, fireWorker, 'Darbuotojas'),
           formatDate(rulesWorker?.signedAt),
           relatedProof(rulesResource, rulesWorker, 'Darbuotojas'),
