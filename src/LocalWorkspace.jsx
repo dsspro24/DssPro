@@ -977,7 +977,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
   const [assignmentPresetDraft, setAssignmentPresetDraft] = useState({ id: '', name: '', resourceIds: [] });
   const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
-  const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'], relatedTestId: '', relatedJournalId: '' });
+  const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'], relatedTestId: '', relatedJournalId: '', defaultSettings: {} });
   const [resourceFileUploading, setResourceFileUploading] = useState(false);
   const [resourceSaving, setResourceSaving] = useState(false);
   const [editingResourceId, setEditingResourceId] = useState(null);
@@ -2725,7 +2725,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const resetResourceForm = () => {
     setEditingResourceId(null);
-    setResourceForm({ title: '', type: 'Testas', category: '', image: '', imageUrl: '', html: '', htmlUrl: '', validityMonths: 12, requiredSigners: ['Darbuotojas'], relatedTestId: '', relatedJournalId: '' });
+    setResourceForm({ title: '', type: 'Testas', category: '', image: '', imageUrl: '', html: '', htmlUrl: '', validityMonths: 12, requiredSigners: ['Darbuotojas'], relatedTestId: '', relatedJournalId: '', defaultSettings: {} });
     setDraftQuestions([{ prompt: '', options: ['', ''], correctIndex: 0 }]);
   };
 
@@ -2779,6 +2779,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       requiredSigners: resource.requiredSigners ?? ['Darbuotojas'],
       relatedTestId: resource.relatedTestId ?? '',
       relatedJournalId: resource.relatedJournalId ?? '',
+      defaultSettings: resource.defaultSettings ?? {},
     });
     setDraftQuestions(resource.questions?.length ? resource.questions.map((question) => ({ ...question, options: [...question.options] })) : [{ prompt: '', options: ['', ''], correctIndex: 0 }]);
     document.getElementById('resource-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2823,6 +2824,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const resourceType = normalizeResourceType(resourceForm);
       const existingResourceType = existingResource ? normalizeResourceType(existingResource) : null;
       const defaultSettings = { ...(existingResource?.defaultSettings ?? {}) };
+      if (editingResourceId === 'res-fire-safety-journal') {
+        defaultSettings.fireSafetyInstructions = getFireSafetyInstructionRows(resourceForm.defaultSettings);
+      }
       if (existingResource?.templateKind === 'intro-dss-journal') {
         const instructorRole = resourceForm.requiredSigners.includes('Vadovas') ? 'Vadovas' : 'DSS specialistas';
         defaultSettings.instructorCanManager = instructorRole === 'Vadovas';
@@ -5409,6 +5413,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <label className="text-sm font-medium">Turinio tipas<select className={`${inputClass} mt-1`} value={resourceForm.type} onChange={(event) => { const type = event.target.value; const requiredSigners = editingResourceId === 'res-aap' ? ['Darbuotojas', 'Vadovas'] : ['Žurnalas', 'Kortelė'].includes(type) ? ['Darbuotojas', 'DSS specialistas'] : ['Darbuotojas']; setResourceForm((current) => ({ ...current, type, requiredSigners })); }}>{data.resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeDisplayNames[type] ?? type}</option>)}</select></label>
                 <label className="text-sm font-medium">Kategorija<input className={`${inputClass} mt-1`} value={resourceForm.category} onChange={(event) => setResourceForm({ ...resourceForm, category: event.target.value })} placeholder="Priešgaisrinė sauga" /></label>
                 <label className="text-sm font-medium">Galiojimas (mėn.)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={resourceForm.validityMonths} onChange={(event) => setResourceForm({ ...resourceForm, validityMonths: event.target.value })} /></label>
+                {editingResourceTemplateKind === 'fire-safety-journal' && <fieldset className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 md:col-span-2">
+                  <legend className="px-1 text-sm font-semibold">Kūrėjo numatytieji gaisrinės saugos žurnalo nustatymai</legend>
+                  <p className="text-xs text-slate-600">Šios reikšmės pagal nutylėjimą bus rodomos visoms įmonėms. Įmonės vadovas galės pakeisti jas savo žurnalo nustatymuose; pakeitimai bus išsaugoti tik tai įmonei.</p>
+                  {getFireSafetyInstructionRows(resourceForm.defaultSettings).map((instruction, index) => <fieldset key={index} className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
+                    <legend className="px-1 text-sm font-semibold">Numatytoji instrukcija {index + 1}</legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-sm font-medium">Instrukcijos Nr.<input className={`${inputClass} mt-1`} value={instruction.instructionNumber} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, instructionNumber: event.target.value } : row) } }))} placeholder="GS1" /></label>
+                      <label className="text-sm font-medium">Tvirtinimo data<input className={`${inputClass} mt-1`} type="date" value={instruction.approvalDate} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, approvalDate: event.target.value } : row) } }))} /></label>
+                      <label className="text-sm font-medium">Instrukcijos pavadinimas<input className={`${inputClass} mt-1`} value={instruction.instructionTitle} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, instructionTitle: event.target.value } : row) } }))} /></label>
+                      <label className="text-sm font-medium">Kas tvirtina?<select className={`${inputClass} mt-1`} value={instruction.approverRole} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, approverRole: event.target.value } : row) } }))}><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option></select></label>
+                      <label className="text-sm font-medium">Tvirtintojo vardas, pavardė<input className={`${inputClass} mt-1`} value={instruction.approverName} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, approverName: event.target.value } : row) } }))} placeholder="Palikite tuščią, jei naudoti įmonės duomenis" /></label>
+                      <label className="text-sm font-medium">Instrukcija pakeista į<input className={`${inputClass} mt-1`} value={instruction.changedInstruction} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).map((row, rowIndex) => rowIndex === index ? { ...row, changedInstruction: event.target.value } : row) } }))} /></label>
+                    </div>
+                    <button type="button" className="text-sm font-semibold text-rose-700 hover:text-rose-900" onClick={() => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: getFireSafetyInstructionRows(current.defaultSettings).filter((_, rowIndex) => rowIndex !== index) } }))}>Pašalinti instrukciją</button>
+                  </fieldset>)}
+                  <button type="button" className="rounded-md border border-emerald-800 px-3 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, fireSafetyInstructions: [...getFireSafetyInstructionRows(current.defaultSettings), { ...fireSafetyInstructionDefaults }] } }))}>Pridėti numatytąją instrukciją</button>
+                </fieldset>}
                 {resourceForm.type === 'Protokolas' && <>
                   <label className="text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} value={resourceForm.relatedTestId ?? ''} onChange={(event) => setResourceForm((current) => ({ ...current, relatedTestId: event.target.value }))}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => normalizeResourceType(resource) === 'Testas' && resource.id !== editingResourceId).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label>
                   <label className="text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={resourceForm.relatedJournalId ?? ''} onChange={(event) => setResourceForm((current) => ({ ...current, relatedJournalId: event.target.value }))}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => normalizeResourceType(resource) === 'Žurnalas' && resource.id !== editingResourceId).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label>
