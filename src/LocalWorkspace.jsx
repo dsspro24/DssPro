@@ -1692,6 +1692,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : `Sutarties Nr. ${employeeForm.contractNumber.trim()} jau priskirtas darbuotojui ${duplicateFormContractEmployee.name}. Pakeiskite numerį arba pirmiausia ištrinkite šį nepasirašiusį darbuotoją.`
     : '';
   const getTaskStatus = (employee, resource) => getResourceWorkflowStatus(employee, resource, data.signatures, data.organizations, validityCheckTime, data.specialists);
+  const getEmployeeProtocolAccessError = (employee, resource) => {
+    if (resource.relatedTestId && !hasPassedProtocolTest(employee, resource)) {
+      return resource.templateKind === 'knowledge-assessment-protocol'
+        ? 'Testas neatliktas arba neišlaikytas. Pirmiausia atlikite ir išlaikykite susietą testą.'
+        : 'Pirmiausia atlikite ir išlaikykite susietą testą.';
+    }
+    if (resource?.templateKind !== 'knowledge-assessment-protocol') return '';
+    const org = data.organizations.find((organization) => organization.id === employee?.orgId);
+    if (!resource.relatedTestId && org?.resourceSettings?.[resource.id]?.allowUnlinkedProtocolSigning === false) {
+      return 'Šiam protokolui nesusietas testas, o įmonės nustatymuose darbuotojo pasirašymas be testo neleidžiamas.';
+    }
+    return '';
+  };
   const dashboardResourceGroups = data.resourceTypes.map((type) => ({
     key: `resource-type:${type}`,
     label: resourceTypeDisplayNames[type] ?? type,
@@ -2509,11 +2522,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const requestWorkerSign = (employee, resource) => {
-    if (resource.relatedTestId && !hasPassedProtocolTest(employee, resource)) {
-      const hasTestAttempt = employee.testResults?.some((result) => result.resourceId === resource.relatedTestId);
-      setNotice(hasTestAttempt
-        ? `Dokumentą „${resource.title}“ galėsite pasirašyti tik išlaikę susietą testą.`
-        : 'Pirmiausia atlikite ir išlaikykite susietą testą, tada pasirašykite dokumentą.');
+    const protocolAccessError = getEmployeeProtocolAccessError(employee, resource);
+    if (protocolAccessError) {
+      setNotice(protocolAccessError);
       return;
     }
     if (resource.id === 'res-aap' && !hasSavedAapSizes(employee)) {
@@ -2537,12 +2548,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     event.preventDefault();
     const employee = data.employees.find((item) => item.id === workerSigningTarget.employeeId);
     const resource = data.resources.find((item) => item.id === workerSigningTarget.resourceId);
-    if (resource?.relatedTestId && !hasPassedProtocolTest(employee, resource)) {
+    const protocolAccessError = getEmployeeProtocolAccessError(employee, resource);
+    if (protocolAccessError) {
       setWorkerSigningTarget(null);
-      const hasTestAttempt = employee?.testResults?.some((result) => result.resourceId === resource.relatedTestId);
-      setNotice(hasTestAttempt
-        ? `Dokumentą „${resource.title}“ galėsite pasirašyti tik išlaikę susietą testą.`
-        : 'Pirmiausia atlikite ir išlaikykite susietą testą, tada pasirašykite dokumentą.');
+      setNotice(protocolAccessError);
       return;
     }
     if (resource?.id === 'res-aap' && !hasSavedAapSizes(employee)) {
@@ -3013,6 +3022,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
+    if (userRole === 'darbuotojas' && resource.templateKind === 'knowledge-assessment-protocol') {
+      const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
+      const accessError = getEmployeeProtocolAccessError(employee, resource);
+      if (accessError) {
+        setNotice(accessError);
+        return;
+      }
+    }
     if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview) {
       if (reportArchiveData.organizationId !== currentOrg?.id || reportArchiveData.loading) {
         setNotice('Palaukite, kol bus įkelti archyvuotų darbuotojų ataskaitų duomenys.');
@@ -6559,6 +6576,7 @@ function ProtocolSettingsDialog({ resource, settings, onChange, onSave, onClose 
     <label className="block text-sm font-medium">Naują protokolą kurti<select className={`${inputClass} mt-1`} value={settings.protocolCadence ?? 'weekly-friday'} onChange={(event) => onChange({ ...settings, protocolCadence: event.target.value })}><option value="weekly-friday">Kas penktadienį (pirmadienis–penktadienis)</option><option value="weekly-sunday">Kas sekmadienį (pirmadienis–sekmadienis)</option><option value="until-full">Surinkus 15 darbuotojų</option></select></label>
     <p className="mt-2 text-sm text-slate-500">Darbuotojai grupuojami pagal pakvietimo datą. Tuščias periodas protokolo įrašo nesukuria. „Surinkus 15 darbuotojų“ režime data nustatoma, kai užsipildo paskutinė eilutė.</p>
     <label className="mt-4 block text-sm font-medium">Galiojimas (mėnesiais)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={settings.validityMonths ?? resource.validityMonths ?? 12} onChange={(event) => onChange({ ...settings, validityMonths: event.target.value })} /></label>
+    <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={settings.allowUnlinkedProtocolSigning !== false} onChange={(event) => onChange({ ...settings, allowUnlinkedProtocolSigning: event.target.checked })} /><span>Leisti darbuotojui atidaryti ir pasirašyti protokolą, jei testas nesusietas<small className="mt-1 block font-normal text-slate-500">Jei protokolas susietas su testu, darbuotojas galės jį atidaryti ir pasirašyti tik atlikęs bei išlaikęs testą.</small></span></label>
     <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><p className="text-xs text-slate-500">Komisijos vaidmenys automatiškai parenkami pagal priimtus paskyrimus. Vadovas gali juos pakeisti.</p><div className="grid gap-2 sm:grid-cols-2">{protocolSignerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => {
       const currentRequiredSigners = settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'];
       const requiredSigners = event.target.checked
