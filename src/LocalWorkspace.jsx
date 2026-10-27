@@ -5631,10 +5631,14 @@ function getRequiredSigners(resource, org, employee) {
             : legacySettings.instructorCanManager ? ['Vadovas'] : ['DSS specialistas'];
     return ['Darbuotojas', ...(instructorRoles.length ? instructorRoles : ['DSS specialistas'])];
   }
+  const organizationRequiredSigners = org?.resourceSettings?.[resource?.id]?.requiredSigners;
+  if (resource?.templateKind === 'internal-documents-register' && Array.isArray(organizationRequiredSigners)) {
+    return [...new Set(['Darbuotojas', ...organizationRequiredSigners])];
+  }
   const assignedRoles = Array.isArray(employee?.requiredSignersByResource?.[resource?.id])
     ? employee.requiredSignersByResource[resource.id]
-    : Array.isArray(org?.resourceSettings?.[resource?.id]?.requiredSigners)
-      ? org.resourceSettings[resource.id].requiredSigners
+    : Array.isArray(organizationRequiredSigners)
+      ? organizationRequiredSigners
       : Array.isArray(resource.requiredSigners)
         ? resource.requiredSigners
       : ['Žurnalas', 'Kortelė'].includes(resource.type) && org?.dss?.length
