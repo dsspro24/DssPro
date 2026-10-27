@@ -191,36 +191,30 @@ const hasPassedProtocolTest = (employee, resource) => {
   if (!resource.relatedTestId) return true;
   return Boolean(getLatestPassedProtocolTestResult(employee, resource));
 };
-const getConfiguredProtocolTestId = (protocol, org, resources) => {
-  const companySettings = org?.resourceSettings ?? {};
-  const selectedTest = resources.find((resource) => normalizeResourceType(resource) === 'Testas'
-    && Object.hasOwn(companySettings[resource.id] ?? {}, 'relatedProtocolId')
-    && companySettings[resource.id].relatedProtocolId === protocol.id);
-  if (selectedTest) return selectedTest.id;
-  const defaultTest = resources.find((resource) => normalizeResourceType(resource) === 'Testas'
-    && Object.hasOwn(resource.defaultSettings ?? {}, 'relatedProtocolId')
-    && resource.defaultSettings.relatedProtocolId === protocol.id);
-  if (defaultTest) return defaultTest.id;
-
-  const legacyTest = resources.find((resource) => resource.id === protocol.relatedTestId);
-  if (legacyTest && Object.hasOwn(companySettings[legacyTest.id] ?? {}, 'relatedProtocolId')) {
-    return companySettings[legacyTest.id].relatedProtocolId === protocol.id ? legacyTest.id : null;
-  }
-  if (legacyTest && Object.hasOwn(legacyTest.defaultSettings ?? {}, 'relatedProtocolId')) {
-    return legacyTest.defaultSettings.relatedProtocolId === protocol.id ? legacyTest.id : null;
-  }
-  return protocol.relatedTestId ?? null;
+const getConfiguredTestResourceIds = (test, org, resources) => {
+  const saved = test.companySettings ?? org?.resourceSettings?.[test.id] ?? {};
+  const defaults = test.defaultSettings ?? {};
+  if (Object.hasOwn(saved, 'relatedResourceIds')) return saved.relatedResourceIds ?? [];
+  if (Object.hasOwn(saved, 'relatedProtocolId')) return saved.relatedProtocolId ? [saved.relatedProtocolId] : [];
+  if (Object.hasOwn(defaults, 'relatedResourceIds')) return defaults.relatedResourceIds ?? [];
+  if (Object.hasOwn(defaults, 'relatedProtocolId')) return defaults.relatedProtocolId ? [defaults.relatedProtocolId] : [];
+  if (!test?.id) return [];
+  return resources.filter((resource) => ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
+    && resource.relatedTestId === test.id).map((resource) => resource.id);
 };
-const getConfiguredTestProtocolId = (test, org, resources) => {
-  const companySettings = org?.resourceSettings?.[test.id] ?? {};
-  if (Object.hasOwn(companySettings, 'relatedProtocolId')) return companySettings.relatedProtocolId || null;
-  if (Object.hasOwn(test.defaultSettings ?? {}, 'relatedProtocolId')) return test.defaultSettings.relatedProtocolId || null;
-  const legacyProtocol = resources.find((resource) => normalizeResourceType(resource) === 'Protokolas'
-    && resource.relatedTestId === test.id);
-  return legacyProtocol && getConfiguredProtocolTestId(legacyProtocol, org, resources) === test.id
-    ? legacyProtocol.id
-    : null;
+const getConfiguredResourceTestIds = (resource, org, resources) => {
+  const relatedTests = resources.filter((test) => normalizeResourceType(test) === 'Testas'
+    && getConfiguredTestResourceIds(test, org, resources).includes(resource.id));
+  if (relatedTests.length) return relatedTests.map((test) => test.id);
+  const saved = org?.resourceSettings?.[resource.id] ?? {};
+  if (Object.hasOwn(saved, 'relatedTestIds')) return saved.relatedTestIds ?? [];
+  if (Object.hasOwn(saved, 'relatedTestId')) return saved.relatedTestId ? [saved.relatedTestId] : [];
+  if (Object.hasOwn(resource.defaultSettings ?? {}, 'relatedTestIds')) return resource.defaultSettings.relatedTestIds ?? [];
+  if (Object.hasOwn(resource.defaultSettings ?? {}, 'relatedTestId')) return resource.defaultSettings.relatedTestId ? [resource.defaultSettings.relatedTestId] : [];
+  return resource.relatedTestId ? [resource.relatedTestId] : [];
 };
+const getConfiguredProtocolTestId = (protocol, org, resources) => getConfiguredResourceTestIds(protocol, org, resources)[0] ?? null;
+const getConfiguredTestProtocolId = (test, org, resources) => getConfiguredTestResourceIds(test, org, resources)[0] ?? null;
 const getInternalRegisterRelatedResources = (resource, allResources) => {
   const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
     ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
@@ -235,17 +229,24 @@ const getInternalRegisterRelatedResources = (resource, allResources) => {
 };
 const expandProtocolResourceAssignments = (resourceIds, resources, org = null) => {
   const assignedIds = new Set(resourceIds);
-  resources.forEach((resource) => {
-    if (!assignedIds.has(resource.id)) return;
-    if (normalizeResourceType(resource) === 'Protokolas') {
-      const relatedTestId = getConfiguredProtocolTestId(resource, org, resources);
-      if (relatedTestId) assignedIds.add(relatedTestId);
-      if (resource.relatedJournalId) assignedIds.add(resource.relatedJournalId);
-    } else if (normalizeResourceType(resource) === 'Testas') {
-      const relatedProtocolId = getConfiguredTestProtocolId(resource, org, resources);
-      if (relatedProtocolId) assignedIds.add(relatedProtocolId);
-    }
-  });
+  let changed = true;
+  while (changed) {
+    changed = false;
+    resources.forEach((resource) => {
+      if (!assignedIds.has(resource.id)) return;
+      const relatedIds = normalizeResourceType(resource) === 'Testas'
+        ? getConfiguredTestResourceIds(resource, org, resources)
+        : ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
+          ? [...getConfiguredResourceTestIds(resource, org, resources), ...(resource.relatedJournalId ? [resource.relatedJournalId] : [])]
+          : [];
+      relatedIds.forEach((relatedId) => {
+        if (relatedId && !assignedIds.has(relatedId)) {
+          assignedIds.add(relatedId);
+          changed = true;
+        }
+      });
+    });
+  }
   return [...assignedIds];
 };
 const isEmployeeAssignedForSequence = (employee, resource) => (Number.isInteger(Number(employee.sequenceNumbersByResource?.[resource.id]))
@@ -1785,24 +1786,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     : '';
   const getTaskStatus = (employee, resource) => {
     const org = data.organizations.find((organization) => organization.id === employee?.orgId);
-    const configuredResource = resource?.templateKind === 'knowledge-assessment-protocol'
-      ? { ...resource, relatedTestId: getConfiguredProtocolTestId(resource, org, data.resources) }
+    const configuredResource = ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
+      ? { ...resource, relatedTestId: getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? null }
       : resource;
     return getResourceWorkflowStatus(employee, configuredResource, data.signatures, data.organizations, validityCheckTime, data.specialists);
   };
   const getEmployeeProtocolAccessError = (employee, resource) => {
     const org = data.organizations.find((organization) => organization.id === employee?.orgId);
-    const relatedTestId = resource?.templateKind === 'knowledge-assessment-protocol'
-      ? getConfiguredProtocolTestId(resource, org, data.resources)
-      : resource.relatedTestId;
-    const configuredResource = { ...resource, relatedTestId };
-    if (relatedTestId && !hasPassedProtocolTest(employee, configuredResource)) {
-      return resource.templateKind === 'knowledge-assessment-protocol'
-        ? 'Testas neatliktas arba neišlaikytas. Pirmiausia atlikite ir išlaikykite susietą testą.'
-        : 'Pirmiausia atlikite ir išlaikykite susietą testą.';
+    const isLinkedResource = ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource));
+    const relatedTestIds = isLinkedResource
+      ? getConfiguredResourceTestIds(resource, org, data.resources)
+      : resource.relatedTestId ? [resource.relatedTestId] : [];
+    if (relatedTestIds.some((relatedTestId) => !hasPassedProtocolTest(employee, { ...resource, relatedTestId }))) {
+      return 'Testas neatliktas arba neišlaikytas. Pirmiausia atlikite ir išlaikykite susietą testą.';
     }
     if (resource?.templateKind !== 'knowledge-assessment-protocol') return '';
-    if (!relatedTestId && org?.resourceSettings?.[resource.id]?.allowUnlinkedProtocolSigning === false) {
+    if (!relatedTestIds.length && org?.resourceSettings?.[resource.id]?.allowUnlinkedProtocolSigning === false) {
       return 'Šiam protokolui nesusietas testas, o įmonės nustatymuose darbuotojo pasirašymas be testo neleidžiamas.';
     }
     return '';
@@ -2860,7 +2859,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       relatedTestId: resource.relatedTestId ?? '',
       relatedJournalId: resource.relatedJournalId ?? '',
       defaultSettings: normalizeResourceType(resource) === 'Testas'
-        ? { ...(resource.defaultSettings ?? {}), relatedProtocolId: getConfiguredTestProtocolId(resource, null, data.resources) ?? '' }
+        ? { ...(resource.defaultSettings ?? {}), relatedResourceIds: getConfiguredTestResourceIds(resource, null, data.resources) }
         : resource.defaultSettings ?? {},
     });
     setDraftQuestions(resource.questions?.length ? resource.questions.map((question) => ({ ...question, options: [...question.options] })) : [{ prompt: '', options: ['', ''], correctIndex: 0 }]);
@@ -3158,7 +3157,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
-    if (userRole === 'darbuotojas' && resource.templateKind === 'knowledge-assessment-protocol') {
+    if (userRole === 'darbuotojas' && ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))) {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const accessError = getEmployeeProtocolAccessError(employee, resource);
       if (accessError) {
@@ -5501,16 +5500,42 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <label className="text-sm font-medium">Turinio tipas<select className={`${inputClass} mt-1`} value={resourceForm.type} onChange={(event) => { const type = event.target.value; const requiredSigners = editingResourceId === 'res-aap' ? ['Darbuotojas', 'Vadovas'] : ['Žurnalas', 'Kortelė'].includes(type) ? ['Darbuotojas', 'DSS specialistas'] : ['Darbuotojas']; setResourceForm((current) => ({ ...current, type, requiredSigners })); }}>{data.resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeDisplayNames[type] ?? type}</option>)}</select></label>
                 <label className="text-sm font-medium">Kategorija<input className={`${inputClass} mt-1`} value={resourceForm.category} onChange={(event) => setResourceForm({ ...resourceForm, category: event.target.value })} placeholder="Priešgaisrinė sauga" /></label>
                 <label className="text-sm font-medium">Galiojimas (mėn.)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={resourceForm.validityMonths} onChange={(event) => setResourceForm({ ...resourceForm, validityMonths: event.target.value })} /></label>
-                {resourceForm.type === 'Testas' && <label className="text-sm font-medium md:col-span-2">Kūrėjo numatytasis susietas protokolas
-                  <select className={`${inputClass} mt-1`} value={resourceForm.defaultSettings?.relatedProtocolId ?? ''} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, relatedProtocolId: event.target.value } }))}>
-                    <option value="">Nesieti su jokiu protokolu</option>
-                    {data.resources.filter((resource) => normalizeResourceType(resource) === 'Protokolas'
-                      && resource.id !== editingResourceId
-                      && (!getConfiguredProtocolTestId(resource, null, data.resources)
-                        || getConfiguredProtocolTestId(resource, null, data.resources) === editingResourceId)).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}
-                  </select>
-                  <span className="mt-1 block text-xs font-normal text-slate-500">Ši sąsaja bus numatyta visoms įmonėms, bet vadovas galės ją pakeisti savo įmonės žurnalo / testo nustatymuose.</span>
-                </label>}
+                {resourceForm.type === 'Testas' && <fieldset className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 md:col-span-2">
+                  <legend className="px-1 text-sm font-semibold">Kūrėjo numatytos sąsajos su protokolais ir kortelėmis</legend>
+                  <p className="text-xs text-slate-600">Pažymėkite visus protokolus ar korteles, kuriems šio testo reikia. Nieko nepažymėjus testas liks nesusietas. Vadovas galės pasirinkti savo įmonei atskirai.</p>
+                  {data.resources.filter((resource) => ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
+                    && resource.id !== editingResourceId
+                    && (!getConfiguredResourceTestIds(resource, null, data.resources).length
+                      || getConfiguredResourceTestIds(resource, null, data.resources).includes(editingResourceId)))
+                    .map((resource) => {
+                      const selectedIds = getConfiguredTestResourceIds(
+                        { id: editingResourceId, defaultSettings: resourceForm.defaultSettings },
+                        null,
+                        data.resources,
+                      );
+                      return <label key={resource.id} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={selectedIds.includes(resource.id)} onChange={(event) => setResourceForm((current) => {
+                          const relatedResourceIds = getConfiguredTestResourceIds(
+                            { id: editingResourceId, defaultSettings: current.defaultSettings },
+                            null,
+                            data.resources,
+                          );
+                          return {
+                            ...current,
+                            defaultSettings: {
+                              ...current.defaultSettings,
+                              relatedResourceIds: event.target.checked
+                                ? [...new Set([...relatedResourceIds, resource.id])]
+                                : relatedResourceIds.filter((id) => id !== resource.id),
+                            },
+                          };
+                        })} />
+                        {resource.title} <span className="text-xs text-slate-500">· {resource.type}</span>
+                      </label>;
+                    })}
+                  {!data.resources.some((resource) => ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
+                    && resource.id !== editingResourceId) && <p className="text-sm text-slate-500">Bibliotekoje nėra protokolų ar kortelių, kuriuos būtų galima susieti.</p>}
+                </fieldset>}
                 {editingResourceTemplateKind === 'fire-safety-journal' && <fieldset className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 md:col-span-2">
                   <legend className="px-1 text-sm font-semibold">Kūrėjo numatytieji gaisrinės saugos žurnalo nustatymai</legend>
                   <p className="text-xs text-slate-600">Šios reikšmės pagal nutylėjimą bus rodomos visoms įmonėms. Įmonės vadovas galės pakeisti jas savo žurnalo nustatymuose; pakeitimai bus išsaugoti tik tai įmonei.</p>
@@ -6328,18 +6353,21 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           relatedProof(resource, registerWorker, registerConfirmationRole),
         ]);
       } else if (resource.templateKind === 'knowledge-assessment-protocol') {
-        const result = getLatestPassedProtocolTestResult(item, resource) ?? getLatestProtocolTestResult(item, resource);
-        const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : resource.relatedTestId ? 'Testo rezultato nėra' : '';
+        const relatedTestId = getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? resource.relatedTestId;
+        const configuredResource = { ...resource, relatedTestId };
+        const result = getLatestPassedProtocolTestResult(item, configuredResource) ?? getLatestProtocolTestResult(item, configuredResource);
+        const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : relatedTestId ? 'Testo rezultato nėra' : '';
         writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
+        const relatedTestId = getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? resource.relatedTestId;
         const testResult = (item.testResults ?? [])
-          .filter((result) => result.resourceId === resource.relatedTestId)
+          .filter((result) => result.resourceId === relatedTestId)
           .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
         const latestSignature = (resourceId, role) => signatures
           .filter((signature) => signature.employeeId === item.id && signature.resourceId === resourceId && signature.role === role)
           .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
-        const workerSignature = latestSignature(resource.id, 'Darbuotojas') ?? latestSignature(resource.relatedTestId, 'Darbuotojas');
-        const instructorSignature = latestSignature(resource.id, 'DSS specialistas') ?? latestSignature(resource.relatedTestId, 'DSS specialistas');
+        const workerSignature = latestSignature(resource.id, 'Darbuotojas') ?? latestSignature(relatedTestId, 'Darbuotojas');
+        const instructorSignature = latestSignature(resource.id, 'DSS specialistas') ?? latestSignature(relatedTestId, 'DSS specialistas');
         const assignedInstructor = specialists.find((person) => org?.dss?.includes(person.id))?.name ?? 'DSS specialistas';
         const instructorName = instructorSignature?.signer ?? assignedInstructor;
         const cardProof = (signature, signerName, pending) => {
@@ -6932,9 +6960,38 @@ function LegacyResourceSettingsDialog({ resource, settings, resources = [], orga
 }
 
 function ResourceSettingsDialog(props) {
+  if (normalizeResourceType(props.resource) === 'Testas') return <TestResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
   return <LegacyResourceSettingsDialog {...props} />;
+}
+
+function TestResourceSettingsDialog({ resource, settings, organization, resources = [], availableResourceIds = [], onChange, onSave, onClose }) {
+  const relatedResourceIds = getConfiguredTestResourceIds({ ...resource, companySettings: settings }, organization, resources);
+  const candidates = resources.filter((candidate) => ['Protokolas', 'Kortelė'].includes(normalizeResourceType(candidate))
+    && availableResourceIds.includes(candidate.id)
+    && (!getConfiguredResourceTestIds(candidate, organization, resources).length
+      || getConfiguredResourceTestIds(candidate, organization, resources).includes(resource.id)));
+  const editableSettings = Object.entries(settings).filter(([key, value]) => key !== 'relatedProtocolId'
+    && key !== 'relatedResourceIds'
+    && key !== 'requiredSigners'
+    && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'));
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+    <div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės testo nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div>
+    <div className="grid gap-4 sm:grid-cols-2">{editableSettings.map(([key, value]) => <label key={key} className="text-sm font-medium">{key === 'validityMonths' ? 'Galiojimas (mėn.)' : key}<input className={`${inputClass} mt-1`} type={typeof value === 'boolean' ? 'checkbox' : typeof value === 'number' ? 'number' : 'text'} checked={typeof value === 'boolean' ? value : undefined} value={typeof value === 'boolean' ? undefined : value} onChange={(event) => onChange({ ...settings, [key]: typeof value === 'boolean' ? event.target.checked : typeof value === 'number' ? Number(event.target.value) : event.target.value })} /></label>)}</div>
+    <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Susieti protokolai ir kortelės</legend><p className="text-xs text-slate-600">Pažymėkite visus dokumentus, kuriems šio testo reikia. Nieko nepažymėjus testas šioje įmonėje nesiejamas su dokumentais.</p>
+      {candidates.map((candidate) => <label key={candidate.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={relatedResourceIds.includes(candidate.id)} onChange={(event) => onChange({
+        ...settings,
+        relatedResourceIds: event.target.checked
+          ? [...new Set([...relatedResourceIds, candidate.id])]
+          : relatedResourceIds.filter((id) => id !== candidate.id),
+      })} />{candidate.title}<span className="text-xs text-slate-500">· {candidate.type}</span></label>)}
+      {!candidates.length && <p className="text-sm text-slate-500">Įmonei nepriskirta protokolų ar kortelių.</p>}
+    </fieldset>
+    <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? ['Darbuotojas']).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? ['Darbuotojas']), value])] : (settings.requiredSigners ?? ['Darbuotojas']).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>
+    <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+  </form></div>;
 }
 
 function FireSafetyResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
