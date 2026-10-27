@@ -864,6 +864,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.dss.includes(selectedSpecialistId));
   const dssWorkspaceIsReady = !cloudMode || (dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'ready');
   const [notice, setNotice] = useState('');
+  const [protocolAccessPopup, setProtocolAccessPopup] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
@@ -2524,7 +2525,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const requestWorkerSign = (employee, resource) => {
     const protocolAccessError = getEmployeeProtocolAccessError(employee, resource);
     if (protocolAccessError) {
-      setNotice(protocolAccessError);
+      setProtocolAccessPopup(protocolAccessError);
       return;
     }
     if (resource.id === 'res-aap' && !hasSavedAapSizes(employee)) {
@@ -2551,7 +2552,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const protocolAccessError = getEmployeeProtocolAccessError(employee, resource);
     if (protocolAccessError) {
       setWorkerSigningTarget(null);
-      setNotice(protocolAccessError);
+      setProtocolAccessPopup(protocolAccessError);
       return;
     }
     if (resource?.id === 'res-aap' && !hasSavedAapSizes(employee)) {
@@ -3026,7 +3027,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const accessError = getEmployeeProtocolAccessError(employee, resource);
       if (accessError) {
-        setNotice(accessError);
+        setProtocolAccessPopup(accessError);
         return;
       }
     }
@@ -5398,6 +5399,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
       </main>
 
+      {protocolAccessPopup && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="protocol-access-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 shrink-0 text-amber-600" size={22} /><div><h2 id="protocol-access-title" className="text-lg font-bold">{protocolAccessPopup.startsWith('Testas') ? 'Testas neatliktas' : 'Protokolo atidaryti negalima'}</h2><p className="mt-2 text-sm text-slate-700">{protocolAccessPopup}</p></div></div><div className="mt-5 flex justify-end"><button type="button" autoFocus className={buttonClass} onClick={() => setProtocolAccessPopup('')}>Gerai</button></div></section></div>}
       {previewResource?.type === 'Testas' && quizResult?.resourceId === previewResource.id && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950 p-4"><section role="dialog" aria-modal="true" aria-labelledby="quiz-outcome-title" aria-live="polite" className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-xl"><h2 id="quiz-outcome-title" className={`text-3xl font-bold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? 'Išlaikyta' : 'Neišlaikyta :('}</h2><p className="mt-2 text-sm text-slate-600">Rezultatas: {quizResult.score}%</p>{quizResult.passed ? <button type="button" className={`${buttonClass} mt-5`} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={16} />Pasirašyti</button> : <button type="button" className="mt-5 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => { setQuizResult(null); setQuizAnswers({}); }}>Bandyti dar kartą</button>}</section></div>}
 
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><label className="mt-4 block text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedTestId} onChange={(event) => setProtocolRelatedTestId(event.target.value)}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Testas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><label className="mt-4 block text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedJournalId} onChange={(event) => setProtocolRelatedJournalId(event.target.value)}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Žurnalas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei. Susiejimą galite praleisti.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => { setProtocolSource(null); setProtocolRelatedTestId(''); setProtocolRelatedJournalId(''); }}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
