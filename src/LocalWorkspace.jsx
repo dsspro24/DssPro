@@ -574,7 +574,7 @@ const initialData = {
   ],
 };
 
-function createInitialCloudWorkspace(organization, managerName = '') {
+function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = []) {
   const organizationTemplate = initialData.organizations[0];
   const planCode = organization.plan_code === 'pro' ? 'pro' : 'standard';
   const plan = planCode === 'pro' ? 'Pro' : 'Standartinis';
@@ -591,7 +591,7 @@ function createInitialCloudWorkspace(organization, managerName = '') {
     dssInvitations: [],
     employeeAssignmentPresets: [],
     resourceSettings: {},
-    resources: [],
+    resources: defaultResourceIds,
   };
 
   return {
@@ -723,11 +723,14 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
+    const defaultResourceIds = initializeCreatorDefaults
+      ? (creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id)
+      : [];
     const cloudDefaults = cloudMode && cloudOrganization
-      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName)
+      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds)
       : null;
     const loadedData = initialCloudData
       ? {
@@ -748,7 +751,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         protocolCommissionSignatures: initialCloudData.protocolCommissionSignatures ?? [],
         subscriptions: initialCloudData.subscriptions ?? [],
       }
-      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName) : loadData();
+      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds) : loadData();
     const workspaceData = {
       ...loadedData,
       resources: (loadedData.resources ?? []).map((resource) => {
@@ -1769,6 +1772,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
     || isCompanyCreatedProtocol(resource, currentOrg?.id)
     || creatorReadOnlyPreview && resource.organizationId === currentOrg?.id);
+  const editingResourceTemplateKind = data.resources.find((resource) => resource.id === editingResourceId)?.templateKind;
+  const editingInstructorTemplate = ['intro-dss-journal', 'workplace-dss-journal'].includes(editingResourceTemplateKind);
   const filteredLibraryResources = visibleLibraryResources.filter((resource) => {
     const matchesType = libraryTypeFilter === 'visos' || resource.type === libraryTypeFilter;
     const matchesSearch = `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(librarySearch.trim().toLocaleLowerCase('lt'));
@@ -1777,10 +1782,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const dssTasks = useMemo(() => {
     const latestInstructorSignatureByTask = new Map();
     for (const signature of data.signatures) {
-      const resource = data.resources.find((item) => item.id === signature.resourceId);
-      const introManagerIsAllowed = resource?.templateKind === 'intro-dss-journal'
-        && currentOrg?.resourceSettings?.[resource.id]?.instructorCanManager === true;
-      if (signature.orgId !== currentOrg?.id || !(signature.role === 'DSS specialistas' || introManagerIsAllowed && signature.role === 'Vadovas')
+      if (signature.orgId !== currentOrg?.id || signature.role !== 'DSS specialistas'
         || (signature.validUntil && new Date(signature.validUntil).getTime() < validityCheckTime)) continue;
       const key = JSON.stringify([signature.employeeId, signature.resourceId]);
       const signedAt = new Date(signature.signedAt).getTime();
@@ -1818,6 +1820,38 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const setCreatorResourceDefault = async (resource, enabled) => {
+    try {
+      if (cloudMode) {
+        const { data: updated, error } = await supabase.rpc('set_creator_resource_default', {
+          input_resource_id: resource.id,
+          input_enabled: enabled,
+        });
+        if (error) throw error;
+        if (!updated) throw new Error('Šablonas nerastas kūrėjo bibliotekoje.');
+      }
+      setData((current) => ({
+        ...current,
+        resources: current.resources.map((item) => item.id === resource.id
+          ? { ...item, defaultForOrganizations: enabled }
+          : item),
+        ...(!cloudMode ? {
+          organizations: current.organizations.map((organization) => ({
+            ...organization,
+            resources: enabled
+              ? [...new Set([...organization.resources, resource.id])]
+              : organization.resources.filter((id) => id !== resource.id),
+          })),
+        } : {}),
+      }));
+      setNotice(enabled
+        ? 'Šablonas pažymėtas kaip numatytasis ir priskirtas esamoms įmonėms.'
+        : 'Šablonas nebėra numatytasis; jo priskyrimas pašalintas iš esamų įmonių.');
+    } catch (error) {
+      setNotice(`Numatytojo šablono nustatyti nepavyko: ${error.message}`);
+    }
+  };
 
   const setDssManagementPermission = async (specialistId, canManage) => {
     if (!cloudMode || userRole !== 'vadovas' || !currentOrg) return;
@@ -2288,10 +2322,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const builtInDefaults = initialData.resources.find((item) => item.id === resource.id)?.defaultSettings ?? {};
     const defaults = { ...builtInDefaults, ...resource.defaultSettings };
     const saved = currentOrg?.resourceSettings?.[resource.id] ?? {};
-    const defaultRequiredSigners = resource.templateKind === 'intro-dss-journal'
-      ? ['Darbuotojas']
-      : [...(defaults.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'])];
+    const defaultRequiredSigners = [...(defaults.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'])];
     if (!defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
+    const savedInstructorRole = saved.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+      ?? (saved.instructorCanManager ? 'Vadovas' : null);
+    const defaultInstructorRole = savedInstructorRole
+      ?? defaultRequiredSigners.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+      ?? (saved.instructorCanDss === false ? 'Vadovas' : 'DSS specialistas');
     const acceptedRoles = new Set((data.commissionAssignments ?? [])
       .filter((assignment) => assignment.organizationId === currentOrg?.id && assignment.status === 'accepted')
       .map((assignment) => assignment.role));
@@ -2322,7 +2359,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : {}),
       validityMonths: saved.validityMonths ?? defaults.validityMonths ?? resource.validityMonths ?? 12,
       requiredSigners: resource.templateKind === 'intro-dss-journal'
-        ? ['Darbuotojas']
+        ? ['Darbuotojas', defaultInstructorRole]
         : resource.templateKind === 'knowledge-assessment-protocol'
         ? [...new Set(defaultRequiredSigners)]
         : saved.requiredSigners ?? [...new Set(defaultRequiredSigners)],
@@ -2340,7 +2377,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!currentOrg || !resourceSettingsTarget) return;
     const settings = { ...resourceSettingsDraft, requiredSigners: [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])] };
     if (resourceSettingsTarget.templateKind === 'intro-dss-journal'
-      && !settings.instructorCanManager && !settings.instructorCanDss) settings.instructorCanDss = true;
+      && !settings.requiredSigners.some((role) => ['Vadovas', 'DSS specialistas'].includes(role))) {
+      settings.requiredSigners = [...settings.requiredSigners, 'DSS specialistas'];
+    }
+    if (['intro-dss-journal', 'workplace-dss-journal'].includes(resourceSettingsTarget.templateKind)) {
+      const instructorRole = settings.requiredSigners.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
+      settings.requiredSigners = [...new Set(['Darbuotojas', instructorRole])];
+      if (resourceSettingsTarget.templateKind === 'intro-dss-journal') {
+        settings.instructorCanManager = instructorRole === 'Vadovas';
+        settings.instructorCanDss = instructorRole === 'DSS specialistas';
+      }
+    }
     delete settings.rowCount;
     delete settings.populateEmployees;
     if (dateEnteredPerRecordTemplateKinds.has(resourceSettingsTarget.templateKind)) delete settings.date;
@@ -2649,9 +2696,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       const resourceType = normalizeResourceType(resourceForm);
       const existingResourceType = existingResource ? normalizeResourceType(existingResource) : null;
+      const defaultSettings = { ...(existingResource?.defaultSettings ?? {}) };
+      if (existingResource?.templateKind === 'intro-dss-journal') {
+        const instructorRole = resourceForm.requiredSigners.includes('Vadovas') ? 'Vadovas' : 'DSS specialistas';
+        defaultSettings.instructorCanManager = instructorRole === 'Vadovas';
+        defaultSettings.instructorCanDss = instructorRole === 'DSS specialistas';
+      }
       const resource = {
         ...existingResource,
         ...resourceForm,
+        defaultSettings,
+        defaultForOrganizations: existingResource?.defaultForOrganizations === true,
         htmlUrl,
         id: editingResourceId ?? `res-${Date.now()}`,
         title: resourceForm.title.trim(),
@@ -4147,11 +4202,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             })),
           ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).map((resourceId) => {
             const resource = data.resources.find((item) => item.id === resourceId);
-            const managerCanInstruct = resource?.templateKind === 'intro-dss-journal'
-              && currentOrg?.resourceSettings?.[resource.id]?.instructorCanManager === true;
-            if (!managerCanInstruct || !getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
-              .some((signer) => signer.role !== 'Darbuotojas' && signer.status !== 'signed')) return null;
-            return { id: `intro-manager-${employee.id}-${resource.id}`, title: resource.title, description: `${employee.name} · laukia instruktoriaus parašo`, employee, resource };
+            if (!resource || getTaskStatus(employee, resource).key !== 'awaitingEmployer'
+              || !getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
+                .some((signer) => signer.role === 'Vadovas' && signer.status !== 'signed')) return null;
+            const isInstruction = ['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind);
+            return {
+              id: `manager-signature-${employee.id}-${resource.id}`,
+              title: resource.title,
+              description: `${employee.name} · ${isInstruction ? 'laukia instruktoriaus parašo' : 'laukia vadovo parašo'}`,
+              employee,
+              resource,
+            };
           }).filter(Boolean)),
           ...currentCommissionAssignments
             .filter((assignment) => assignment.status === 'pending')
@@ -5102,7 +5163,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={resourceForm.relatedJournalId ?? ''} onChange={(event) => setResourceForm((current) => ({ ...current, relatedJournalId: event.target.value }))}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => normalizeResourceType(resource) === 'Žurnalas' && resource.id !== editingResourceId).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label>
                   <p className="text-xs text-slate-500 md:col-span-2">Pasirinkus testą ar žurnalą, darbuotojui priskyrus protokolą, susieti dokumentai bus priskirti kartu, jei jie priskirti įmonei. Protokolą bus galima pasirašyti, jei susietas testas bent kartą išlaikytas.</p>
                 </>}
-                <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3 md:col-span-2"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{[['Darbuotojas', 'Darbuotojas'], ['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas'], ['Komisijos pirmininkas', 'Komisijos pirmininkas'], ['Komisijos narys', 'Komisijos nariai']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={resourceForm.requiredSigners.includes(role)} disabled={role === 'Darbuotojas'} onChange={(event) => setResourceForm((current) => ({ ...current, requiredSigners: event.target.checked ? [...new Set([...current.requiredSigners, role])] : current.requiredSigners.filter((item) => item !== role) }))} />{label}{role === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div><p className="text-xs text-slate-500">Komisijos parašų varneles pažymėkite tik tada, kai jų reikia. Protokoluose pagal priimtus paskyrimus vaidmenys parenkami automatiškai.</p></fieldset>
+                <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3 md:col-span-2"><legend className="px-1 text-sm font-semibold">{editingInstructorTemplate ? 'Kas instruktuoja ir turi pasirašyti' : 'Kas turi pasirašyti'}</legend>{editingInstructorTemplate ? <div className="grid gap-2 sm:grid-cols-2">{[['Vadovas', 'Įmonės vadovas instruktavo'], ['DSS specialistas', 'DSS specialistas instruktavo']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name="default-instructor-role" checked={resourceForm.requiredSigners.includes(role)} onChange={() => setResourceForm((current) => ({ ...current, requiredSigners: ['Darbuotojas', role] }))} />{label}</label>)}</div> : <div className="grid gap-2 sm:grid-cols-2">{[['Darbuotojas', 'Darbuotojas'], ['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas'], ['Komisijos pirmininkas', 'Komisijos pirmininkas'], ['Komisijos narys', 'Komisijos nariai']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={resourceForm.requiredSigners.includes(role)} disabled={role === 'Darbuotojas'} onChange={(event) => setResourceForm((current) => ({ ...current, requiredSigners: event.target.checked ? [...new Set([...current.requiredSigners, role])] : current.requiredSigners.filter((item) => item !== role) }))} />{label}{role === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div>}<p className="text-xs text-slate-500">{editingInstructorTemplate ? 'Pasirinktas vaidmuo bus rodomas instruktoriaus vietoje. Protokolo komisijos parašai nustatomi atskirai.' : 'Komisijos parašų varneles pažymėkite tik tada, kai jų reikia. Protokoluose pagal priimtus paskyrimus vaidmenys parenkami automatiškai.'}</p></fieldset>
                 <label className={`flex cursor-pointer items-center gap-2 self-end rounded-lg border border-slate-300 px-3 py-2 text-sm ${resourceFileUploading ? 'pointer-events-none opacity-60' : ''}`}><Upload size={16} />{resourceFileUploading ? 'Įkeliamas failas…' : editingResourceId ? 'Pakeisti HTML failą' : 'Įkelti HTML šabloną'}<input className="sr-only" type="file" accept=".html,.htm,text/html" disabled={resourceFileUploading} onChange={(event) => handleResourceFile(event.target.files?.[0], 'html')} /></label>
                 <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm ${resourceFileUploading ? 'pointer-events-none opacity-60' : ''}`}><ImagePlus size={16} />{resourceFileUploading ? 'Įkeliamas failas…' : 'Priskirti viršelio nuotrauką'}<input className="sr-only" type="file" accept="image/*" disabled={resourceFileUploading} onChange={(event) => handleResourceFile(event.target.files?.[0], 'image')} /></label>
                 {resourceForm.image && <img className="h-16 w-28 rounded-md object-cover" src={resourceForm.image} alt="Pasirinktas viršelis" />}
@@ -5126,7 +5187,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
             </Panel>
             <LibraryFilters resources={data.resources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
-            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
+            <p className="text-sm text-slate-600">„Numatytasis įmonėms“ priskiria arba pašalina šabloną visų esamų įmonių bibliotekose. Naujos įmonės jį taip pat gaus automatiškai. Vadovai vėliau galės keisti savo įmonės pasirinkimus.</p>
+            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><input type="checkbox" checked={resource.defaultForOrganizations === true} onChange={(event) => setCreatorResourceDefault(resource, event.target.checked)} />Numatytasis įmonėms</label><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
           </section>}
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
@@ -5153,7 +5215,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       </dialog>
       {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
       {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p>{workerSigningTarget.resourceId === 'res-aap' && <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={workerAapBothPagesConfirmed} onChange={(event) => { setWorkerAapBothPagesConfirmed(event.target.checked); setWorkerSignError(''); }} /><span>Patvirtinu, kad vienu parašu pasirašau abu šio AAP kortelės lapus. Tas pats PIN parašas bus pateiktas abiejų lapų vietose.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setWorkerAapBothPagesConfirmed(false); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={workerSigningTarget.resourceId === 'res-aap' && !workerAapBothPagesConfirmed}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
-      {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbdavio parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · AAP išdavimo kortelė</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
+      {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti vadovo parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · {data.resources.find((resource) => resource.id === employerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p>{dssSigningSubmitting && <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950"><span className="size-5 shrink-0 animate-spin rounded-full border-2 border-sky-700 border-t-transparent" aria-hidden="true" /><span><strong className="block">Pasirašoma, prašome palaukti…</strong><span className="text-sky-800">Pasirašyta {dssSigningProgress} iš {dssSigningTasks.length} dokumentų.</span></span></div>}{dssSigningTasks.length === dssSignatureBatchSize && selectedCurrentDssTasks.length > dssSigningTasks.length && <p className="rounded-md bg-sky-50 p-3 text-sm text-sky-900">Šį kartą bus pasirašyta iki {dssSignatureBatchSize} dokumentų. Likę pasirinkti dokumentai bus palikti kitai pasirašymo partijai.</p>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} disabled={dssSigningSubmitting} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<div className={dssSigningSubmitting ? 'pointer-events-none opacity-60' : ''}><SignaturePad value={signatureInk} onChange={setSignatureInk} /></div><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required disabled={dssSigningSubmitting} /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={dssSigningSubmitting} onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningSubmitting || (dssSigningTasks.length > 1 && !dssReviewConfirmed)}>{dssSigningSubmitting ? <><span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />Pasirašoma…</> : <><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</>}</button></div></form></div>}
     </div>
   );
@@ -5405,11 +5467,19 @@ function getResourceWorkflowStatus(employee, resource, signatures, organizations
 }
 function getRequiredSigners(resource, org, employee) {
   if (resource?.templateKind === 'intro-dss-journal') {
-    const settings = org?.resourceSettings?.[resource.id] ?? resource.defaultSettings ?? {};
-    const instructorRoles = [
-      ...(settings.instructorCanManager ? ['Vadovas'] : []),
-      ...(settings.instructorCanDss !== false ? ['DSS specialistas'] : []),
-    ];
+    const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
+    const legacySettings = { ...resource.defaultSettings, ...savedSettings };
+    const savedInstructorRoles = savedSettings.requiredSigners?.filter((role) => ['Vadovas', 'DSS specialistas'].includes(role));
+    const resourceInstructorRoles = resource.requiredSigners?.filter((role) => ['Vadovas', 'DSS specialistas'].includes(role));
+    const instructorRoles = savedInstructorRoles?.length
+      ? savedInstructorRoles
+      : savedSettings.instructorCanManager
+        ? ['Vadovas']
+        : savedSettings.instructorCanDss === false
+          ? ['Vadovas']
+          : resourceInstructorRoles?.length
+            ? resourceInstructorRoles
+            : legacySettings.instructorCanManager ? ['Vadovas'] : ['DSS specialistas'];
     return ['Darbuotojas', ...(instructorRoles.length ? instructorRoles : ['DSS specialistas'])];
   }
   const assignedRoles = Array.isArray(employee?.requiredSignersByResource?.[resource?.id])
@@ -6304,9 +6374,13 @@ function ResourceSettingsDialog({ resource, settings, onChange, onSave, onClose 
     && typeof value !== 'boolean');
   if ((resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule')
     && !textFields.some(([key]) => key === 'date')) textFields.push(['date', '']);
-  const booleanFields = Object.entries(settings).filter(([key, value]) => key !== 'populateEmployees' && typeof value === 'boolean');
+  const booleanFields = Object.entries(settings).filter(([key, value]) => key !== 'populateEmployees'
+    && !(['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind)
+      && ['instructorCanManager', 'instructorCanDss'].includes(key))
+    && typeof value === 'boolean');
+  const instructorRole = settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{resource.templateKind !== 'intro-dss-journal' && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
 }
 
 function ResourceSelectionList({ resources, selectedIds, onChange, renderSelected }) {

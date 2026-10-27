@@ -43,6 +43,8 @@ Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijun
 
 Vadovas įmonės nustatymuose gali atskirai suteikti DSS specialistui teisę tvarkyti įmonės darbo sritį arba bet kada ją atšaukti. Gavęs teisę specialistas gali tvarkyti darbuotojus, dokumentus, priskyrimus ir DSS komisiją; jis išlieka DSS specialistu ir gali pasirašyti tik kaip DSS specialistas. Vadovo parašo PIN keitimas ir vadovo vardu pasirašymas lieka tik vadovui.
 
+Turinio kūrėjas bibliotekos šablonus gali pažymėti kaip numatytuosius įmonėms: jie priskiriami esamoms įmonėms ir automatiškai priskiriami kuriant naują įmonę. Vadovas gali pakeisti savo įmonės pasirinkimus. Įvadinio ir darbo vietos instruktavimo žurnaluose galima nustatyti, ar instruktavo vadovas, ar DSS specialistas; protokolo komisijos narių parašai nustatomi atskirai.
+
 Cloud parašų istorija kraunama iš normalizuotos `document_signatures` lentelės puslapiais po 25 įrašus. Ekrane pirmiausia rodomi parašo metaduomenys, o saugyklos URL ir vaizdas įkeliami tik paspaudus „Peržiūrėti parašą“. Darbo eigos būsenos ir kitos funkcijos kol kas tebenaudoja darbo srities `signatures` metaduomenis.
 
 `organization_data` JSON darbo sritis paliekama dabartiniams nustatymams ir suderinamumui su dar neperkeltomis funkcijomis. Didesnės istorijos ir sąrašai gali būti palaipsniui perkeliami į normalizuotas lenteles atskirais, suderinamais žingsniais; vienu pakeitimu visos darbo srities schema nekeičiama. Šiuo metu parašų istorijos skaitymas jau naudoja normalizuotą lentelę, tačiau kitos parašų darbo eigos dalys dar remiasi JSON metaduomenimis.

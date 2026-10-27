@@ -372,6 +372,7 @@ async function loadManagerWorkspace(user) {
 
   return {
     organization,
+    initializeCreatorDefaults: !savedWorkspace,
     managerName,
     catalog: hydratedCatalog,
     data: {
@@ -784,6 +785,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onExit={signOut}
       initialCloudData={workspace.data}
       creatorCatalog={workspace.catalog}
+      initializeCreatorDefaults={workspace.initializeCreatorDefaults}
       creatorAccounts={workspace.creatorAccounts}
       onCreatorPreview={openCreatorPreview}
       onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
