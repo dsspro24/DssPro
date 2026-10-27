@@ -191,6 +191,36 @@ const hasPassedProtocolTest = (employee, resource) => {
   if (!resource.relatedTestId) return true;
   return Boolean(getLatestPassedProtocolTestResult(employee, resource));
 };
+const getConfiguredProtocolTestId = (protocol, org, resources) => {
+  const companySettings = org?.resourceSettings ?? {};
+  const selectedTest = resources.find((resource) => normalizeResourceType(resource) === 'Testas'
+    && Object.hasOwn(companySettings[resource.id] ?? {}, 'relatedProtocolId')
+    && companySettings[resource.id].relatedProtocolId === protocol.id);
+  if (selectedTest) return selectedTest.id;
+  const defaultTest = resources.find((resource) => normalizeResourceType(resource) === 'Testas'
+    && Object.hasOwn(resource.defaultSettings ?? {}, 'relatedProtocolId')
+    && resource.defaultSettings.relatedProtocolId === protocol.id);
+  if (defaultTest) return defaultTest.id;
+
+  const legacyTest = resources.find((resource) => resource.id === protocol.relatedTestId);
+  if (legacyTest && Object.hasOwn(companySettings[legacyTest.id] ?? {}, 'relatedProtocolId')) {
+    return companySettings[legacyTest.id].relatedProtocolId === protocol.id ? legacyTest.id : null;
+  }
+  if (legacyTest && Object.hasOwn(legacyTest.defaultSettings ?? {}, 'relatedProtocolId')) {
+    return legacyTest.defaultSettings.relatedProtocolId === protocol.id ? legacyTest.id : null;
+  }
+  return protocol.relatedTestId ?? null;
+};
+const getConfiguredTestProtocolId = (test, org, resources) => {
+  const companySettings = org?.resourceSettings?.[test.id] ?? {};
+  if (Object.hasOwn(companySettings, 'relatedProtocolId')) return companySettings.relatedProtocolId || null;
+  if (Object.hasOwn(test.defaultSettings ?? {}, 'relatedProtocolId')) return test.defaultSettings.relatedProtocolId || null;
+  const legacyProtocol = resources.find((resource) => normalizeResourceType(resource) === 'Protokolas'
+    && resource.relatedTestId === test.id);
+  return legacyProtocol && getConfiguredProtocolTestId(legacyProtocol, org, resources) === test.id
+    ? legacyProtocol.id
+    : null;
+};
 const getInternalRegisterRelatedResources = (resource, allResources) => {
   const findRelatedResource = (id, pattern) => allResources.find((candidate) => candidate.id === id)
     ?? allResources.find((candidate) => candidate.id !== resource.id && pattern.test(`${candidate.title} ${candidate.category}`));
@@ -203,12 +233,18 @@ const getInternalRegisterRelatedResources = (resource, allResources) => {
     findRelatedResource('res-safety-data-sheets', /saugos duomenų lap|\bsdl\b/i),
   ].filter(Boolean);
 };
-const expandProtocolResourceAssignments = (resourceIds, resources) => {
+const expandProtocolResourceAssignments = (resourceIds, resources, org = null) => {
   const assignedIds = new Set(resourceIds);
   resources.forEach((resource) => {
-    if (!assignedIds.has(resource.id) || normalizeResourceType(resource) !== 'Protokolas') return;
-    if (resource.relatedTestId) assignedIds.add(resource.relatedTestId);
-    if (resource.relatedJournalId) assignedIds.add(resource.relatedJournalId);
+    if (!assignedIds.has(resource.id)) return;
+    if (normalizeResourceType(resource) === 'Protokolas') {
+      const relatedTestId = getConfiguredProtocolTestId(resource, org, resources);
+      if (relatedTestId) assignedIds.add(relatedTestId);
+      if (resource.relatedJournalId) assignedIds.add(resource.relatedJournalId);
+    } else if (normalizeResourceType(resource) === 'Testas') {
+      const relatedProtocolId = getConfiguredTestProtocolId(resource, org, resources);
+      if (relatedProtocolId) assignedIds.add(relatedProtocolId);
+    }
   });
   return [...assignedIds];
 };
@@ -284,9 +320,14 @@ const addEmployeeToProtocolBatches = (data, employee) => {
   if (!org) return { batches: data.protocolBatches ?? [], resourceIds: employee.resourceIds ?? [] };
   const batches = [...(data.protocolBatches ?? [])];
   const resourceIds = new Set(employee.resourceIds ?? []);
-  const protocols = data.resources.filter((resource) => resource.templateKind === 'knowledge-assessment-protocol'
-    && org.resources.includes(resource.id)
-    && (resource.relatedTestId ? employee.resourceIds?.includes(resource.relatedTestId) : employee.resourceIds?.includes(resource.id)));
+  const protocols = data.resources.filter((resource) => {
+    if (resource.templateKind !== 'knowledge-assessment-protocol' || !org.resources.includes(resource.id)) return false;
+    const relatedTestId = getConfiguredProtocolTestId(resource, org, data.resources);
+    return relatedTestId ? employee.resourceIds?.includes(relatedTestId) : employee.resourceIds?.includes(resource.id);
+  }).map((resource) => ({
+    ...resource,
+    relatedTestId: getConfiguredProtocolTestId(resource, org, data.resources),
+  }));
 
   protocols.forEach((resource) => {
     const testResult = getLatestPassedProtocolTestResult(employee, resource) ?? getLatestProtocolTestResult(employee, resource);
@@ -1427,9 +1468,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           if (!resource) return null;
           const signerOverrides = currentOrg?.resourceSettings?.[resource.id]?.commissionSignerOverrides;
           if (typeof signerOverrides?.[assignment.role] === 'boolean' && !signerOverrides[assignment.role]) return null;
-          const allPassed = !resource.relatedTestId || batch.employeeIds.every((employeeId) => data.employees
+          const relatedTestId = getConfiguredProtocolTestId(resource, currentOrg, data.resources);
+          const allPassed = !relatedTestId || batch.employeeIds.every((employeeId) => data.employees
             .find((item) => item.id === employeeId)
-            ?.testResults?.some((result) => result.resourceId === resource.relatedTestId && result.passed));
+            ?.testResults?.some((result) => result.resourceId === relatedTestId && result.passed));
           if (!allPassed) return null;
           const signatures = (data.protocolCommissionSignatures ?? []).filter((signature) => signature.batchId === batch.id);
           return {
@@ -1620,6 +1662,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       resource: data.resources.find((resource) => resource.id === batch.resourceId),
       employees: (batch.employeeIds ?? []).map((employeeId) => reportEmployees.find((employee) => employee.id === employeeId)).filter(Boolean),
     }))
+    .map((entry) => entry.resource?.templateKind === 'knowledge-assessment-protocol'
+      ? { ...entry, resource: { ...entry.resource, relatedTestId: getConfiguredProtocolTestId(entry.resource, currentOrg, data.resources) } }
+      : entry)
     .filter(({ batch, resource, employees }) => {
       if (!resource) return false;
       const ready = isProtocolBatchReady(batch, employees, resource);
@@ -1724,16 +1769,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? `Sutarties Nr. ${employeeForm.contractNumber.trim()} jau priskirtas darbuotojui ${duplicateFormContractEmployee.name}, kuris yra pasirašęs dokumentų. Pakeiskite numerį arba archyvuokite darbuotoją.`
       : `Sutarties Nr. ${employeeForm.contractNumber.trim()} jau priskirtas darbuotojui ${duplicateFormContractEmployee.name}. Pakeiskite numerį arba pirmiausia ištrinkite šį nepasirašiusį darbuotoją.`
     : '';
-  const getTaskStatus = (employee, resource) => getResourceWorkflowStatus(employee, resource, data.signatures, data.organizations, validityCheckTime, data.specialists);
+  const getTaskStatus = (employee, resource) => {
+    const org = data.organizations.find((organization) => organization.id === employee?.orgId);
+    const configuredResource = resource?.templateKind === 'knowledge-assessment-protocol'
+      ? { ...resource, relatedTestId: getConfiguredProtocolTestId(resource, org, data.resources) }
+      : resource;
+    return getResourceWorkflowStatus(employee, configuredResource, data.signatures, data.organizations, validityCheckTime, data.specialists);
+  };
   const getEmployeeProtocolAccessError = (employee, resource) => {
-    if (resource.relatedTestId && !hasPassedProtocolTest(employee, resource)) {
+    const org = data.organizations.find((organization) => organization.id === employee?.orgId);
+    const relatedTestId = resource?.templateKind === 'knowledge-assessment-protocol'
+      ? getConfiguredProtocolTestId(resource, org, data.resources)
+      : resource.relatedTestId;
+    const configuredResource = { ...resource, relatedTestId };
+    if (relatedTestId && !hasPassedProtocolTest(employee, configuredResource)) {
       return resource.templateKind === 'knowledge-assessment-protocol'
         ? 'Testas neatliktas arba neišlaikytas. Pirmiausia atlikite ir išlaikykite susietą testą.'
         : 'Pirmiausia atlikite ir išlaikykite susietą testą.';
     }
     if (resource?.templateKind !== 'knowledge-assessment-protocol') return '';
-    const org = data.organizations.find((organization) => organization.id === employee?.orgId);
-    if (!resource.relatedTestId && org?.resourceSettings?.[resource.id]?.allowUnlinkedProtocolSigning === false) {
+    if (!relatedTestId && org?.resourceSettings?.[resource.id]?.allowUnlinkedProtocolSigning === false) {
       return 'Šiam protokolui nesusietas testas, o įmonės nustatymuose darbuotojo pasirašymas be testo neleidžiamas.';
     }
     return '';
@@ -2779,7 +2834,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       requiredSigners: resource.requiredSigners ?? ['Darbuotojas'],
       relatedTestId: resource.relatedTestId ?? '',
       relatedJournalId: resource.relatedJournalId ?? '',
-      defaultSettings: resource.defaultSettings ?? {},
+      defaultSettings: normalizeResourceType(resource) === 'Testas'
+        ? { ...(resource.defaultSettings ?? {}), relatedProtocolId: getConfiguredTestProtocolId(resource, null, data.resources) ?? '' }
+        : resource.defaultSettings ?? {},
     });
     setDraftQuestions(resource.questions?.length ? resource.questions.map((question) => ({ ...question, options: [...question.options] })) : [{ prompt: '', options: ['', ''], correctIndex: 0 }]);
     document.getElementById('resource-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2823,7 +2880,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       const resourceType = normalizeResourceType(resourceForm);
       const existingResourceType = existingResource ? normalizeResourceType(existingResource) : null;
-      const defaultSettings = { ...(existingResource?.defaultSettings ?? {}) };
+      const defaultSettings = { ...(existingResource?.defaultSettings ?? {}), ...(resourceForm.defaultSettings ?? {}) };
       if (editingResourceId === 'res-fire-safety-journal') {
         defaultSettings.fireSafetyInstructions = getFireSafetyInstructionRows(resourceForm.defaultSettings);
       }
@@ -3034,7 +3091,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setProtocolSource(resource);
     setProtocolTitle('');
     const assignedResourceIds = new Set(currentOrg?.resources ?? []);
-    setProtocolRelatedTestId(assignedResourceIds.has(resource.relatedTestId) ? resource.relatedTestId : '');
+    const relatedTestId = getConfiguredProtocolTestId(resource, currentOrg, data.resources);
+    setProtocolRelatedTestId(assignedResourceIds.has(relatedTestId) ? relatedTestId : '');
     setProtocolRelatedJournalId(assignedResourceIds.has(resource.relatedJournalId) ? resource.relatedJournalId : '');
   };
 
@@ -3111,6 +3169,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       defaultSettings: { ...resource.defaultSettings, ...companySettings },
       requiredSigners: companySettings.requiredSigners ?? resource.requiredSigners,
       validityMonths: companySettings.validityMonths ?? resource.validityMonths,
+      ...(resource.templateKind === 'knowledge-assessment-protocol'
+        ? { relatedTestId: getConfiguredProtocolTestId(resource, currentOrg, data.resources) }
+        : {}),
     };
     const protocolBatch = (data.protocolBatches ?? []).find((batch) => batch.id === protocolBatchId);
     const previewArchivedEmployees = activeTab === 'ataskaitos'
@@ -3262,6 +3323,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const assignedResourceIds = expandProtocolResourceAssignments(
       inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)),
       data.resources,
+      currentOrg,
     ).filter((resourceId) => currentOrg.resources.includes(resourceId));
     const requiredSignersByResource = Object.fromEntries(assignedResourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
@@ -3491,7 +3553,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const availableResourceIds = new Set(currentOrg?.resources ?? []);
     const assignedResourceIds = (employee.resourceIds ?? []).filter((resourceId) => availableResourceIds.has(resourceId)
       && data.resources.some((resource) => resource.id === resourceId));
-    const resourceIds = expandProtocolResourceAssignments(assignedResourceIds, data.resources)
+    const resourceIds = expandProtocolResourceAssignments(assignedResourceIds, data.resources, currentOrg)
       .filter((resourceId) => availableResourceIds.has(resourceId));
     setEditingEmployeeId(employee.id);
     setEmployeePositionDraft(employee.position || 'Darbuotojas');
@@ -3517,6 +3579,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const resourceIds = expandProtocolResourceAssignments(
       employeeResourceDraft.filter((resourceId) => availableResourceIds.has(resourceId)),
       data.resources,
+      currentOrg,
     ).filter((resourceId) => availableResourceIds.has(resourceId));
     const requiredSignersByResource = Object.fromEntries(resourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
@@ -5413,6 +5476,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <label className="text-sm font-medium">Turinio tipas<select className={`${inputClass} mt-1`} value={resourceForm.type} onChange={(event) => { const type = event.target.value; const requiredSigners = editingResourceId === 'res-aap' ? ['Darbuotojas', 'Vadovas'] : ['Žurnalas', 'Kortelė'].includes(type) ? ['Darbuotojas', 'DSS specialistas'] : ['Darbuotojas']; setResourceForm((current) => ({ ...current, type, requiredSigners })); }}>{data.resourceTypes.map((type) => <option key={type} value={type}>{resourceTypeDisplayNames[type] ?? type}</option>)}</select></label>
                 <label className="text-sm font-medium">Kategorija<input className={`${inputClass} mt-1`} value={resourceForm.category} onChange={(event) => setResourceForm({ ...resourceForm, category: event.target.value })} placeholder="Priešgaisrinė sauga" /></label>
                 <label className="text-sm font-medium">Galiojimas (mėn.)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={resourceForm.validityMonths} onChange={(event) => setResourceForm({ ...resourceForm, validityMonths: event.target.value })} /></label>
+                {resourceForm.type === 'Testas' && <label className="text-sm font-medium md:col-span-2">Kūrėjo numatytasis susietas protokolas
+                  <select className={`${inputClass} mt-1`} value={resourceForm.defaultSettings?.relatedProtocolId ?? ''} onChange={(event) => setResourceForm((current) => ({ ...current, defaultSettings: { ...current.defaultSettings, relatedProtocolId: event.target.value } }))}>
+                    <option value="">Nesieti su jokiu protokolu</option>
+                    {data.resources.filter((resource) => normalizeResourceType(resource) === 'Protokolas'
+                      && resource.id !== editingResourceId
+                      && (!getConfiguredProtocolTestId(resource, null, data.resources)
+                        || getConfiguredProtocolTestId(resource, null, data.resources) === editingResourceId)).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}
+                  </select>
+                  <span className="mt-1 block text-xs font-normal text-slate-500">Ši sąsaja bus numatyta visoms įmonėms, bet vadovas galės ją pakeisti savo įmonės žurnalo / testo nustatymuose.</span>
+                </label>}
                 {editingResourceTemplateKind === 'fire-safety-journal' && <fieldset className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 md:col-span-2">
                   <legend className="px-1 text-sm font-semibold">Kūrėjo numatytieji gaisrinės saugos žurnalo nustatymai</legend>
                   <p className="text-xs text-slate-600">Šios reikšmės pagal nutylėjimą bus rodomos visoms įmonėms. Įmonės vadovas galės pakeisti jas savo žurnalo nustatymuose; pakeitimai bus išsaugoti tik tai įmonei.</p>
@@ -5465,7 +5538,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
           ? <ProtocolSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />
-          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
+          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} resources={data.resources} organization={currentOrg} availableResourceIds={currentOrg?.resources ?? []} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
       </main>
 
       {protocolAccessPopup && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="protocol-access-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 shrink-0 text-amber-600" size={22} /><div><h2 id="protocol-access-title" className="text-lg font-bold">{protocolAccessPopup.startsWith('Testas') ? 'Testas neatliktas' : 'Protokolo atidaryti negalima'}</h2><p className="mt-2 text-sm text-slate-700">{protocolAccessPopup}</p></div></div><div className="mt-5 flex justify-end"><button type="button" autoFocus className={buttonClass} onClick={() => setProtocolAccessPopup('')}>Gerai</button></div></section></div>}
@@ -6744,7 +6817,7 @@ function ProtocolSettingsDialog({ resource, settings, onChange, onSave, onClose 
   </form></div>;
 }
 
-function LegacyResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
+function LegacyResourceSettingsDialog({ resource, settings, resources = [], organization = null, availableResourceIds = [], onChange, onSave, onClose }) {
   const labels = {
     periodicity: 'Medicininės apžiūros periodiškumas',
     directorName: 'Direktoriaus vardas, pavardė',
@@ -6770,7 +6843,7 @@ function LegacyResourceSettingsDialog({ resource, settings, onChange, onSave, on
     changedInstruction: 'Instrukcija pakeista į',
     validityMonths: 'Galiojimas (mėnesiais)',
   };
-  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount', 'signatureFieldRoles'].includes(key)
+  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount', 'signatureFieldRoles', 'relatedProtocolId'].includes(key)
     && !(dateEnteredPerRecordTemplateKinds.has(resource.templateKind) && key === 'date')
     && !(resource.templateKind === 'intro-dss-journal' && key === 'date')
     && typeof value !== 'boolean');
@@ -6782,7 +6855,10 @@ function LegacyResourceSettingsDialog({ resource, settings, onChange, onSave, on
     && typeof value === 'boolean');
   const instructorRole = settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{resource.templateKind === 'internal-documents-register' && <fieldset className="mt-5 space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas pasirašo kiekviename žurnalo langelyje</legend><p className="text-xs text-slate-600">Pasirašyto asmens vardas, parašas, data, laikas ir IP bus rodomi nurodytoje žurnalo vietoje.</p>{internalRegisterSignatureFieldLabels.map(([key, label]) => <label key={key} className="block text-sm font-medium">{label}<select className={`${inputClass} mt-1`} value={(settings.signatureFieldRoles ?? internalRegisterSignatureFieldDefaults)[key] ?? 'Darbuotojas'} onChange={(event) => onChange({ ...settings, signatureFieldRoles: { ...internalRegisterSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}), [key]: event.target.value } })}><option value="Darbuotojas">Darbuotojas</option><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option>{['dssInstructor', 'fireInstructor'].includes(key) && <option value="instruktavęs">Instruktavęs asmuo (pagal atitinkamo žurnalo nustatymą)</option>}<option value="niekas">Niekas nepasirašo</option></select></label>)}</fieldset>}{['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{normalizeResourceType(resource) === 'Testas' && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Susietas protokolas</legend><p className="text-xs text-slate-600">Pasirinkite protokolą, kuris įmonei bus priskirtas kartu su šiuo testu. „Nesieti“ panaikins kūrėjo nustatytą numatytąjį ryšį tik šiai įmonei.</p><select className={inputClass} value={settings.relatedProtocolId ?? getConfiguredTestProtocolId(resource, organization, resources) ?? ''} onChange={(event) => onChange({ ...settings, relatedProtocolId: event.target.value })}><option value="">Nesieti su jokiu protokolu</option>{resources.filter((candidate) => normalizeResourceType(candidate) === 'Protokolas'
+      && availableResourceIds.includes(candidate.id)
+      && (!getConfiguredProtocolTestId(candidate, organization, resources)
+        || getConfiguredProtocolTestId(candidate, organization, resources) === resource.id)).map((protocol) => <option key={protocol.id} value={protocol.id}>{protocol.title}</option>)}</select></fieldset>}{resource.templateKind === 'internal-documents-register' && <fieldset className="mt-5 space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas pasirašo kiekviename žurnalo langelyje</legend><p className="text-xs text-slate-600">Pasirašyto asmens vardas, parašas, data, laikas ir IP bus rodomi nurodytoje žurnalo vietoje.</p>{internalRegisterSignatureFieldLabels.map(([key, label]) => <label key={key} className="block text-sm font-medium">{label}<select className={`${inputClass} mt-1`} value={(settings.signatureFieldRoles ?? internalRegisterSignatureFieldDefaults)[key] ?? 'Darbuotojas'} onChange={(event) => onChange({ ...settings, signatureFieldRoles: { ...internalRegisterSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}), [key]: event.target.value } })}><option value="Darbuotojas">Darbuotojas</option><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option>{['dssInstructor', 'fireInstructor'].includes(key) && <option value="instruktavęs">Instruktavęs asmuo (pagal atitinkamo žurnalo nustatymą)</option>}<option value="niekas">Niekas nepasirašo</option></select></label>)}</fieldset>}{['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
 }
 
 function ResourceSettingsDialog(props) {
