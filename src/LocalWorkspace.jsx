@@ -2148,7 +2148,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           return { ...current, resources: [...resourcesById.values()] };
         });
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error
+        ? error.message
+        : error && typeof error === 'object'
+          ? JSON.stringify(error)
+          : String(error);
       setNotice(restoredResources.length
         ? `Atkurta dalis standartinių šablonų (${restoredResources.length}). Likusių atkurti nepavyko: ${message}. Galite bandyti dar kartą.`
         : `Standartinių šablonų atkurti nepavyko: ${message}`);
