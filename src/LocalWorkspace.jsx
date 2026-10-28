@@ -681,6 +681,7 @@ function createInitialCloudWorkspace(organization, managerName = '', defaultReso
   const planCode = organization.plan_code === 'pro' ? 'pro' : 'standard';
   const plan = planCode === 'pro' ? 'Pro' : 'Standartinis';
   const defaultResourceSettings = Object.fromEntries(creatorResources
+    .filter((resource) => resource.defaultForOrganizations === true)
     .map((resource) => [resource.id, {
       ...(resource.defaultSettings ?? {}),
       requiredSigners: resource.requiredSigners ?? resource.defaultSettings?.requiredSigners ?? ['Darbuotojas'],
@@ -851,7 +852,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
-      ? (creatorCatalog?.resources ?? []).map((resource) => resource.id)
+      ? (creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id)
       : [];
     const cloudDefaults = cloudMode && cloudOrganization
       ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
@@ -2028,6 +2029,44 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
 
+  const setCreatorResourceDefault = async (resource, enabled) => {
+    try {
+      if (cloudMode) {
+        const { data: updated, error } = await supabase.rpc('set_creator_resource_default', {
+          input_resource_id: resource.id,
+          input_enabled: enabled,
+        });
+        if (error) throw error;
+        if (!updated) throw new Error('Šablonas nerastas kūrėjo bibliotekoje.');
+        if (enabled) {
+          const { error: defaultsError } = await supabase.rpc('apply_creator_resource_default_to_organizations', {
+            input_resource_id: resource.id,
+          });
+          if (defaultsError) throw defaultsError;
+        }
+      }
+      setData((current) => ({
+        ...current,
+        resources: current.resources.map((item) => item.id === resource.id
+          ? { ...item, defaultForOrganizations: enabled }
+          : item),
+        ...(!cloudMode ? {
+          organizations: current.organizations.map((organization) => ({
+            ...organization,
+            resources: enabled
+              ? [...new Set([...organization.resources, resource.id])]
+              : organization.resources.filter((id) => id !== resource.id),
+          })),
+        } : {}),
+      }));
+      setNotice(enabled
+        ? 'Šablonas pažymėtas kaip numatytasis ir priskirtas esamoms įmonėms.'
+        : 'Šablonas nebėra numatytasis; jo priskyrimas pašalintas iš esamų įmonių.');
+    } catch (error) {
+      setNotice(`Numatytojo šablono nustatyti nepavyko: ${error.message}`);
+    }
+  };
+
   const restoreDefaultResources = async () => {
     if (!cloudMode || userRole !== 'kurejas' || restoringDefaultResources) return;
     setRestoringDefaultResources(true);
@@ -2047,7 +2086,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           ...(typeof existingResource?.image === 'string' && existingResource.image.startsWith('data:')
             ? { image: existingResource.image }
             : {}),
-          defaultForOrganizations: true,
+          defaultForOrganizations: existingResource?.defaultForOrganizations === true,
         };
         const loadTestTemplate = defaultTestTemplateLoaders.get(resource.id);
         if (loadTestTemplate) resource = { ...resource, html: await loadTestTemplate() };
@@ -2089,16 +2128,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
         const { data: updated, error } = await supabase.rpc('set_creator_resource_default', {
           input_resource_id: resource.id,
-          input_enabled: true,
+          input_enabled: resource.defaultForOrganizations,
         });
         if (error) throw error;
         if (!updated) throw new Error(`„${resource.title}“ nerastas bendrame kataloge.`);
-        const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults', {
-          input_resource_id: resource.id,
-          input_previous_resource: existingResource ? resourceForDatabase(existingResource) : null,
-        });
-        if (defaultsError) throw defaultsError;
-        restoredResources.push({ ...resource, defaultForOrganizations: true });
+        if (resource.defaultForOrganizations) {
+          const { error: defaultsError } = await supabase.rpc('apply_creator_resource_default_to_organizations', {
+            input_resource_id: resource.id,
+          });
+          if (defaultsError) throw defaultsError;
+        }
+        restoredResources.push({ ...resource, defaultForOrganizations: resource.defaultForOrganizations });
       }
 
       setData((current) => {
@@ -2106,7 +2146,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         restoredResources.forEach((resource) => resourcesById.set(resource.id, { ...resourcesById.get(resource.id), ...resource }));
         return { ...current, resources: [...resourcesById.values()] };
       });
-      setNotice(`Standartiniai šablonai atkurti ir priskirti esamoms įmonėms (${restoredResources.length} šablonų).`);
+      setNotice(`Standartiniai šablonai atkurti (${restoredResources.length} šablonų). Įmonėms priskirti tik pažymėti numatytieji šablonai.`);
     } catch (error) {
       if (restoredResources.length) {
         setData((current) => {
@@ -3020,7 +3060,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ...existingResource,
         ...resourceForm,
         defaultSettings,
-        defaultForOrganizations: true,
+        defaultForOrganizations: existingResource?.defaultForOrganizations === true,
         htmlUrl,
         id: editingResourceId ?? `res-${Date.now()}`,
         title: resourceForm.title.trim(),
@@ -3042,11 +3082,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         });
         if (error) throw error;
         uploadedHtmlPath = null;
-        const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults', {
-          input_resource_id: resource.id,
-          input_previous_resource: existingResource ? resourceForDatabase(existingResource) : null,
-        });
-        if (defaultsError) throw defaultsError;
+        if (resource.defaultForOrganizations) {
+          const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults', {
+            input_resource_id: resource.id,
+            input_previous_resource: existingResource ? resourceForDatabase(existingResource) : null,
+          });
+          if (defaultsError) throw defaultsError;
+        }
       }
       setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
       setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');
@@ -5719,8 +5761,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
             </Panel>
             <LibraryFilters resources={data.resources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
-            <p className="text-sm text-slate-600">Visi bendros bibliotekos šablonai ir kūrėjo nustatymai yra numatytieji visoms įmonėms. Vadovai gali koreguoti šablono nustatymus savo įmonei; jų pakeitimai išsaugomi ir neperrašomi kūrėjo atnaujinimais.</p>
-            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">Numatytasis visoms įmonėms</p><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
+            <p className="text-sm text-slate-600">Pažymėkite varnele šablonus, kuriuos norite priskirti visoms esamoms ir naujoms įmonėms. Kūrėjo nustatymai bus numatytieji; vadovai gali išsisaugoti atskirus savo įmonės pasirinkimus.</p>
+            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><input type="checkbox" checked={resource.defaultForOrganizations === true} onChange={(event) => setCreatorResourceDefault(resource, event.target.checked)} />Numatytasis įmonėms</label><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
           </section>}
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
