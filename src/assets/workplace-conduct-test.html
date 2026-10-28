@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Psichologinio ir fizinio smurto prevencijos testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .instructions {
+            background-color: #f1f5f9;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            font-size: 10.5px;
+            border-left: 3px solid #2563eb;
+        }
+
+        .instructions ul {
+            margin: 0;
+            padding-left: 15px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        ____________________________________________________<br>
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Prieš psichologinį ir fizinį smurtą, diskriminaciją ir priekabiavimą nukreiptos mokymo programos</div>
+    <div class="test-subtitle">Testas</div>
+
+    <div class="instructions">
+        <ul>
+            <li>Klausimai turi tik vieną teisingą atsakymo variantą.</li>
+            <li>Apibraukite „O“ teisingą atsakymo variantą.</li>
+        </ul>
+    </div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Kas yra psichologinis smurtas darbe?</div>
+        <ul class="options-list">
+            <li>a) Prieš darbuotoją nukreiptas tikslinis, sisteminis, ilgesnį laiką pasikartojantis elgesys ar veiksmai priekabiaujant prie darbuotojo ar jį bauginat, siekiant sumažinti jo vertę ir profesinius sugebėjimus, pažeminti, pašiepti, atitolinti nuo kolektyvo;</li>
+            <li>b) Tikslingas priekabiavimas, įžeidinėjimas norint pašiepti;</li>
+            <li>c) Balso pakėlimas, keikimasis ir kitoks neetiškas elgesys darbo vietoje.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Kur pirmiausia reikia kreiptis patyrus psichologinį ar fizinį smurtą:</div>
+        <ul class="options-list">
+            <li>a) Pranešti administracijai ir kitiems kolegoms;</li>
+            <li>b) Parašyti valstybinei darbo inspekcijai arba darbo ginčų komisijai;</li>
+            <li>c) Pranešti įmonėje atsakingiems asmenims už psichologinį ir fizinį smurtą, diskriminaciją arba kreiptis į tiesioginį vadovą ir rašyti pranešimą dėl psichologinio smurto, diskriminacijos ar priekabiavimo.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Psichologinio smurto darbe požymiai:</div>
+        <ul class="options-list">
+            <li>a) Grasinimai, šmeižtas, pasikartojantis sarkazmas, viešas žeminimas, ignoravimas ir izoliavimas nuo kitų kolegų;</li>
+            <li>b) Vienkartinis pašiepimas, vieną kartą pasakytas sarkazmas ar pastaba, periodiniai patikrinimas;</li>
+            <li>c) Periodiniai patikrinimai, pašiepimas, asmens ignoravimas konkrečioje situacijoje.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Kaip apibūdintumėte diskriminaciją?</div>
+        <ul class="options-list">
+            <li>a) Pasikartojanti darbdavio kritika, pakeltas balsas, norint nužeminti;</li>
+            <li>b) Vadovo pagrįstos pastabos dėl netvarkingos aprangos, nenaudojamų asmeninių apsaugos priemonių;</li>
+            <li>c) Nelygios sąlygos ir nesąžiningas elgesys su darbuotoju dėl amžiaus, lyties, negalios, rasės, įsitikinimų ar pažiūrų, tautybės, pilietybės, kilmės, kalbos, tikėjimo, ir pan.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Diskriminacijos darbe požymiai:</div>
+        <ul class="options-list">
+            <li>a) Priedų neišmokėjimas dėl prastų rezultatų, viršvalandžiai;</li>
+            <li>b) Neadekvatus darbo krūvis, manipuliavimas darbo užmokesčiu;</li>
+            <li>c) Pagrįstos pastabos ir kritika, periodiniai patikrinimai.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Koks svarbiausias principas tiriant psichologinio smurto atvejus?</div>
+        <ul class="options-list">
+            <li>a) Konfidencialumas ir nešališkumas;</li>
+            <li>b) Viešas visų kolegų įtraukimas į tyrimą;</li>
+            <li>c) Vadovo asmeninė nuomonė.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Kas padeda sumažinti psichologinio smurto riziką įmonėje?</div>
+        <ul class="options-list">
+            <li>a) Aiškios taisyklės, mokymai, saugi pranešimų sistema;</li>
+            <li>b) Didelis darbo krūvis;</li>
+            <li>c) Vadovo griežta kontrolė kiekvieną dieną.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Kaip apibūdintumėte priekabiavimą darbe?</div>
+        <ul class="options-list">
+            <li>a) Bet koks nepriimtinas elgesys ar jo grėsmė siekiant padaryti fizinį, psichologinį, seksualinį ar ekonominį poveikį, kai gali atsirasti įžeidžianti aplinka arba (ir) atsirado arba gali atsirasti fizinė, turtinė ir (arba) neturtinė žala;</li>
+            <li>b) Turtinė ir neturtinė žala patirta dirbant ilgą laiką darbo vietoje;</li>
+            <li>c) Izoliacija ir ignoravimas darbo vietoje kolegų arba darbdavio.</li>
+        </ul>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Kas nelaikoma psichologiniu smurtu darbe?</div>
+        <ul class="options-list">
+            <li>a) Skirtingų nuomonių reiškimas, darbuotojo elgesys dėl informacijos stokos, pagrįsta kritika ir pastabos;</li>
+            <li>b) Aprangos kritikavimas, pašiepimas religinių ar politinių pažiūrų;</li>
+            <li>c) Pasikartojančios į asmenį nukreiptos seksistiškos žinutės, kolegų įžeidžiančio pobūdžio komentarai.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Kas nelaikoma diskriminacija darbe?</div>
+        <ul class="options-list">
+            <li>a) Kritika dėl politinių pažiūrų;</li>
+            <li>b) Pastovios pagrįstos pastabos dėl netvarkingos aprangos, asmeninių apsaugos priemonių;</li>
+            <li>c) Nepagrįstos pastabos dėl aprangos.</li>
+        </ul>
+    </div>
+
+    <!-- 11 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">11. Kas nelaikoma priekabiavimu darbe?</div>
+        <ul class="options-list">
+            <li>a) Darbuotojo elgesys dėl informacijos ir darbo etiketo stokos, darbdavio pagrįstos pastabos;</li>
+            <li>b) Pastovus nepadorios informacijos siuntimas, seksistiško pobūdžio žinutės;</li>
+            <li>c) Algos neišmokėjimas nepagrindžiant, priedų nemokėjimas be priežasties.</li>
+        </ul>
+    </div>
+
+    <!-- 12 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">12. Tinkami įrodymai pamačius arba patyrus psichologinį ar fizinį smurtą:</div>
+        <ul class="options-list">
+            <li>a) Išsaugotos SMS žinutės, el. laiškai, nuotraukos ir vaizdo bei garso įrašai kuriuose atsispindi pažeidimas, liudininkai;</li>
+            <li>b) Skundas parašytas valstybinei darbo inspekcijai, darbo tarybai;</li>
+            <li>c) Receptai ir išrašai dėl lėtinių ligų.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>a</td></tr>
+                <tr><td>2.</td><td>c</td></tr>
+                <tr><td>3.</td><td>a</td></tr>
+                <tr><td>4.</td><td>c</td></tr>
+                <tr><td>5.</td><td>b</td></tr>
+                <tr><td>6.</td><td>a</td></tr>
+                <tr><td>7.</td><td>a</td></tr>
+                <tr><td>8.</td><td>b</td></tr>
+                <tr><td>9.</td><td>a</td></tr>
+                <tr><td>10.</td><td>a</td></tr>
+                <tr><td>11.</td><td>a</td></tr>
+                <tr><td>12.</td><td>a</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

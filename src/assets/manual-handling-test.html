@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus mokymo programa - Testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Darbuotojų, atliekančių krovinių kėlimo rankomis darbus</div>
+    <div class="test-subtitle">Testų klausimai</div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Krovinių kėlimo rankomis ribos:</div>
+        <ul class="options-list">
+            <li>a) nuo 5 kg iki 25 kg;</li>
+            <li>b) nuo 20 kg iki 45 kg;</li>
+            <li>c) nuo 15 kg iki 50 kg.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Kraunami kroviniai turi būti:</div>
+        <ul class="options-list">
+            <li>a) slystantys;</li>
+            <li>b) krintantys;</li>
+            <li>c) stabilūs.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Krovinių transportavimo rankomis ruožai turi būti:</div>
+        <ul class="options-list">
+            <li>a) drėkinami;</li>
+            <li>b) gerai apšviesti;</li>
+            <li>c) su stabiliu pagrindu ir be pavojų paslysti, neužkrauti gamybinėmis atliekomis.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Pakraunant-iškraunant krovinius sunkesnius kaip 25 kg ir keliant juos aukščiau 3 m būtina:</div>
+        <ul class="options-list">
+            <li>a) krauti rankomis;</li>
+            <li>b) naudoti kėlimo mechanizmus;</li>
+            <li>c) pakviesti į pagalbą padėjėjus.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Nešant krovinius ant pečių reikia:</div>
+        <ul class="options-list">
+            <li>a) išlaikyti nuotolį;</li>
+            <li>b) lenkti vienam kitą;</li>
+            <li>c) stumdytis.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Darbuotojai (krovikai) turi būti aprūpinti AAP:</div>
+        <ul class="options-list">
+            <li>a) pirštinėmis;</li>
+            <li>b) apsaugine avalyne;</li>
+            <li>c) apsauginiais diržais;</li>
+            <li>d) apsauginiu skydeliu.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Siekiant kėlimo metu išvengti rizikos, krovinys turi būti:</div>
+        <ul class="options-list">
+            <li>a) išpakuotas;</li>
+            <li>b) bet koks krovinys;</li>
+            <li>c) tinkamai įpakuoti ir parengti kėlimui.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Perkeliant, pernešant kėlimo metu smulkius krovinius, reikia panaudoti:</div>
+        <ul class="options-list">
+            <li>a) vamzdžius;</li>
+            <li>b) metalo gabalus;</li>
+            <li>c) kėlimo mechanizmus.</li>
+        </ul>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Stumti krovininį vežimėlį reikia iš:</div>
+        <ul class="options-list">
+            <li>a) šono;</li>
+            <li>b) galo;</li>
+            <li>c) priekio.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Nepatikimai arba netvarkingai sukrautus krovinius į rietuves, dėžes galima taisyti:</div>
+        <ul class="options-list">
+            <li>a) laužtuvais;</li>
+            <li>b) padėklais;</li>
+            <li>c) rankomis.</li>
+        </ul>
+    </div>
+
+    <!-- 11 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">11. Kraunant krovinius pasilipus naudotis:</div>
+        <ul class="options-list">
+            <li>a) dėžėmis;</li>
+            <li>b) kėdėmis;</li>
+            <li>c) inventorinėmis kopėčiomis su aštriais metaliniais kamščiais apačioje.</li>
+        </ul>
+    </div>
+
+    <!-- 12 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">12. Medžiagas sandėlyje būtina krauti, kad atstumas tarp sienos ir krovinio būtų ne mažesnis:</div>
+        <ul class="options-list">
+            <li>a) 3 m;</li>
+            <li>b) 0,8 m;</li>
+            <li>c) 20 cm.</li>
+        </ul>
+    </div>
+
+    <!-- 13 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">13. Keliant nuo žemės krovinį nugarą laikyti:</div>
+        <ul class="options-list">
+            <li>a) tiesią;</li>
+            <li>b) sukūprintą.</li>
+        </ul>
+    </div>
+
+    <!-- 14 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">14. Judant automašinai darbuotojui draudžiama:</div>
+        <ul class="options-list">
+            <li>a) krauti krovinį iš jos;</li>
+            <li>b) stovėti mašinos parkavimosi zonoje;</li>
+            <li>c) įlipti arba išlipti iš jos.</li>
+        </ul>
+    </div>
+
+    <!-- 15 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">15. Darbuotojui su kėlimo mechanizmu leidžiama dirbti:</div>
+        <ul class="options-list">
+            <li>a) leidus atsakingam darbo vadovui;</li>
+            <li>b) turint tam tikrą pažymėjimą;</li>
+            <li>c) esant būtinybei.</li>
+        </ul>
+    </div>
+
+    <!-- 16 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">16. Saugūs darbo metodai:</div>
+        <ul class="options-list">
+            <li>a) kelti svorį ištiesinus nugarą ir sulenkus kelius;</li>
+            <li>b) kelti svorį kiek galima arčiau kūno;</li>
+            <li>c) svorį nuleisti tolygiai;</li>
+            <li>d) kelti svorį bet kaip.</li>
+        </ul>
+    </div>
+
+    <!-- 17 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">17. Kroviniai kraunami į:</div>
+        <ul class="options-list">
+            <li>a) kur yra vietos;</li>
+            <li>b) vadovo nurodytą vietą;</li>
+            <li>c) iš anksto numatytą vietą sandėliavimui.</li>
+        </ul>
+    </div>
+
+    <!-- 18 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">18. Darbuotojas turi gauti tikslią informaciją apie:</div>
+        <ul class="options-list">
+            <li>a) krovinio svorį;</li>
+            <li>b) krovinio turinį;</li>
+            <li>c) krovinio kainą.</li>
+        </ul>
+    </div>
+
+    <!-- 19 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">19. Įvykus nelaimingam atsitikimui darbe, pakeliui į darbą ar iš darbo, susirgus darbuotojas:</div>
+        <ul class="options-list">
+            <li>a) pats privalo pranešti apie nelaimingą atsitikimą ar ligą;</li>
+            <li>b) per kitus asmenis turi pranešti apie nelaimingą atsitikimą ar ligą;</li>
+            <li>c) gali nepranešti.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>a</td></tr>
+                <tr><td>2.</td><td>c</td></tr>
+                <tr><td>3.</td><td>b, c</td></tr>
+                <tr><td>4.</td><td>b</td></tr>
+                <tr><td>5.</td><td>a</td></tr>
+                <tr><td>6.</td><td>a, b</td></tr>
+                <tr><td>7.</td><td>c</td></tr>
+                <tr><td>8.</td><td>c</td></tr>
+                <tr><td>9.</td><td>a, b</td></tr>
+                <tr><td>10.</td><td>c</td></tr>
+                <tr><td>11.</td><td>c</td></tr>
+                <tr><td>12.</td><td>b</td></tr>
+                <tr><td>13.</td><td>a</td></tr>
+                <tr><td>14.</td><td>b, c</td></tr>
+                <tr><td>15.</td><td>b</td></tr>
+                <tr><td>16.</td><td>a, b, c</td></tr>
+                <tr><td>17.</td><td>b, c</td></tr>
+                <tr><td>18.</td><td>a, b</td></tr>
+                <tr><td>19.</td><td>a, b</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

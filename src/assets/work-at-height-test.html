@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbuotojo, atliekančio darbus aukštyje mokymo programa - Testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Darbuotojo, atliekančio darbus aukštyje mokymo programa</div>
+    <div class="test-subtitle">Testų klausimai</div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Nuo kurio aukščio pradedant atliekami darbai priskiriami darbams atliekamiems aukštyje?</div>
+        <ul class="options-list">
+            <li>1 m;</li>
+            <li>1,1 m;</li>
+            <li>5 m.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Nuo kurio aukščio pradedant atliekami darbai priskiriami aukštalipių darbams?</div>
+        <ul class="options-list">
+            <li>1 m;</li>
+            <li>1,1 m;</li>
+            <li>5 m.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Kokiame aukštyje dirbantis darbuotojas turi turėti medicinos pažymą?</div>
+        <ul class="options-list">
+            <li>1 m;</li>
+            <li>1,1 m;</li>
+            <li>5 m.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Darbuotojo, atliekančio darbus aukštyje, apsaugos priemonės:</div>
+        <ul class="options-list">
+            <li>apsaugos diržas;</li>
+            <li>apsauginis šalmas;</li>
+            <li>respiratorius;</li>
+            <li>apsauginiai akiniai.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Darbuotojo, atliekančio darbus aukštyje, paaukštinimo priemonės:</div>
+        <ul class="options-list">
+            <li>kopėčios, lipynės;</li>
+            <li>dėžės, kėdės;</li>
+            <li>pastoliai, paklotai.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Draudžiama atlikti darbus aukštyje, jeigu:</div>
+        <ul class="options-list">
+            <li>a) vėjo greitis 12-15 m/s;</li>
+            <li>b) vėjo greitis 2-10 m/s;</li>
+            <li>c) vėjo greitis 5-9 m/s.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Draudžiama dirbti ant pastolių:</div>
+        <ul class="options-list">
+            <li>žmonių grupėmis;</li>
+            <li>arti veikiančių elektros tiekimo linijų;</li>
+            <li>vasarą.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Kokiame aukštyje dirbant naudoti apsauginį diržą?</div>
+        <ul class="options-list">
+            <li>2 m;</li>
+            <li>1,5 m;</li>
+            <li>1,3 m.</li>
+        </ul>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Saugos diržai turi būti:</div>
+        <ul class="options-list">
+            <li>su žyma apie atliktą bandymą;</li>
+            <li>be žymos;</li>
+            <li>be defektų.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Išmontuotų pastolių elementus:</div>
+        <ul class="options-list">
+            <li>mesti iš aukščio;</li>
+            <li>laikyti darbo vietoje;</li>
+            <li>atsargiai nuleisti į apačią keliamaisiais mechanizmais ar virvėmis.</li>
+        </ul>
+    </div>
+
+    <!-- 11 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">11. Kaip išmontuojami pastoliai?</div>
+        <ul class="options-list">
+            <li>nuo apačios į viršų;</li>
+            <li>aukštais iš viršaus į apačią;</li>
+            <li>nugriaunami.</li>
+        </ul>
+    </div>
+
+    <!-- 12 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">12. Ant pristatomų kopėčių draudžiama:</div>
+        <ul class="options-list">
+            <li>a) dirbti šalia ar virš neapsaugotų veikiančių mašinų besisukančių dalių ir transporterių;</li>
+            <li>b) naudoti rankines elektros mašinas ir parakinį įrankį;</li>
+            <li>c) virinti dujomis ar elektra;</li>
+            <li>d) tempti laidus ar prilaikyti aukštyje sunkias detales.</li>
+        </ul>
+    </div>
+
+    <!-- 13 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">13. Darbuotojų, dirbančių aukštyje, krovinių padavimo angos turi būti atitvertos:</div>
+        <ul class="options-list">
+            <li>iš vienos pusės;</li>
+            <li>iš dviejų pusių;</li>
+            <li>iš keturių pusių.</li>
+        </ul>
+    </div>
+
+    <!-- 14 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">14. Darbininko, dirbančio aukštyje, profesinės rizikos veiksniai:</div>
+        <ul class="options-list">
+            <li>a) kritimas iš aukščio;</li>
+            <li>b) nepalankios oro sąlygos;</li>
+            <li>c) galimybė susižeisti darbo įrankiais.</li>
+        </ul>
+    </div>
+
+    <!-- 15 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">15. Įvykus nelaimingam atsitikimui, pakeliui į darbą ar iš darbo, darbuotojas:</div>
+        <ul class="options-list">
+            <li>pats privalo pranešti apie nelaimingą atsitikimą;</li>
+            <li>per kitus asmenis turi pranešti apie nelaimingą atsitikimą;</li>
+            <li>gali nepranešti.</li>
+        </ul>
+    </div>
+
+    <!-- 16 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">16. Kurie iš šių požymių yra smegenų sutrenkimo požymiai?</div>
+        <ul class="options-list">
+            <li>galvos skausmas;</li>
+            <li>vėmimas;</li>
+            <li>kraujavimas iš ausų ir nosies.</li>
+        </ul>
+    </div>
+
+    <!-- 17 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">17. Kurie iš šių požymių rodo, kad lūžo galūnės kaulas?</div>
+        <ul class="options-list">
+            <li>galūnės skaudamos vietos patinimas;</li>
+            <li>sumuštos vietos kraujavimas;</li>
+            <li>visiškas galūnės nejautrumas.</li>
+        </ul>
+    </div>
+
+    <!-- 18 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">18. Kokias žinote pirmines gaisro gesinimo priemones?</div>
+        <ul class="options-list">
+            <li>smėlis;</li>
+            <li>gesintuvai;</li>
+            <li>nedegus audeklas;</li>
+            <li>ledas.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>b (1,1 m)</td></tr>
+                <tr><td>2.</td><td>c (5 m)</td></tr>
+                <tr><td>3.</td><td>c (5 m)</td></tr>
+                <tr><td>4.</td><td>a, b</td></tr>
+                <tr><td>5.</td><td>a, c</td></tr>
+                <tr><td>6.</td><td>a</td></tr>
+                <tr><td>7.</td><td>b</td></tr>
+                <tr><td>8.</td><td>a (2 m)</td></tr>
+                <tr><td>9.</td><td>a, c</td></tr>
+                <tr><td>10.</td><td>c</td></tr>
+                <tr><td>11.</td><td>b</td></tr>
+                <tr><td>12.</td><td>a, b, c, d</td></tr>
+                <tr><td>13.</td><td>c</td></tr>
+                <tr><td>14.</td><td>a, b, c</td></tr>
+                <tr><td>15.</td><td>a, b</td></tr>
+                <tr><td>16.</td><td>a, b</td></tr>
+                <tr><td>17.</td><td>a</td></tr>
+                <tr><td>18.</td><td>a, b, c</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

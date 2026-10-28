@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dirbančių su pavojingomis cheminėmis medžiagomis mokymo, atestavimo programa - Testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .sub-options {
+            margin-top: 4px;
+            margin-bottom: 6px;
+            padding-left: 10px;
+            font-style: italic;
+            color: #334155;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Dirbančių su pavojingomis cheminėmis medžiagomis mokymo, atestavimo programa</div>
+    <div class="test-subtitle">Testų klausimai</div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Cheminės medžiagos ir preparatai priskiriami:</div>
+        <ul class="options-list">
+            <li>a) sprogstamosios medžiagos ir preparatai;</li>
+            <li>b) oksiduojančios medžiagos ir preparatai;</li>
+            <li>c) ypač degios medžiagos ir preparatai;</li>
+            <li>d) labai degios medžiagos ir preparatai;</li>
+            <li>e) degios medžiagos ir preparatai;</li>
+            <li>f) nedegios medžiagos ir preparatai.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Iškraunant ir pakraunant chemines medžiagas būtina jas:</div>
+        <ul class="options-list">
+            <li>a) vilkti;</li>
+            <li>b) mėtyti;</li>
+            <li>c) nepažeisti pakuotės.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Kaip turi būti sandėliuojamos cheminės medžiagos?</div>
+        <ul class="options-list">
+            <li>a) kad matytus pakuotė;</li>
+            <li>b) sudėti bet kaip;</li>
+            <li>c) kad pakuotės etiketė būtų atsukta į parėjimo pusę.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Chemines medžiagas sandėliuoti:</div>
+        <ul class="options-list">
+            <li>a) gerai vėdinamoje, užrakinamoje patalpoje;</li>
+            <li>b) koridoriuje;</li>
+            <li>c) bet kurioje patalpoje.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Chemines medžiagas dėti prie arti šildymo įrenginių ne arčiau kaip:</div>
+        <ul class="options-list">
+            <li>a) 0,5 m;</li>
+            <li>b) 1 m;</li>
+            <li>c) 3 m.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Dezinfekavimo medžiagų atsargas laikyti tik:</div>
+        <ul class="options-list">
+            <li>a) pažeistoje taroje;</li>
+            <li>b) sandarioje nepažeistoje taroje;</li>
+            <li>c) nesvarbu kaip.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Kur leidžiama išpilti sprogius ir degius produktus?</div>
+        <ul class="options-list">
+            <li>a) į specialios talpos indus;</li>
+            <li>b) į kanalizacijos sistemą;</li>
+            <li>c) suderinus su priešgaisrinės saugos pareigūnais, galima išpilti į gruntą.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Pirmosios pagalbos priemonės patekus cheminėms medžiagoms:</div>
+        <div class="sub-options">
+            - patekus ant odos: išteptą ar sulietą drabužį tuoj pat nusiimti. Odą gerai nuplauti vandeniu ir muilu;<br>
+            - patekus i akis: išversti viršutinį akies voką. Apie 10 min. plauti akį švariu, tekančiu vandeniu. Kviesti gydytoją;<br>
+            - patekus į burną (prarijus): nutraukti cheminėms medžiagos patekimą į organizmą. Nepanikuoti. Neteisti sukelti vėmimo! Skubiai kviesti greitąją pagalbą, vežti į gydymo įstaigą;
+        </div>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Saugūs darbo metodai:</div>
+        <ul class="options-list">
+            <li>a) darbo metu naudoti asmenines apsaugines priemones;</li>
+            <li>b) darbo ir kasdieninius rūbus laikyti atskirai;</li>
+            <li>c) valgyti, gerti ir rūkyti tik specialiai įrengtose vietose;</li>
+            <li>d) pastoviai praustis;</li>
+            <li>e) dirbti su cheminėmis medžiagomis tik apmokytiems ir instruktuotiems darbuotojams.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Gaisrinės saugos reikalavimai:</div>
+        <ul class="options-list">
+            <li>a) žinoti pirmines gaisro gesinimo priemones, mokėti jomis naudotis;</li>
+            <li>b) rūkyti tik tam skirtose ženklais pažymėtose ir tinkamai įrengtose vietose;</li>
+            <li>c) rūkyti ir valgyti tik savo darbo vietose.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>a, b, c, d, e</td></tr>
+                <tr><td>2.</td><td>c</td></tr>
+                <tr><td>3.</td><td>c</td></tr>
+                <tr><td>4.</td><td>a</td></tr>
+                <tr><td>5.</td><td>b</td></tr>
+                <tr><td>6.</td><td>b</td></tr>
+                <tr><td>7.</td><td>a</td></tr>
+                <tr><td>8.</td><td>a, b, c</td></tr>
+                <tr><td>9.</td><td>a, b, c, d, e</td></tr>
+                <tr><td>10.</td><td>a, b</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

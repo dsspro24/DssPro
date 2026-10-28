@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose - Mokymų testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .instructions {
+            background-color: #f1f5f9;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            font-size: 10.5px;
+            border-left: 3px solid #2563eb;
+        }
+
+        .instructions ul {
+            margin: 0;
+            padding-left: 15px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose</div>
+    <div class="test-subtitle">Mokymų testas</div>
+
+    <div class="instructions">
+        <ul>
+            <li>Klausimai turi tik vieną teisingą atsakymo variantą.</li>
+            <li>Apibraukite „O“ teisingą atsakymo variantą.</li>
+        </ul>
+    </div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Aptikus sprogmenis reikia iškviesti:</div>
+        <ul class="options-list">
+            <li>a) Kariuomenę;</li>
+            <li>b) Tiesioginius vadovus;</li>
+            <li>c) Policiją.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Sušalusį gruntą virš kabelių leidžiama nukasti:</div>
+        <ul class="options-list">
+            <li>a) Kastuvu, prieš tai pašildžius atvira liepsna;</li>
+            <li>b) Kastuvu su laužtuvo pagalba;</li>
+            <li>c) Tik kastuvu.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Kasant tranšėjas ir radus schemoje nepažymėtą kabelį reikia:</div>
+        <ul class="options-list">
+            <li>a) Nutraukti darbus ir iškviesti darbų vadovą;</li>
+            <li>b) Tęsti darbus atsargiau;</li>
+            <li>c) Paženklinti ir kasti toliau.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Pagal tvirtinimo būdą tranšėjos būna:</div>
+        <ul class="options-list">
+            <li>a) Ramstomos ir neramstomos;</li>
+            <li>b) Vertikalios ir horizontalios;</li>
+            <li>c) Gilios ir seklumos.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Kokiu atstumu nuo iškasos briaunos kraunamas iškastas gruntas?</div>
+        <ul class="options-list">
+            <li>a) Ne mažiau kaip 0,5 m;</li>
+            <li>b) Ne mažiau kaip 1,5 m;</li>
+            <li>c) Arčiau, kad būtų patogiau.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Ar galima pradėti grunto kasimo darbus iškasose be išduoto leidimo?</div>
+        <ul class="options-list">
+            <li>a) Taip, jei darbininkai apmokyti;</li>
+            <li>b) Ne, būtina turėti leidimą darbams;</li>
+            <li>c) Taip, jei darbai vyksta ne giliau kaip 1,5 metrai.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Kokio gylio iškasose būtina įrengti atramines konstrukcijas (ramščius)?</div>
+        <ul class="options-list">
+            <li>a) Didesnėse nei 1 metro gylio iškasose;</li>
+            <li>b) Didesnėse nei 1,25 metro gylio iškasose;</li>
+            <li>c) Visose iškasose, nepriklausomai nuo gylio.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Ką daryti, jei iškasa pradeda slinkti?</div>
+        <ul class="options-list">
+            <li>a) Bėgti iš iškasos;</li>
+            <li>b) Kviesti darbų vadovą ir sustiprinti šlaitus;</li>
+            <li>c) Nekreipti dėmesio.</li>
+        </ul>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Kaip suteikti pirmąją pagalbą susižeidus ranką?</div>
+        <ul class="options-list">
+            <li>a) Uždėti spaudžiamąjį tvarstį ir pranešti vadovui;</li>
+            <li>b) Uždėti šaltą kompresą ir dirbti toliau;</li>
+            <li>c) Nepaisyti ir tęsti darbą.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Ką daryti atsiradus kibirkščiavimui ar ugniai šalia iškasos?</div>
+        <ul class="options-list">
+            <li>a) Nedelsiant gesinti gesintuvu ir informuoti vadovą;</li>
+            <li>b) Palaukti, gal pati užges;</li>
+            <li>c) Išeiti iš darbo vietos.</li>
+        </ul>
+    </div>
+
+    <!-- 11 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">11. Kas turi patikrinti darbo vietą prieš kasimą?</div>
+        <ul class="options-list">
+            <li>a) Pats darbuotojas;</li>
+            <li>b) Atsakingas darbų vadovas;</li>
+            <li>c) Trečiosios tarnybos.</li>
+        </ul>
+    </div>
+
+    <!-- 12 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">12. Kodėl svarbu dirbti dviese giliose iškasose?</div>
+        <ul class="options-list">
+            <li>a) Kad greičiau vyktų darbas;</li>
+            <li>b) Kad vienas galėtų padėti nelaimės atveju;</li>
+            <li>c) Kad nesinaudočiau telefonu darbo metu.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Mokymų testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>c</td></tr>
+                <tr><td>2.</td><td>c</td></tr>
+                <tr><td>3.</td><td>a</td></tr>
+                <tr><td>4.</td><td>a</td></tr>
+                <tr><td>5.</td><td>b</td></tr>
+                <tr><td>6.</td><td>b</td></tr>
+                <tr><td>7.</td><td>b</td></tr>
+                <tr><td>8.</td><td>b</td></tr>
+                <tr><td>9.</td><td>a</td></tr>
+                <tr><td>10.</td><td>a</td></tr>
+                <tr><td>11.</td><td>b</td></tr>
+                <tr><td>12.</td><td>b</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

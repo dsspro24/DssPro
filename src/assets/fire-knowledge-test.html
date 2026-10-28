@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaisrinės saugos žinių patikrinimo testas</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .test-page {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 10px;
+            color: #475569;
+            text-align: right;
+        }
+
+        .test-title {
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #0f172a;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .test-subtitle {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #2563eb;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .question-block {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .options-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .options-list li {
+            margin-bottom: 4px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .options-list li::before {
+            content: "O";
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .answers-section {
+            margin-top: 40px;
+            page-break-before: always;
+        }
+
+        table.answers-table {
+            width: 50%;
+            margin: 15px auto;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        table.answers-table th, 
+        table.answers-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px;
+            text-align: center;
+        }
+
+        table.answers-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .test-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="test-page">
+    <div class="header-info">
+        (vardas, pavardė, pareigos, parašas, data)
+    </div>
+
+    <div class="test-title">Gaisrinės saugos žinių patikrinimo testas</div>
+    <div class="test-subtitle">Testas</div>
+
+    <!-- 1 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">1. Kokiu telefono numeriu kviečiami ugniagesiai?</div>
+        <ul class="options-list">
+            <li>a) 112;</li>
+            <li>b) 011;</li>
+            <li>c) 01.</li>
+        </ul>
+    </div>
+
+    <!-- 2 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">2. Kokios pagrindinės gesinimo medžiagos naudojamos šiuolaikiniuose gesintuvuose?</div>
+        <ul class="options-list">
+            <li>a) putos;</li>
+            <li>b) dujos;</li>
+            <li>c) milteliai;</li>
+            <li>d) visi atsakymai teisingi.</li>
+        </ul>
+    </div>
+
+    <!-- 3 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">3. Putų gesintuvais gesinti draudžiama:</div>
+        <ul class="options-list">
+            <li>a) neišjungtus elektros prietaisus;</li>
+            <li>b) žmogaus veidą;</li>
+            <li>c) šarminius metalus;</li>
+            <li>d) visi atsakymai teisingi.</li>
+        </ul>
+    </div>
+
+    <!-- 4 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">4. Veiksmų seka kilus gaisrui:</div>
+        <ul class="options-list">
+            <li>a) iškviesti ugniagesius, evakuoti žmones, gesinti gaisrą;</li>
+            <li>b) evakuoti žmones, iškviesti ugniagesius, gesinti gaisrus;</li>
+            <li>c) gesinti gaisrą, evakuoti žmones, iškviesti ugniagesius.</li>
+        </ul>
+    </div>
+
+    <!-- 5 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">5. Gaisrų klasė C, tai:</div>
+        <ul class="options-list">
+            <li>a) dujų gaisrai;</li>
+            <li>b) metalų gaisrai;</li>
+            <li>c) skystųjų arba galinčių suskystėti kietųjų medžiagų gaisrai;</li>
+            <li>d) kietųjų medžiagų gaisrai.</li>
+        </ul>
+    </div>
+
+    <!-- 6 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">6. Kokios medžiagos priskiriamos sunkiai degių medžiagų grupei?</div>
+        <ul class="options-list">
+            <li>a) medžiagos, kurios užsidega tik nuo galingo ugnies šaltinio;</li>
+            <li>b) medžiagos, kurios tik smilksta ir anglėja;</li>
+            <li>c) medžiagos, kurios degą smilksta ir anglėja veikiant uždegimo šaltiniui, o jį pašalinus - procesai nutrūksta savaime;</li>
+            <li>d) visi aukščiau nurodyti teiginiai teisingi.</li>
+        </ul>
+    </div>
+
+    <!-- 7 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">7. Kiek evakuacinių išėjimų turi būti iš kiekvieno pastato aukšto?</div>
+        <ul class="options-list">
+            <li>a) ne mažiau kaip 2 visuomeninės paskirties pastate, kai aukštų skaičius daugiau kaip du;</li>
+            <li>b) ne mažiau kaip 3;</li>
+            <li>c) išėjimų skaičius priklauso nuo aukšte esančių žmonių skaičiaus;</li>
+            <li>d) išėjimų skaičius priklauso nuo pastato aukštų skaičiaus.</li>
+        </ul>
+    </div>
+
+    <!-- 8 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">8. Kokie reikalavimai keliami evakuaciniuose išėjimuose esančių durų atidarymo krypčiai?</div>
+        <ul class="options-list">
+            <li>a) durys turi atsidaryti tik evakuacijos kryptimi;</li>
+            <li>b) durys gali būti atidaromos į patalpų vidų, jei jose nuolat būna ne daugiau kaip 25 žmonės;</li>
+            <li>c) durys gali būti atidaromos į patalpos vidų sandėliuose, kurių plotas ne didesnis kaip 300 m2;</li>
+            <li>d) durys gal būti atidaromos į patalpų vidų, jei jose nuolat būna ne daugiau kaip 15 žmonių.</li>
+        </ul>
+    </div>
+
+    <!-- 9 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">9. Evakuacijos kelių plotis turi būti ne mažesnis:</div>
+        <ul class="options-list">
+            <li>a) 1,5 m;</li>
+            <li>b) 1,2 m;</li>
+            <li>c) 2,0 m;</li>
+            <li>d) 2,5 m.</li>
+        </ul>
+    </div>
+
+    <!-- 10 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">10. Evakuacijos keliuose praėjimų aukštis turi būti ne mažesnis:</div>
+        <ul class="options-list">
+            <li>a) 2,0 m;</li>
+            <li>b) 2,2 m;</li>
+            <li>c) 1,8 m;</li>
+            <li>d) 2,5 m.</li>
+        </ul>
+    </div>
+
+    <!-- 11 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">11. Masinė žmonių buvimo patalpa yra tokia, kurioje vienu metu gali būti daugiau kaip:</div>
+        <ul class="options-list">
+            <li>a) 100 žmonių;</li>
+            <li>b) 75 žmonės;</li>
+            <li>c) 50 žmonių;</li>
+            <li>d) 25 žmonės.</li>
+        </ul>
+    </div>
+
+    <!-- 12 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">12. Kokios yra gamybos kategorijos pagal gaisro arba sprogimo ir gaisro kilimo pavojų?</div>
+        <ul class="options-list">
+            <li>a) Asg, Bsg, Cg;</li>
+            <li>b) A, B, C, D;</li>
+            <li>c) Asg, Bsg, Cg, Dg, Eg;</li>
+            <li>d) A, B, Cg, Dsg, Esy, G.</li>
+        </ul>
+    </div>
+
+    <!-- 13 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">13. Kokia yra tikslingiausia veiksmų seka kilus gaisrui?</div>
+        <ul class="options-list">
+            <li>a) iškviesti ugniagesius, evakuoti žmones, gesinti gaisrą;</li>
+            <li>b) evakuoti žmones, iškviesti ugniagesius, gesinti gaisrą;</li>
+            <li>c) gesinti gaisrą, evakuoti žmones, iškviesti ugniagesius.</li>
+        </ul>
+    </div>
+
+    <!-- 14 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">14. Bendrosios gaisrinės saugos taisyklės nustato pagrindinius gaisrinės saugos reikalavimus:</div>
+        <ul class="options-list">
+            <li>a) eksploatuojant pastatus, statinius ir technologinius įrenginius;</li>
+            <li>b) eksploatuojant, statant, rekonstruojant bei techniškai pertvarkant pastatus, statininius ir technologinius įrenginius;</li>
+            <li>c) abu atsakymai teisingi.</li>
+        </ul>
+    </div>
+
+    <!-- 15 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">15. Krypties ir informacijos ženklai išdėstomi:</div>
+        <ul class="options-list">
+            <li>a) kad jie gerai būtų matomi iš bet kurios patalpos vietos;</li>
+            <li>b) prie evakuacinių išėjimų ir gesinimo priemonių;</li>
+            <li>c) laisvai pasirinktoje vietoje.</li>
+        </ul>
+    </div>
+
+    <!-- 16 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">16. Atstumas nuo elektros šviestuvų iki sandėliuojamų degių medžiagų turi būti ne mažesnis kaip:</div>
+        <ul class="options-list">
+            <li>a) 0,2 m;</li>
+            <li>b) 0,5 m;</li>
+            <li>c) 1,0 m.</li>
+        </ul>
+    </div>
+
+    <!-- 17 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">17. Naudoti elektros laidus ir kabelius su pažeista izoliuojančia medžiaga:</div>
+        <ul class="options-list">
+            <li>a) draudžiama;</li>
+            <li>b) leidžiama;</li>
+            <li>c) leidžiama, jei nėra gaisro kilimo pavojaus.</li>
+        </ul>
+    </div>
+
+    <!-- 18 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">18. Įmonės gamybinėse ir sandėliavimo patalpose šildyti galima naudojant:</div>
+        <ul class="options-list">
+            <li>a) savo gamybos šildymo prietaisus;</li>
+            <li>b) atviro tipo pramoninės gamybos prietaisus;</li>
+            <li>c) uždaro tipo pramoninės gamybos prietaisus.</li>
+        </ul>
+    </div>
+
+    <!-- 19 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">19. Ant rampų draudžiama laikyti degias medžiagas:</div>
+        <ul class="options-list">
+            <li>a) darbo metu;</li>
+            <li>b) ne darbo metu;</li>
+            <li>c) visą parą.</li>
+        </ul>
+    </div>
+
+    <!-- 20 Klausimas -->
+    <div class="question-block">
+        <div class="question-title">20. Lengvieji automobiliai aikštelėse statomi paliekant tarp jų:</div>
+        <ul class="options-list">
+            <li>a) 0,6 m atstumą;</li>
+            <li>b) 0,8 m atstumą;</li>
+            <li>c) 1,0 m atstumą.</li>
+        </ul>
+    </div>
+
+    <!-- ATSAKYMŲ LENTELĖ -->
+    <div class="answers-section">
+        <div class="test-subtitle">Testo atsakymai</div>
+        <table class="answers-table">
+            <thead>
+                <tr>
+                    <th>Klausimo numeris</th>
+                    <th>Atsakymo variantas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1.</td><td>a</td></tr>
+                <tr><td>2.</td><td>d</td></tr>
+                <tr><td>3.</td><td>d</td></tr>
+                <tr><td>4.</td><td>a</td></tr>
+                <tr><td>5.</td><td>a</td></tr>
+                <tr><td>6.</td><td>c</td></tr>
+                <tr><td>7.</td><td>a</td></tr>
+                <tr><td>8.</td><td>d</td></tr>
+                <tr><td>9.</td><td>b</td></tr>
+                <tr><td>10.</td><td>a</td></tr>
+                <tr><td>11.</td><td>c</td></tr>
+                <tr><td>12.</td><td>c</td></tr>
+                <tr><td>13.</td><td>a</td></tr>
+                <tr><td>14.</td><td>c</td></tr>
+                <tr><td>15.</td><td>a</td></tr>
+                <tr><td>16.</td><td>b</td></tr>
+                <tr><td>17.</td><td>a</td></tr>
+                <tr><td>18.</td><td>c</td></tr>
+                <tr><td>19.</td><td>b</td></tr>
+                <tr><td>20.</td><td>a</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>
