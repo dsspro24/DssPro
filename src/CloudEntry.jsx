@@ -386,6 +386,26 @@ async function loadManagerWorkspace(user) {
   };
 }
 
+async function invokeCreatorAssetMigration(body) {
+  let result = await supabase.functions.invoke('creator-migrate-assets', { body });
+  const status = result.error?.context instanceof Response ? result.error.context.status : null;
+  if (!result.error || status !== 401) return result;
+
+  const { data, error } = await supabase.auth.refreshSession();
+  if (error || !data.session) {
+    return {
+      data: null,
+      error: new Error('Prisijungimo sesija nebegalioja. Atsijunkite ir prisijunkite iš naujo, tada bandykite dar kartą.'),
+    };
+  }
+
+  result = await supabase.functions.invoke('creator-migrate-assets', {
+    body,
+    headers: { Authorization: `Bearer ${data.session.access_token}` },
+  });
+  return result;
+}
+
 export default function CloudEntry({ onExit, onBackToLanding }) {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -634,10 +654,13 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     setErrorMessage('');
     setCreatorPreviewLoading(true);
     try {
-      const { error: assetMigrationError } = await supabase.functions.invoke('creator-migrate-assets', {
-        body: { organizationId },
-      });
-      if (assetMigrationError) throw new Error(`Nepavyko paruošti įmonės failų: ${assetMigrationError.message}`);
+      const { error: assetMigrationError } = await invokeCreatorAssetMigration({ organizationId });
+      if (assetMigrationError) {
+        const details = assetMigrationError.context instanceof Response
+          ? await assetMigrationError.context.clone().json().catch(() => null)
+          : null;
+        throw new Error(`Nepavyko paruošti įmonės failų: ${details?.error ?? assetMigrationError.message}`);
+      }
       const { data: savedWorkspace, error } = await supabase
         .from('organization_data')
         .select('data')

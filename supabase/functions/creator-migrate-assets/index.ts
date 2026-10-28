@@ -197,8 +197,16 @@ Deno.serve(async (request) => {
 
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const adminClient = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: { user }, error: userError } = await userClient.auth.getUser();
-  if (userError || !user) return response(401, { error: 'Session is invalid or expired' });
+  const accessToken = authorization.replace(/^Bearer\s+/i, '').trim();
+  if (!accessToken) return response(401, { error: 'Authenticated request required' });
+  const authResponse = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${accessToken}` },
+  });
+  if (!authResponse.ok) {
+    const authError = await authResponse.json().catch(() => null);
+    return response(401, { error: authError?.message ?? authError?.msg ?? 'Session is invalid or expired' });
+  }
+  const user = await authResponse.json();
   const { data: isCreator, error: creatorError } = await userClient.rpc('is_creator');
   if (creatorError) return response(403, { error: 'Could not verify workspace access' });
   const body = await request.json().catch(() => ({}));

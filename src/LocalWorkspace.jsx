@@ -13,6 +13,17 @@ import knowledgeAssessmentProtocolTemplate from './assets/knowledge-assessment-p
 import jobDescriptionFamiliarizationTemplate from './assets/job-description-familiarization-journal.html?raw';
 import internalDocumentsRegisterTemplate from './assets/internal-documents-register-journal.html?raw';
 import chemicalSafetyInstructionCardTemplate from './assets/chemical-safety-instruction-card.html?raw';
+const defaultFamiliarizationTopics = [
+  'Psichologinio smurto, diskriminacijos ir priekabiavimo prevencijos politika;',
+  'Darbuotojų saugos ir sveikatos politika;',
+  'Gaisrinės saugos instrukcijos rengimo, keitimo, pildymo ir mokymo tvarka;',
+  'Incidentų tyrimo tvarka, nelaimingų atsitikimų darbe, profesinių ligų tyrimo ir registravimo tvarka;',
+  'Alkoholio įtakos organizmui ir administracinių nuobaudų taikymu būnant neblaiviam. Nušalinimo (dėl neblaivumo) nuo darbo schema. Darbuotojų neblaivumo (girtumo) kontrolės tvarka, prevencijos priemonių planas. Su eismu susijusių nelaimingų atsitikimų darbe mažinimu;',
+  'Profesinės rizikos vertinimo išvadomis, šalinimo mažinimo priemonių planu;',
+  'Kaip saugiai dirbti ir išvengiant nelaimingų atsitikimų atliekant darbus ant kopėčių, pastolių ir lipynių;',
+  'Darbuotojų supažindinimas su saugaus kopėčių, lipynių naudojimo ir patikros tvarkos aprašu;',
+  'Asmeninių apsauginių priemonių naudojimas. Nelaimingi atsitikimai.',
+];
 const defaultTestTemplateLoaders = new Map([
   ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
@@ -657,7 +668,7 @@ const initialData = {
     { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', html: medicalExaminationScheduleTemplate, templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', html: jobDescriptionFamiliarizationTemplate, templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, regulationNumber: '' } },
-    { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructorName: '' } },
+    { id: 'res-familiarization-card', title: 'Darbuotojų supažindinimo kortelė', type: 'Kortelė', category: 'Darbuotojų supažindinimas', image: '/courses/safety-training.jpg', duration: '20 darbuotojų', html: employeeFamiliarizationTemplate, templateKind: 'familiarization-card', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, date: '', instructorName: '', familiarizationTopics: defaultFamiliarizationTopics } },
     { id: 'res-workplace-dss-journal', title: 'DSS instruktavimų darbo vietoje žurnalas', type: 'Žurnalas', category: 'Instruktavimas darbo vietoje', image: '/courses/construction-ppe.jpg', duration: '15 įrašų', html: workplaceInstructionsTemplate, templateKind: 'workplace-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructionNumber: '', instructionTitle: '', instructorName: '', instructorPosition: '', signatureFieldRoles: workplaceDssSignatureFieldDefaults } },
     { id: 'res-intro-dss-journal', title: 'Įvadinių instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Įvadinis instruktavimas', image: '/courses/safety-ergonomics.jpg', duration: '15 įrašų', html: introInstructionsTemplate, templateKind: 'intro-dss-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, instructorName: '', instructorPosition: '', instructorCanManager: false, instructorCanDss: true } },
     { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', html: workRulesTemplate, templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true } },
@@ -2682,6 +2693,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ...(resource.templateKind === 'fire-safety-journal'
         ? { signatureFieldRoles: getFireSafetySignatureFieldRoles(resource, saved) }
         : {}),
+      ...(resource.templateKind === 'familiarization-card'
+        ? { familiarizationTopics: saved.familiarizationTopics ?? defaults.familiarizationTopics ?? defaultFamiliarizationTopics }
+        : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { commissionSignerOverrides } : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { protocolCadence: saved.protocolCadence ?? defaults.protocolCadence ?? 'weekly-friday' } : {}),
     };
@@ -2704,6 +2718,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (resourceSettingsTarget.templateKind === 'intro-dss-journal'
       && !settings.requiredSigners.some((role) => ['Vadovas', 'DSS specialistas'].includes(role))) {
       settings.requiredSigners = [...settings.requiredSigners, 'DSS specialistas'];
+    }
+    if (resourceSettingsTarget.templateKind === 'familiarization-card') {
+      settings.familiarizationTopics = (Array.isArray(settings.familiarizationTopics) ? settings.familiarizationTopics : defaultFamiliarizationTopics)
+        .map((topic) => String(topic).trim())
+        .filter(Boolean);
     }
     if (resourceSettingsTarget.templateKind === 'workplace-dss-journal') {
       const fieldRoles = { ...workplaceDssSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
@@ -2953,6 +2972,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const getResourceWithHtml = async (resource, { useCache = true } = {}) => {
+    if (resource.id === 'res-familiarization-card' || resource.templateKind === 'familiarization-card') {
+      const defaultResource = initialData.resources.find((item) => item.id === 'res-familiarization-card');
+      resource = {
+        ...defaultResource,
+        ...resource,
+        templateKind: resource.templateKind ?? defaultResource?.templateKind,
+        defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
+      };
+    }
     if (resource.id === 'res-fire-safety-journal' || resource.id === 'res-medical-examination-schedule' || resource.id === 'res-work-rules-journal') {
       const defaultResource = initialData.resources.find((item) => item.id === resource.id);
       resource = {
@@ -6755,6 +6783,18 @@ function prepareResourcePrintHtml(html, title) {
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
 
+function applyFamiliarizationTopics(html, topics) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const list = parsed.querySelector('.topics-list');
+  if (!list) return html;
+  list.replaceChildren(...topics.map((topic) => {
+    const item = parsed.createElement('li');
+    item.textContent = topic;
+    return item;
+  }));
+  return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
+}
+
 function buildResourcePreviewHtml(resource, employee, org, signatures, resources = []) {
   resources = resource.previewResources ?? resources;
   if (resource.id === 'res-aap' && resource.aapCatalogPreview) {
@@ -6818,7 +6858,12 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     const fallbackHtml = resource.id === 'res-medical-examination-schedule'
       ? medicalExaminationScheduleTemplate
       : '<p>Šis šablonas dar neturi turinio.</p>';
-    const html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || fallbackHtml);
+    let html = Object.entries(values).reduce((content, [key, value]) => content.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value), resource.html || fallbackHtml);
+    if (resource.templateKind === 'familiarization-card') {
+      const configuredTopics = resource.defaultSettings?.familiarizationTopics;
+      const topics = Array.isArray(configuredTopics) ? configuredTopics : defaultFamiliarizationTopics;
+      html = applyFamiliarizationTopics(html, topics.filter((topic) => typeof topic === 'string').map((topic) => topic.trim()).filter(Boolean));
+    }
     if (resource.templateOnly) {
       const templateHtml = resource.type === 'Protokolas' ? numberDocumentSequenceColumn(html) : html;
       return `<!doctype html>\n${templateHtml}`;
@@ -7160,7 +7205,8 @@ function LegacyResourceSettingsDialog({ resource, settings, resources = [], orga
     && typeof value === 'boolean');
   const instructorRole = settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{normalizeResourceType(resource) === 'Testas' && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Susietas protokolas</legend><p className="text-xs text-slate-600">Pasirinkite protokolą, kuris įmonei bus priskirtas kartu su šiuo testu. „Nesieti“ panaikins kūrėjo nustatytą numatytąjį ryšį tik šiai įmonei.</p><select className={inputClass} value={settings.relatedProtocolId ?? getConfiguredTestProtocolId(resource, organization, resources) ?? ''} onChange={(event) => onChange({ ...settings, relatedProtocolId: event.target.value })}><option value="">Nesieti su jokiu protokolu</option>{resources.filter((candidate) => normalizeResourceType(candidate) === 'Protokolas'
+  const familiarizationTopics = Array.isArray(settings.familiarizationTopics) ? settings.familiarizationTopics : defaultFamiliarizationTopics;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div><div className="grid gap-4 sm:grid-cols-2">{textFields.map(([key, value]) => { const type = key === 'date' ? 'date' : ['rowCount', 'validityMonths'].includes(key) ? 'number' : 'text'; return <label key={key} className="text-sm font-medium">{labels[key] ?? key}<input className={`${inputClass} mt-1`} type={type} min={type === 'number' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>; })}{booleanFields.map(([key, value]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />{labels[key] ?? key}</label>)}</div>{resource.templateKind === 'familiarization-card' && <fieldset className="mt-5 space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Supažindinimo temos</legend><p className="text-xs text-slate-600">Šios temos rodomos darbuotojų supažindinimo kortelėje. Galite keisti, pašalinti arba pridėti temas tik šiai įmonei.</p>{familiarizationTopics.map((topic, index) => <div key={index} className="flex items-start gap-2"><label className="flex-1 text-xs font-medium text-slate-600">Tema {index + 1}<textarea className={`${inputClass} mt-1 min-h-16`} rows={2} value={topic} onChange={(event) => onChange({ ...settings, familiarizationTopics: familiarizationTopics.map((currentTopic, topicIndex) => topicIndex === index ? event.target.value : currentTopic) })} /></label><button type="button" className="mt-6 rounded-md border border-rose-200 p-2 text-rose-700 hover:bg-rose-50" aria-label={`Pašalinti temą ${index + 1}`} onClick={() => onChange({ ...settings, familiarizationTopics: familiarizationTopics.filter((_, topicIndex) => topicIndex !== index) })}><Trash2 size={16} /></button></div>)}<button type="button" className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onChange({ ...settings, familiarizationTopics: [...familiarizationTopics, ''] })}><Plus size={16} />Pridėti temą</button></fieldset>}{normalizeResourceType(resource) === 'Testas' && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Susietas protokolas</legend><p className="text-xs text-slate-600">Pasirinkite protokolą, kuris įmonei bus priskirtas kartu su šiuo testu. „Nesieti“ panaikins kūrėjo nustatytą numatytąjį ryšį tik šiai įmonei.</p><select className={inputClass} value={settings.relatedProtocolId ?? getConfiguredTestProtocolId(resource, organization, resources) ?? ''} onChange={(event) => onChange({ ...settings, relatedProtocolId: event.target.value })}><option value="">Nesieti su jokiu protokolu</option>{resources.filter((candidate) => normalizeResourceType(candidate) === 'Protokolas'
       && availableResourceIds.includes(candidate.id)
       && (!getConfiguredProtocolTestId(candidate, organization, resources)
         || getConfiguredProtocolTestId(candidate, organization, resources) === resource.id)).map((protocol) => <option key={protocol.id} value={protocol.id}>{protocol.title}</option>)}</select></fieldset>}{resource.templateKind === 'internal-documents-register' && <fieldset className="mt-5 space-y-3 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas pasirašo kiekviename žurnalo langelyje</legend><p className="text-xs text-slate-600">Pasirašyto asmens vardas, parašas, data, laikas ir IP bus rodomi nurodytoje žurnalo vietoje.</p>{internalRegisterSignatureFieldLabels.map(([key, label]) => <label key={key} className="block text-sm font-medium">{label}<select className={`${inputClass} mt-1`} value={(settings.signatureFieldRoles ?? internalRegisterSignatureFieldDefaults)[key] ?? 'Darbuotojas'} onChange={(event) => onChange({ ...settings, signatureFieldRoles: { ...internalRegisterSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}), [key]: event.target.value } })}><option value="Darbuotojas">Darbuotojas</option><option value="Vadovas">Vadovas</option><option value="DSS specialistas">DSS specialistas</option>{['dssInstructor', 'fireInstructor'].includes(key) && <option value="instruktavęs">Instruktavęs asmuo (pagal atitinkamo žurnalo nustatymą)</option>}<option value="niekas">Niekas nepasirašo</option></select></label>)}</fieldset>}{['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas instruktavo ir turi pasirašyti</legend>{[['Vadovas', 'Įmonės vadovas'], ['DSS specialistas', 'DSS specialistas']].map(([role, label]) => <label key={role} className="flex items-center gap-2 text-sm"><input type="radio" name={`instructor-role-${resource.id}`} checked={instructorRole === role} onChange={() => onChange({ ...settings, requiredSigners: ['Darbuotojas', role], ...(resource.templateKind === 'intro-dss-journal' ? { instructorCanManager: role === 'Vadovas', instructorCanDss: role === 'DSS specialistas' } : {}) })} />{label}</label>)}</fieldset>}{!['intro-dss-journal', 'workplace-dss-journal', 'fire-safety-journal'].includes(resource.templateKind) && <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><div className="grid gap-2 sm:grid-cols-2">{signerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value === 'Darbuotojas' || (settings.requiredSigners ?? []).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => onChange({ ...settings, requiredSigners: event.target.checked ? [...new Set([...(settings.requiredSigners ?? []), value])] : (settings.requiredSigners ?? []).filter((role) => role !== value) })} />{label}{value === 'Darbuotojas' && <span className="text-xs text-slate-500">(privalomas)</span>}</label>)}</div></fieldset>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div></form></div>;
