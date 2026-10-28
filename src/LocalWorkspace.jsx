@@ -3211,7 +3211,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const archivedEmployees = archivedRecord
       ? [archivedRecord.employee]
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
-      ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee).filter(Boolean)
+      ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee
+        ?? previewArchivedEmployees.find((employee) => employee.id === employeeId)).filter(Boolean)
       : previewArchivedEmployees.filter((employee) => employee.resourceIds?.includes(resource.id));
     const sequenceEmployees = [...new Map([
       ...data.employees.filter((person) => person.orgId === currentOrg?.id),
