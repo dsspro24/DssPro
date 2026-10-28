@@ -2652,13 +2652,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       protocolSignerRoleOptions.slice(-2).forEach(({ value }) => {
         if (typeof commissionSignerOverrides[value] === 'boolean'
           ? commissionSignerOverrides[value]
-          : acceptedRoles.has(value)) defaultRequiredSigners.push(value);
+          : defaultRequiredSigners.includes(value) || acceptedRoles.has(value)) defaultRequiredSigners.push(value);
       });
     } else if (resource.templateKind === 'knowledge-assessment-protocol') {
       protocolSignerRoleOptions.slice(-2).forEach(({ value }) => {
         const required = typeof commissionSignerOverrides[value] === 'boolean'
           ? commissionSignerOverrides[value]
-          : acceptedRoles.has(value);
+          : defaultRequiredSigners.includes(value) || acceptedRoles.has(value);
         if (required) defaultRequiredSigners.push(value);
         else {
           const index = defaultRequiredSigners.indexOf(value);
