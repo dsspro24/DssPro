@@ -676,10 +676,17 @@ const initialData = {
   ],
 };
 
-function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = []) {
+function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = [], creatorResources = []) {
   const organizationTemplate = initialData.organizations[0];
   const planCode = organization.plan_code === 'pro' ? 'pro' : 'standard';
   const plan = planCode === 'pro' ? 'Pro' : 'Standartinis';
+  const defaultResourceSettings = Object.fromEntries(creatorResources
+    .filter((resource) => resource.defaultForOrganizations === true)
+    .map((resource) => [resource.id, {
+      ...(resource.defaultSettings ?? {}),
+      requiredSigners: resource.requiredSigners ?? resource.defaultSettings?.requiredSigners ?? ['Darbuotojas'],
+      validityMonths: resource.validityMonths ?? resource.defaultSettings?.validityMonths ?? 12,
+    }]));
   const cloudOrganization = {
     ...organizationTemplate,
     id: organization.id,
@@ -692,7 +699,7 @@ function createInitialCloudWorkspace(organization, managerName = '', defaultReso
     dss: [],
     dssInvitations: [],
     employeeAssignmentPresets: [],
-    resourceSettings: {},
+    resourceSettings: defaultResourceSettings,
     resources: defaultResourceIds,
   };
 
@@ -848,7 +855,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? (creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id)
       : [];
     const cloudDefaults = cloudMode && cloudOrganization
-      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds)
+      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
       : null;
     const loadedData = initialCloudData
       ? {
@@ -869,7 +876,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         protocolCommissionSignatures: initialCloudData.protocolCommissionSignatures ?? [],
         subscriptions: initialCloudData.subscriptions ?? [],
       }
-      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds) : loadData();
+      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? []) : loadData();
     const workspaceData = {
       ...loadedData,
       resources: (loadedData.resources ?? []).map((resource) => {
@@ -3054,6 +3061,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           input_resource_types: data.resourceTypes,
         });
         if (error) throw error;
+        uploadedHtmlPath = null;
+        if (resource.defaultForOrganizations) {
+          const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults');
+          if (defaultsError) throw defaultsError;
+        }
       }
       setData((current) => ({ ...current, resources: editingResourceId ? current.resources.map((item) => item.id === editingResourceId ? resource : item) : [resource, ...current.resources] }));
       setNotice(editingResourceId ? 'Turinio šablonas atnaujintas.' : 'Turinio šablonas įtrauktas į bendrą biblioteką.');

@@ -1,3 +1,84 @@
+create or replace function public.sync_creator_resource_defaults()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  default_resource jsonb;
+  resource_id text;
+  resource_settings jsonb;
+begin
+  if auth.uid() is not null and not public.is_creator() then
+    raise exception 'Creator access required';
+  end if;
+
+  for default_resource in
+    select item.value
+      from public.creator_workspace_data as catalog
+      cross join lateral jsonb_array_elements(coalesce(catalog.data -> 'resources', '[]'::jsonb)) as item(value)
+      where catalog.id = true
+        and coalesce((item.value ->> 'defaultForOrganizations')::boolean, false)
+        and coalesce(item.value ->> 'organizationId', '') = ''
+  loop
+    resource_id := default_resource ->> 'id';
+    resource_settings := coalesce(default_resource -> 'defaultSettings', '{}'::jsonb)
+      || jsonb_build_object(
+        'requiredSigners',
+        coalesce(default_resource -> 'requiredSigners', default_resource -> 'defaultSettings' -> 'requiredSigners', '["Darbuotojas"]'::jsonb),
+        'validityMonths',
+        coalesce(default_resource -> 'validityMonths', default_resource -> 'defaultSettings' -> 'validityMonths', '12'::jsonb)
+      );
+
+    update public.organization_data as workspace
+      set data = jsonb_set(
+        workspace.data,
+        '{organizations}',
+        (
+          select coalesce(jsonb_agg(
+            case
+              when organization.value ->> 'id' = workspace.organization_id::text then
+                jsonb_set(
+                  jsonb_set(
+                    organization.value,
+                    '{resources}',
+                    case
+                      when coalesce(organization.value -> 'resources', '[]'::jsonb) ? resource_id
+                        then coalesce(organization.value -> 'resources', '[]'::jsonb)
+                      else coalesce(organization.value -> 'resources', '[]'::jsonb) || jsonb_build_array(resource_id)
+                    end,
+                    true
+                  ),
+                  '{resourceSettings}',
+                  jsonb_set(
+                    coalesce(organization.value -> 'resourceSettings', '{}'::jsonb),
+                    array[resource_id],
+                    coalesce(organization.value -> 'resourceSettings' -> resource_id, '{}'::jsonb) || resource_settings,
+                    true
+                  ),
+                  true
+                )
+              else organization.value
+            end
+            order by organization.ordinality
+          ), '[]'::jsonb)
+          from jsonb_array_elements(coalesce(workspace.data -> 'organizations', '[]'::jsonb))
+            with ordinality as organization(value, ordinality)
+        ),
+        true
+      ),
+      updated_by = coalesce(auth.uid(), workspace.updated_by),
+      updated_at = now()
+      where workspace.data -> 'organizations' is not null;
+  end loop;
+end;
+$$;
+
+revoke all on function public.sync_creator_resource_defaults() from public, anon;
+grant execute on function public.sync_creator_resource_defaults() to authenticated;
+
+select public.sync_creator_resource_defaults();
+
 create or replace function public.set_creator_resource_default(
   input_resource_id text,
   input_enabled boolean
@@ -107,6 +188,10 @@ begin
     updated_by = auth.uid(),
     updated_at = now()
   where workspace.data -> 'organizations' is not null;
+
+  if input_enabled then
+    perform public.sync_creator_resource_defaults();
+  end if;
 
   return true;
 end;
