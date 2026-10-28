@@ -6371,13 +6371,13 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           relatedProof(resource, registerWorker, registerConfirmationRole),
         ]);
       } else if (resource.templateKind === 'knowledge-assessment-protocol') {
-        const relatedTestId = getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? resource.relatedTestId;
+        const relatedTestId = getConfiguredResourceTestIds(resource, org, allResources)[0] ?? resource.relatedTestId;
         const configuredResource = { ...resource, relatedTestId };
         const result = getLatestPassedProtocolTestResult(item, configuredResource) ?? getLatestProtocolTestResult(item, configuredResource);
         const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : relatedTestId ? 'Testo rezultato nėra' : '';
         writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
-        const relatedTestId = getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? resource.relatedTestId;
+        const relatedTestId = getConfiguredResourceTestIds(resource, org, allResources)[0] ?? resource.relatedTestId;
         const testResult = (item.testResults ?? [])
           .filter((result) => result.resourceId === relatedTestId)
           .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
