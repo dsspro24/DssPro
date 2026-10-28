@@ -1586,7 +1586,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }).then(({ data: employees, error }) => {
         if (!active) return;
         if (error) throw error;
-        setReportArchiveData({ organizationId: currentOrg.id, employees: employees ?? [], loading: false, error: '' });
+        setReportArchiveData({
+          organizationId: currentOrg.id,
+          employees: (employees ?? []).map(({ orgId, employee }) => ({
+            ...employee,
+            orgId: orgId ?? employee.orgId,
+          })),
+          loading: false,
+          error: '',
+        });
       }).catch((error) => {
         if (active) setReportArchiveData({ organizationId: currentOrg.id, employees: [], loading: false, error: error.message });
       });
