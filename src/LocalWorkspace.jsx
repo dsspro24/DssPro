@@ -1702,6 +1702,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const protocolPageCount = Math.max(1, Math.ceil(visibleProtocolBatches.length / protocolPageSize));
   const currentProtocolPage = Math.min(protocolPage, protocolPageCount);
   const paginatedProtocolBatches = visibleProtocolBatches.slice((currentProtocolPage - 1) * protocolPageSize, currentProtocolPage * protocolPageSize);
+  const previewProtocolBatch = async (resource, batch) => {
+    try {
+      await openResourcePreview(resource, { protocolBatchId: batch.id });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNotice(`Protokolo „${resource.title}“ peržiūrėti nepavyko: ${message}`);
+    }
+  };
   const protocolRegistryPanel = reportTypeFilter === 'Protokolas' ? <Panel title="Periodinių protokolų registras">
     <div className="mb-4 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1.5fr)_minmax(14rem,1fr)_minmax(12rem,0.8fr)_auto]">
       <label className="block text-sm font-medium">Ieškoti darbuotojo<div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={protocolSearch} onChange={(event) => { setProtocolSearch(event.target.value); setProtocolPage(1); }} placeholder="Vardas, pavardė" /></div></label>
@@ -1714,7 +1722,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const status = ready ? 'Paruoštas'
         : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas'
           : resource.relatedTestId ? 'Laukia testo' : 'Laukia datos';
-      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: batch.id })}><Eye size={15} />Peržiūrėti</button>];
+      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => previewProtocolBatch(resource, batch)}><Eye size={15} />Peržiūrėti</button>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
@@ -3173,7 +3181,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         return;
       }
     }
-    if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview) {
+    if (cloudMode && userRole === 'vadovas' && activeTab === 'ataskaitos' && !creatorReadOnlyPreview
+      && normalizeResourceType(resource) !== 'Protokolas') {
       if (reportArchiveData.organizationId !== currentOrg?.id || reportArchiveData.loading) {
         setNotice('Palaukite, kol bus įkelti archyvuotų darbuotojų ataskaitų duomenys.');
         return;
@@ -6402,8 +6411,13 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
 
   if (resource.templateKind === 'knowledge-assessment-protocol') {
     const assignments = (resource.previewCommissionAssignments ?? [])
-      .filter((assignment) => assignment.status === 'accepted'
-        && (!resource.protocolBatchDate || (assignment.respondedAt && new Date(assignment.respondedAt).toISOString().slice(0, 10) <= resource.protocolBatchDate)))
+      .filter((assignment) => {
+        if (assignment.status !== 'accepted') return false;
+        if (!resource.protocolBatchDate) return true;
+        const respondedAt = assignment.respondedAt ? new Date(assignment.respondedAt) : null;
+        return respondedAt && !Number.isNaN(respondedAt.getTime())
+          && respondedAt.toISOString().slice(0, 10) <= resource.protocolBatchDate;
+      })
       .sort((left, right) => (left.role === 'Komisijos pirmininkas' ? -1 : 1) - (right.role === 'Komisijos pirmininkas' ? -1 : 1));
     const batchSignatures = (resource.previewProtocolCommissionSignatures ?? [])
       .filter((signature) => signature.batchId === resource.protocolBatchId);
