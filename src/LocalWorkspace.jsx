@@ -2126,6 +2126,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         });
         if (error) throw error;
         if (!updated) throw new Error(`„${resource.title}“ nerastas bendrame kataloge.`);
+        const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults', {
+          input_resource_id: resource.id,
+          input_previous_resource: existingResource ? resourceForDatabase(existingResource) : null,
+        });
+        if (defaultsError) throw defaultsError;
         restoredResources.push({ ...resource, defaultForOrganizations: true });
       }
 
@@ -2621,7 +2626,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const builtInDefaults = initialData.resources.find((item) => item.id === resource.id)?.defaultSettings ?? {};
     const defaults = { ...builtInDefaults, ...resource.defaultSettings };
     const saved = currentOrg?.resourceSettings?.[resource.id] ?? {};
-    const defaultRequiredSigners = [...(defaults.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas'])];
+    const defaultRequiredSigners = [...(resource.requiredSigners ?? defaults.requiredSigners ?? ['Darbuotojas'])];
     if (!defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
     const savedInstructorRole = saved.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
       ?? (saved.instructorCanManager ? 'Vadovas' : null);
@@ -3063,7 +3068,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         if (error) throw error;
         uploadedHtmlPath = null;
         if (resource.defaultForOrganizations) {
-          const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults');
+          const { error: defaultsError } = await supabase.rpc('sync_creator_resource_defaults', {
+            input_resource_id: resource.id,
+            input_previous_resource: existingResource ? resourceForDatabase(existingResource) : null,
+          });
           if (defaultsError) throw defaultsError;
         }
       }
