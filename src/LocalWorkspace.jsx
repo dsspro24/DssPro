@@ -848,7 +848,7 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
@@ -986,6 +986,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
   const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
+  const [deletingCreatorAccountId, setDeletingCreatorAccountId] = useState('');
   const [creatorOrganizationPage, setCreatorOrganizationPage] = useState(1);
   const [creatorAccountPage, setCreatorAccountPage] = useState(1);
   const [employeeSort, setEmployeeSort] = useState({ key: 'resource-type:Kortelė', direction: 'asc' });
@@ -3204,6 +3205,53 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.alert(`Įmonė ištrinta, bet dalies failų pašalinti nepavyko: ${result.warning}`);
     }
     await onCreatorOrganizationDeleted();
+  };
+
+  const deleteCreatorAccount = async (account) => {
+    if (!cloudMode || userRole !== 'kurejas' || !account?.id || !account.email || deletingCreatorAccountId) return;
+    const typedEmail = window.prompt(`Norėdami ištrinti paskyrą, įrašykite tikslų el. paštą:\n${account.email}`);
+    if (typedEmail?.trim().toLocaleLowerCase() !== account.email.trim().toLocaleLowerCase()) return;
+
+    const companyEffects = 'Bus ištrintos visos šios paskyros sukurtos įmonės kartu su jų darbuotojais, dokumentais, parašais ir failais. Kitose įmonėse paskyra neteks narystės; jų dokumentai ir parašų istorija liks.';
+    if (!window.confirm(`Galutinai ištrinti ${account.accountType === 'manager' ? 'vadovo' : 'DSS specialisto'} paskyrą „${account.email}“ iš Supabase? ${companyEffects} Paskyros atkurti nebus galima.`)) return;
+
+    setDeletingCreatorAccountId(account.id);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('creator-delete-account', {
+        body: { userId: account.id },
+      });
+      if (error) {
+        const details = error.context instanceof Response ? await error.context.clone().json().catch(() => null) : null;
+        if (details?.dataDeleted) {
+          try {
+            await onCreatorAccountDeleted();
+          } catch (refreshError) {
+            setNotice(`Įmonės duomenys pašalinti, bet paskyrų sąrašo atnaujinti nepavyko: ${refreshError.message || 'Nežinoma klaida'}`);
+            return;
+          }
+        }
+        setNotice(`Paskyros ištrinti nepavyko: ${details?.error ?? error.message}`);
+        return;
+      }
+      if (!result?.deleted) {
+        setNotice('Paskyros ištrinti nepavyko: Supabase nepatvirtino trynimo.');
+        return;
+      }
+
+      if (result.storageCleanupComplete === false) {
+        window.alert(`Paskyra ir jos duomenys ištrinti, bet dalies įmonių failų pašalinti nepavyko: ${result.warning}`);
+      }
+      setNotice(`Paskyra ${account.email} ir jai priklausiusios įmonės ištrintos.`);
+      try {
+        await onCreatorAccountDeleted();
+      } catch (refreshError) {
+        setNotice(`Paskyra ${account.email} ištrinta, bet paskyrų sąrašo atnaujinti nepavyko: ${refreshError.message || 'Nežinoma klaida'}`);
+      }
+    } catch (error) {
+      setNotice(`Paskyros ištrinti nepavyko: ${error.message || 'Nežinoma klaida'}`);
+    } finally {
+      setDeletingCreatorAccountId('');
+    }
   };
 
   const saveCompanyProtocol = async (event) => {
@@ -5636,7 +5684,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <PageTitle title="Paskyros" subtitle="Registruoti įmonių vadovai ir DSS specialistai." />
             <Panel title="Vadovai ir DSS specialistai">
               <label className="relative mb-4 block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti paskyros</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={creatorAccountSearch} onChange={(event) => { setCreatorAccountSearch(event.target.value); setCreatorAccountPage(1); }} placeholder="Ieškoti pagal vardą, el. paštą ar įmonę" /></label>
-              <DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės']} rows={paginatedCreatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas'])} empty="Paskyrų pagal paiešką nerasta." />
+              <DataTable headers={['Vardas', 'El. paštas', 'Paskyros tipas', 'Įmonės', 'Veiksmai']} rows={paginatedCreatorAccounts.map((account) => [account.fullName || 'Vardas nenurodytas', account.email, account.accountType === 'manager' ? 'Vadovas' : 'DSS specialistas', (account.organizations ?? []).map((organization) => organization.name).join(', ') || 'Nepriskirtas', <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50" disabled={Boolean(deletingCreatorAccountId)} onClick={() => deleteCreatorAccount(account)}><Trash2 size={14} />{deletingCreatorAccountId === account.id ? 'Trinama…' : 'Ištrinti'}</button>])} empty="Paskyrų pagal paiešką nerasta." />
               {creatorAccountsFiltered.length > 0 && <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Paskyrų: {creatorAccountsFiltered.length}</span><nav className="flex items-center gap-2" aria-label="Paskyrų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorAccountPage <= 1} onClick={() => setCreatorAccountPage((page) => Math.max(1, page - 1))}>Atgal</button><span>{Math.min(creatorAccountPage, creatorAccountPageCount)} / {creatorAccountPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-40" disabled={creatorAccountPage >= creatorAccountPageCount} onClick={() => setCreatorAccountPage((page) => Math.min(creatorAccountPageCount, page + 1))}>Toliau</button></nav></div>}
             </Panel>
           </section>}

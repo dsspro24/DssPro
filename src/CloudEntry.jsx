@@ -775,6 +775,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           onExitCreatorPreview={() => setCreatorPreview(null)}
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
+          onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
         /></Suspense>;
       }
     }
@@ -790,6 +791,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onCreatorPreview={openCreatorPreview}
       onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
       onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
+      onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
       cloudOrganization={workspace.organization}
       cloudManagerName={workspace.managerName}
       onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
