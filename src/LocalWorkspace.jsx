@@ -948,13 +948,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }, '');
   }, [activeTab]);
   const [selectedOrgId, setSelectedOrgId] = useState(cloudMode && userRole === 'vadovas'
-    ? cloudOrganization?.id ?? initialCloudData?.organizations[0]?.id ?? ''
-    : initialCloudData?.organizations[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
+    ? cloudOrganization?.id ?? initialCloudData?.organizations?.[0]?.id ?? ''
+    : initialCloudData?.organizations?.[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
-  const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees?.[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists?.[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const dssOrganizationIsOpen = userRole === 'dss'
     && openedDssOrganizationId === selectedOrgId
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.dss.includes(selectedSpecialistId));
@@ -1040,7 +1040,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [inviteSignerDraft, setInviteSignerDraft] = useState({});
   const [selectedAssignmentPresetId, setSelectedAssignmentPresetId] = useState('');
   const [assignmentPresetDraft, setAssignmentPresetDraft] = useState({ id: '', name: '', resourceIds: [] });
-  const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations[0]?.aapItems ?? defaultAapItems);
+  const [aapDraft, setAapDraft] = useState(() => initialCloudData?.organizations?.[0]?.aapItems ?? defaultAapItems);
   const [resourceForm, setResourceForm] = useState({ title: '', type: 'Testas', category: '', image: '', html: '', validityMonths: 12, requiredSigners: ['Darbuotojas'], relatedTestId: '', relatedJournalId: '', defaultSettings: {} });
   const [resourceFileUploading, setResourceFileUploading] = useState(false);
   const [resourceSaving, setResourceSaving] = useState(false);
@@ -2061,12 +2061,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     try {
       const defaultResources = initialData.resources.filter((resource) => !assistantCreatedResourceIds.has(resource.id));
       for (const defaultResource of defaultResources) {
-        let resource = data.resources.find((item) => item.id === defaultResource.id && !item.organizationId);
-        if (!resource) {
-          resource = { ...defaultResource };
-          const loadTestTemplate = defaultTestTemplateLoaders.get(resource.id);
-          if (loadTestTemplate) resource = { ...resource, html: await loadTestTemplate() };
-          if (resource.html) {
+        const existingResource = data.resources.find((item) => item.id === defaultResource.id && !item.organizationId);
+        const existingImageUrl = existingResource?.imageUrl
+          ?? (typeof existingResource?.image === 'string' && !existingResource.image.startsWith('data:')
+            ? existingResource.image
+            : null);
+        let resource = {
+          ...existingResource,
+          ...defaultResource,
+          ...(existingImageUrl ? { image: existingImageUrl, imageUrl: existingImageUrl } : {}),
+          ...(typeof existingResource?.image === 'string' && existingResource.image.startsWith('data:')
+            ? { image: existingResource.image }
+            : {}),
+          defaultForOrganizations: existingResource?.defaultForOrganizations === true,
+        };
+        const loadTestTemplate = defaultTestTemplateLoaders.get(resource.id);
+        if (loadTestTemplate) resource = { ...resource, html: await loadTestTemplate() };
+
+        if (resource.html) {
+          const existingHtml = existingResource ? await getResourceWithHtml(existingResource, { useCache: false }) : null;
+          if (existingHtml?.html !== resource.html || !existingResource?.htmlUrl) {
             const htmlFile = new File([resource.html], `${resource.id}.html`, { type: 'text/html' });
             const uploadedHtml = await uploadCreatorAsset(htmlFile);
             resource = { ...resource, htmlUrl: uploadedHtml.publicUrl };
@@ -2079,17 +2093,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             } catch (error) {
               const { error: cleanupError } = await supabase.storage.from('dsspro-assets').remove([uploadedHtml.path]);
               if (cleanupError) {
-                throw new Error(`„${resource.title}“ išsaugoti nepavyko: ${error.message}. Įkelto HTML failo pašalinti nepavyko: ${cleanupError.message}`);
+                throw new Error(`„${resource.title}“ išsaugoti nepavyko: ${error.message}. Įkelto HTML failo pašalinti nepavyko: ${cleanupError.message}`, { cause: error });
               }
-              throw error;
+              throw new Error(`„${resource.title}“ atnaujinti nepavyko: ${error.message}`, { cause: error });
             }
           } else {
+            resource = { ...resource, htmlUrl: existingResource?.htmlUrl };
             const { error } = await supabase.rpc('save_creator_resource', {
               input_resource: resourceForDatabase(resource),
               input_resource_types: data.resourceTypes,
             });
             if (error) throw error;
           }
+        } else {
+          const { error } = await supabase.rpc('save_creator_resource', {
+            input_resource: resourceForDatabase(resource),
+            input_resource_types: data.resourceTypes,
+          });
+          if (error) throw error;
         }
 
         const { data: updated, error } = await supabase.rpc('set_creator_resource_default', {
@@ -5590,7 +5611,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5"><PageTitle title="Prenumeratų valdymas" subtitle="Peržiūrėkite aktyvias, pasibaigusias ir atšauktas įmonių prenumeratas." /><Panel title="Visos įmonės"><DataTable headers={['Įmonė', 'Planą', 'Būsena', 'Galioja iki', 'Veiksmai']} rows={data.subscriptions.map((subscription) => [data.organizations.find((org) => org.id === subscription.orgId)?.name ?? 'Įmonė', `${subscription.plan} · ${subscription.price} €/mėn.`, subscription.status, subscription.endsAt, <div className="flex gap-2"><button className="text-emerald-800 underline" onClick={() => updateSubscription(subscription.id, 'renew')}>Pratęsti</button>{subscription.status === 'Aktyvi' ? <button className="text-rose-700 underline" onClick={() => updateSubscription(subscription.id, 'cancel')}>Atšaukti</button> : <button className="text-emerald-800 underline" onClick={() => updateSubscription(subscription.id, 'restore')}>Atkurti</button>}</div>])} /></Panel><p className="text-xs text-slate-500">DSS specialistai neapmokestinami. Prenumerata priskiriama įmonei, ne atskirai specialisto paskyrai.</p></section>}
 
           {activeTab === 'biblioteka' && userRole === 'kurejas' && <section className="space-y-5"><PageTitle title="Turinio biblioteka" subtitle="Kurti ir tvarkyti įmonėms prieinamus testų, žurnalų, kortelių ir protokolų šablonus." />
-            {cloudMode && <Panel title="Standartinių šablonų atkūrimas"><p className="text-sm text-slate-600">Atkurkite iš programos kodo trūkstamus standartinius testus, žurnalus, protokolus ir AAP kortelę. Esamų šablonų turinys nebus perrašytas. Atkurti šablonai bus pažymėti numatytaisiais ir priskirti esamoms įmonėms. Individualiai sukurti šablonai neatkuriami.</p><button type="button" className={`${buttonClass} mt-3`} disabled={restoringDefaultResources || resourceSaving || resourceFileUploading} onClick={restoreDefaultResources}><Upload size={16} />{restoringDefaultResources ? 'Atkuriami šablonai…' : 'Atkurti standartinius šablonus'}</button></Panel>}
+            {cloudMode && <Panel title="Standartinių šablonų atkūrimas"><p className="text-sm text-slate-600">Atnaujinkite standartinių testų, žurnalų, protokolų ir AAP kortelės turinį pagal programos versiją. Įkeltos nuotraukos ir įmonių nustatymai bus išsaugoti. Atkurti standartiniai šablonai bus pažymėti numatytaisiais ir priskirti esamoms įmonėms. Individualiai sukurti šablonai neatkuriami.</p><button type="button" className={`${buttonClass} mt-3`} disabled={restoringDefaultResources || resourceSaving || resourceFileUploading} onClick={restoreDefaultResources}><Upload size={16} />{restoringDefaultResources ? 'Atkuriami šablonai…' : 'Atkurti standartinius šablonus'}</button></Panel>}
             <Panel title="Turinio tipai"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.resourceTypes.map((type) => <div key={type} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"><span className="text-sm font-semibold">{resourceTypeDisplayNames[type] ?? type}</span><span className="text-xs text-slate-500">{data.resources.filter((resource) => resource.type === type).length} šablonų</span></div>)}</div></Panel>
             <Panel title={editingResourceId ? 'Redaguoti šabloną' : 'Naujas šablonas'}>
               <form id="resource-editor" onSubmit={addResource} className="grid gap-4 md:grid-cols-2">
