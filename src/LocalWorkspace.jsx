@@ -848,7 +848,7 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
