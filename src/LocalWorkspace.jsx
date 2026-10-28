@@ -7193,7 +7193,7 @@ function LegacyResourceSettingsDialog({ resource, settings, resources = [], orga
     changedInstruction: 'Instrukcija pakeista į',
     validityMonths: 'Galiojimas (mėnesiais)',
   };
-  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount', 'signatureFieldRoles', 'relatedProtocolId'].includes(key)
+  const textFields = Object.entries(settings).filter(([key, value]) => !['requiredSigners', 'rowCount', 'signatureFieldRoles', 'relatedProtocolId', 'familiarizationTopics'].includes(key)
     && !(dateEnteredPerRecordTemplateKinds.has(resource.templateKind) && key === 'date')
     && !(resource.templateKind === 'intro-dss-journal' && key === 'date')
     && typeof value !== 'boolean');
