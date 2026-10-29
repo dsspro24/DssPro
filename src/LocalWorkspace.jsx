@@ -5804,14 +5804,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   const resource = data.resources.find((item) => item.id === task.resourceId);
                   return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
                     <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
-                    <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                    <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
                   </div>;
                 })}
                 {completedCommissionTasks.map((task) => {
                   const resource = data.resources.find((item) => item.id === task.resourceId);
                   return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                     <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
-                    {resource && <button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-900" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti pasirašytą protokolą</button>}
+                    {resource && <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti pasirašytą protokolą</button>}
                   </div>;
                 })}
               </div>
@@ -5820,7 +5820,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="space-y-3">
                 {pendingLegacyCommissionTasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
                   <div><p className="font-semibold">{task.resource.title}</p><p className="mt-1 text-sm text-slate-600">{task.employee.name} · {task.commissionMember}</p></div>
-                  <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => openResourcePreview(task.resource, { employeeId: task.employee.id })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestCommissionSign(task.employee, task.resource, task.commissionMember)}><FileSignature size={15} />Pasirašyti</button></div>
+                  <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(task.resource, { employeeId: task.employee.id })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestCommissionSign(task.employee, task.resource, task.commissionMember)}><FileSignature size={15} />Pasirašyti</button></div>
                 </div>)}
               </div>
             </Panel>}
