@@ -5909,7 +5909,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {pendingCommissionInvitations.length > 0 && <Panel title="Komisijos kvietimai">
               <div className="space-y-3">{pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><p className="font-semibold">{invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">{invitation.role}</p></div><button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button></div>)}</div>
             </Panel>}
-            {(pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos protokolai">
+            {pendingCommissionTasks.length > 0 && <Panel title="DSS komisijos protokolai">
               {pendingCommissionTasks.length > 0 && commissionTaskSelectionControls}
               <div className="space-y-3">
                 {paginatedPendingCommissionTasks.map((task) => {
@@ -5921,13 +5921,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>;
                 })}
                 {commissionTaskPagination}
-                {completedCommissionTasks.map((task) => {
-                  const resource = data.resources.find((item) => item.id === task.resourceId);
-                  return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
-                    {resource && <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti pasirašytą protokolą</button>}
-                  </div>;
-                })}
               </div>
             </Panel>}
             {pendingLegacyCommissionTasks.length > 0 && <Panel title="Kiti komisijai pasirašomi dokumentai">
@@ -5975,7 +5968,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             })} empty="Šioje įmonėje laukiančių DSS parašų nėra." />
             {currentDssTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentDssTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentDssTaskPage * dssTaskPageSize, currentDssTasks.length)} iš {currentDssTasks.length} · pasirinkta {selectedCurrentDssTasks.length}</p><nav className="flex items-center gap-2" aria-label="DSS pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage <= 1} onClick={() => setDssTaskPage(Math.max(1, currentDssTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentDssTaskPage} / {dssTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage >= dssTaskPageCount} onClick={() => setDssTaskPage(Math.min(dssTaskPageCount, currentDssTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
           </Panel>
-          {(pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos protokolai">
+          {pendingCommissionTasks.length > 0 && <Panel title="DSS komisijos protokolai">
             {pendingCommissionTasks.length > 0 && commissionTaskSelectionControls}
             <div className="space-y-3">
               {paginatedPendingCommissionTasks.map((task) => {
@@ -5987,13 +5980,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>;
               })}
               {commissionTaskPagination}
-              {completedCommissionTasks.map((task) => {
-                const resource = data.resources.find((item) => item.id === task.resourceId);
-                return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                  <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
-                  {resource && <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti pasirašytą protokolą</button>}
-                </div>;
-              })}
             </div>
           </Panel>}
           </section>}
