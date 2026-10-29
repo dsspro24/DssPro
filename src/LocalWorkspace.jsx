@@ -1041,7 +1041,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
-  const [employeePositionSearch, setEmployeePositionSearch] = useState('');
   const [employeePositionFilter, setEmployeePositionFilter] = useState({ organizationId: '', position: '' });
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
   const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
@@ -1646,9 +1645,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       });
     return [...positions.values()].sort((left, right) => left.localeCompare(right, 'lt'));
   }, [currentOrg?.employeePositions, managerDashboardEmployees]);
-  const filteredEmployeePositionOptions = useMemo(() => employeePositionOptions.filter((position) => (
-    position.toLocaleLowerCase('lt').includes(employeePositionSearch.trim().toLocaleLowerCase('lt'))
-  )), [employeePositionOptions, employeePositionSearch]);
   const activeEmployeePositionFilter = employeePositionFilter.organizationId === currentOrg?.id
     ? employeePositionFilter.position
     : '';
@@ -5403,12 +5399,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <div><h2 className="text-sm font-bold text-slate-900">Darbuotojai pagal pareigas</h2><p className="mt-1 text-xs text-slate-500">Pasirinkite pareigybę, kad matytumėte jai priskirtus darbuotojus.</p></div>
                     <span className="text-xs font-medium text-slate-500">{employeePositionOptions.length} pareigybės</span>
                   </div>
-                  {employeePositionOptions.length > 0 && <label className="relative mb-3 block w-full sm:max-w-xs"><span className="sr-only">Ieškoti pareigybių</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeePositionSearch} onChange={(event) => setEmployeePositionSearch(event.target.value)} placeholder="Ieškoti pareigybės..." /></label>}
                   <div className="flex flex-wrap gap-2">
                     <button type="button" aria-pressed={!activeEmployeePositionFilter} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${!activeEmployeePositionFilter ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: '' }); setEmployeePage(1); }}>
                       Visos pareigos <span className="ml-1 rounded-full bg-white/80 px-1.5 py-0.5 text-xs">{managerDashboardEmployees.length}</span>
                     </button>
-                    {filteredEmployeePositionOptions.map((position) => {
+                    {employeePositionOptions.map((position) => {
                       const selected = normalizeEmployeePosition(activeEmployeePositionFilter) === normalizeEmployeePosition(position);
                       const employeeCount = employeePositionCounts[normalizeEmployeePosition(position)] ?? 0;
                       return <div key={position} className={`inline-flex items-center overflow-hidden rounded-lg border ${selected ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700'}`}>
@@ -5418,7 +5413,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         <button type="button" aria-label={`Ištrinti pareigybę ${position}`} title={employeeCount ? 'Pirmiausia pakeiskite šią pareigybę turinčių darbuotojų pareigas' : 'Ištrinti pareigybę'} disabled={employeeCount > 0} className="self-stretch border-l border-slate-200 px-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => deleteEmployeePosition(position)}><Trash2 size={15} /></button>
                       </div>;
                     })}
-                    {employeePositionOptions.length > 0 && !filteredEmployeePositionOptions.length && <p className="py-2 text-sm text-slate-500">Pagal paiešką pareigybių nerasta.</p>}
                     {!employeePositionOptions.length && <p className="py-2 text-sm text-slate-500">Pareigybių dar nėra. Pirmąją galite sukurti pridėdami darbuotoją.</p>}
                   </div>
                   {employeePositionOptions.some((position) => (employeePositionCounts[normalizeEmployeePosition(position)] ?? 0) > 0) && <p className="mt-3 text-xs text-slate-500">Pareigybę galima ištrinti tik tada, kai ji nepriskirta darbuotojams. Pirmiausia pakeiskite jų pareigas darbuotojo redagavimo lange.</p>}
