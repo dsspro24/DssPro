@@ -578,7 +578,7 @@ function DemoApp({ cloudMode = false }) {
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer ${activeTab === 'skydelis' ? 'bg-white/10 text-white font-bold shadow-xs' : 'text-emerald-100/70 hover:bg-white/5 hover:text-white'}`}
             >
               <Home size={18} className={activeTab === 'skydelis' ? 'text-[#20e090]' : ''} />
-              <span>Skydelis</span>
+              <span>{userRole === 'vadovas' ? 'Būklės pasas' : 'Skydelis'}</span>
             </button>
 
             {/* DARBUOTOJO SKIRTUKAI */}

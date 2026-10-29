@@ -757,7 +757,7 @@ const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadova
 const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
-  vadovas: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
+  vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
 
@@ -4707,6 +4707,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const resource = data.resources.find((item) => item.id === resourceId);
       return { id: resourceId, title: resource?.title ?? 'Priskirta užduotis', description: getTaskStatus(currentEmployee, resource).label, resource, employee: currentEmployee };
       }),
+      ...(data.aapIssuances ?? [])
+        .filter((issuance) => issuance.employeeId === currentEmployee?.id && issuance.status === 'pending')
+        .map((issuance) => ({
+          id: `aap-issuance-${issuance.id}`,
+          title: 'Gavote papildomą AAP',
+          description: `${issuance.items.map((item) => `${item.name} · ${item.quantity} ${item.unit}`).join(', ')} · ${formatProtocolDate(issuance.issuedAt)}`,
+          aapIssuance: issuance,
+        })),
       ...pendingCommissionInvitations.map((invitation) => ({
         id: `commission-invitation-${invitation.id}`,
         title: 'Kvietimas į DSS komisiją',
@@ -5008,6 +5016,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         setCommissionActionError('');
                         return;
                       }
+                      if (item.aapIssuance) {
+                        setActiveTab('aap');
+                        setAapIssueSigningTarget(item.aapIssuance.id);
+                        setSignatureInk('');
+                        setWorkerSignPin('');
+                        setAapIssueSignError('');
+                        return;
+                      }
                       setTaskFilter('visos');
                       if (item.resource) openResourcePreview(item.resource);
                     } else if (userRole === 'dss') {
@@ -5305,8 +5321,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {canManageSelectedWorkspace && <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeDetails && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{employeeDetails.name}</h2><p className="mt-1 text-sm text-slate-500">Darbuotojo informacija ir dokumentų būklė</p></div><button type="button" aria-label="Uždaryti darbuotojo informaciją" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { document.getElementById('employee-details-dialog')?.close(); setEmployeeDetailsId(null); }}><X size={20} /></button></div>
                   <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">El. paštas</dt><dd className="font-semibold">{employeeDetails.email}</dd></div><div><dt className="text-slate-500">Darbo sutarties Nr.</dt><dd className="font-semibold">{employeeDetails.contractNumber || 'Nenurodytas'}</dd></div><div><dt className="text-slate-500">Pareigos</dt><dd className="font-semibold">{employeeDetails.position || 'Darbuotojas'}</dd></div><div><dt className="text-slate-500">Paskyros būsena</dt><dd className="font-semibold">{employeeDetails.status}</dd></div></dl>
-                  {employeeDetails.resourceIds?.includes('res-aap') && <Panel title="AAP išdavimų istorija">
-                    <div className="mb-3 flex justify-end"><button type="button" className={buttonClass} onClick={() => openAapIssueForm(employeeDetails)}><Plus size={15} />Registruoti naują išdavimą</button></div>
+                  {employeeDetails.resourceIds?.includes('res-aap') && <Panel title="AAP kortelė · papildomi išdavimai">
+                    <p className="mb-3 text-sm text-slate-500">Papildomos priemonės registruojamos prie šio darbuotojo AAP kortelės.</p>
+                    <div className="mb-3 flex justify-end"><button type="button" className={buttonClass} onClick={() => openAapIssueForm(employeeDetails)}><Plus size={15} />Pridėti AAP išdavimą</button></div>
                     {(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === employeeDetails.id).length
                       ? <div className="space-y-3">{(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === employeeDetails.id).slice().sort((left, right) => right.issuedAt.localeCompare(left.issuedAt)).map((issuance) => <div className="rounded-md border border-slate-200 p-3" key={issuance.id}>
                         <div className="flex flex-wrap justify-between gap-2 text-sm"><strong>{formatProtocolDate(issuance.issuedAt)}</strong><span className={issuance.status === 'signed' ? 'font-semibold text-emerald-800' : 'font-semibold text-amber-800'}>{issuance.status === 'signed' ? 'Gavimas patvirtintas' : 'Laukia darbuotojo parašo'}</span></div>
@@ -5503,7 +5520,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'aap' && userRole === 'darbuotojas' && <section className="max-w-3xl space-y-5">
             <PageTitle title="Mano AAP dydžiai" subtitle="Užpildykite dydžius, reikalingus AAP kortelei; juos galėsite pakeisti vėliau." />
-            <Panel title="AAP išdavimų istorija">
+            <Panel title="AAP gavimų istorija">
               {(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).length
                 ? <div className="space-y-3">{(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).slice().sort((left, right) => right.issuedAt.localeCompare(left.issuedAt)).map((issuance) => <article className="rounded-lg border border-slate-200 p-4" key={issuance.id}>
                   <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Išduota {formatProtocolDate(issuance.issuedAt)}</h2><span className={issuance.status === 'signed' ? 'text-sm font-semibold text-emerald-800' : 'text-sm font-semibold text-amber-800'}>{issuance.status === 'signed' ? 'Patvirtinta' : 'Laukia jūsų patvirtinimo'}</span></div>
