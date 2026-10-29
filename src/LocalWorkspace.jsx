@@ -1632,6 +1632,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
   const currentCommissionAssignments = useMemo(() => (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id), [data.commissionAssignments, currentOrg?.id]);
   const orgEmployees = useMemo(() => data.employees.filter((employee) => employee.orgId === currentOrg?.id), [data.employees, currentOrg?.id]);
+  const pendingLegacyCommissionTasks = userRole === 'vadovas'
+    ? orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
+      const resource = data.resources.find((item) => item.id === resourceId);
+      if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
+      return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
+        .filter((signer) => signer.role === 'Komisijos narys' && signer.status !== 'signed')
+        .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, employee, resource, commissionMember: signer.name }));
+    }))
+    : [];
   const managerDashboardEmployees = useMemo(() => [
     ...orgEmployees,
     ...pendingEmployeeInvites.filter((employee) => employee.orgId === currentOrg?.id),
@@ -4717,7 +4726,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     setCommissionSigningTarget({ employeeId: employee.id, resourceId: resource.id, orgId: employee.orgId, member });
     setSignatureInk('');
-    setActiveTab('imone');
+    setActiveTab('zurnalai');
     setCommissionSignPin('');
     setCommissionSignError('');
   };
@@ -5026,12 +5035,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               description: `${employee.name} · galiojo iki ${new Date(`${employee.medicalCertificateValidUntil}T12:00:00`).toLocaleDateString('lt-LT')}`,
               expiredMedicalCertificate: employee,
             })),
-          ...orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
-            const resource = data.resources.find((item) => item.id === resourceId);
-            if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
-            return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
-              .filter((signer) => signer.role === 'Komisijos narys' && signer.status !== 'signed')
-              .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, title: resource.title, description: `${employee.name} · ${signer.name} laukia komisijos parašo`, employee, resource, commissionMember: signer.name }));
+          ...pendingLegacyCommissionTasks.map((task) => ({
+            ...task,
+            title: task.resource.title,
+            description: `${task.employee.name} · ${task.commissionMember} laukia komisijos parašo`,
           })),
         ]
         : [];
@@ -5261,6 +5268,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       setActiveTab('zurnalai');
                       requestManagerSign([item.managerTask]);
                     } else if (userRole === 'vadovas' && item.commissionTask) {
+                      setActiveTab('zurnalai');
                       setProtocolCommissionTaskTarget(item.commissionTask);
                       setSignatureInk('');
                       setWorkerSignPin('');
@@ -5310,7 +5318,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-4 text-sm text-slate-700">Įmonė kviečia jus {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'atstovauti kaip DSS komisijos pirmininką' : 'atstovauti kaip DSS komisijos narį'}. Sutikę gausite pranešimus apie jums pasirašyti pateiktus protokolus.</p>
               <label className="mt-4 flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={commissionConsentChecked} onChange={(event) => setCommissionConsentChecked(event.target.checked)} /><span>Patvirtinu, kad sutinku būti paskirtas(-a) {commissionInvitationTarget.role === 'Komisijos pirmininkas' ? 'DSS komisijos pirmininku' : 'DSS komisijos nariu'}.</span></label>
               <label className="mt-4 block text-sm font-medium">Sutikimo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
-              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Paskyros PIN (jau sukurtas registruojantis)</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
               {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
               <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => respondToCommissionInvitation(false)}>Atsisakyti kvietimo</button><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setCommissionInvitationTarget(null)}>Uždaryti</button><button type="button" className={buttonClass} disabled={commissionActionSubmitting || !commissionConsentChecked || !signatureInk || !/^\d{4}$/.test(workerSignPin)} onClick={() => respondToCommissionInvitation(true)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Sutikti ir pasirašyti'} <Check size={16} /></button></div>
             </section>
@@ -5325,7 +5333,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 return resource && <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline" onClick={() => openResourcePreview(resource, { protocolBatchId: protocolCommissionTaskTarget.batchId, commissionAssignments: protocolCommissionTaskTarget.commissionAssignments, protocolCommissionSignatures: protocolCommissionTaskTarget.protocolCommissionSignatures })}><Eye size={16} />Peržiūrėti visą protokolą</button>;
               })()}
               <label className="mt-4 block text-sm font-medium">Protokolo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
-              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Paskyros PIN (jau sukurtas registruojantis)</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
               {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
               <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setProtocolCommissionTaskTarget(null)}>Atšaukti</button><button className={buttonClass} disabled={commissionActionSubmitting || !signatureInk || !/^\d{4}$/.test(workerSignPin)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Pasirašyti protokolą'} <FileSignature size={16} /></button></div>
             </form>
@@ -5360,13 +5368,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   })}
                 </div>
               </Panel>}
-              {(userRole === 'vadovas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0) || userRole === 'dss' && dssOrganizationIsOpen && pendingCommissionInvitations.length > 0) && <Panel title="Komisijos veiksmai">
+              {userRole === 'dss' && dssOrganizationIsOpen && pendingCommissionInvitations.length > 0 && <Panel title="Komisijos kvietimai">
                 <div className="space-y-3">
                   {pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><p className="font-semibold">Kvietimas · {invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">Komisijos narys</p></div><button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button></div>)}
-                  {userRole === 'vadovas' && pendingCommissionTasks.map((task) => {
-                    const resource = data.resources.find((item) => item.id === task.resourceId);
-                    return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4"><div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div></div>;
-                  })}
                 </div>
               </Panel>}
               {userRole === 'dss' && !dssOrganizationIsOpen && <Panel title="Prižiūrimos įmonės">
@@ -5643,7 +5647,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
                 {userRole === 'vadovas' && filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
-              <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p>{commissionSigningTarget?.orgId === currentOrg?.id && <SignaturePad value={signatureInk} onChange={setSignatureInk} />}<CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} signingTarget={commissionSigningTarget} signPin={commissionSignPin} setSignPin={setCommissionSignPin} signError={commissionSignError} onSign={confirmCommissionSign} onCancel={() => { setCommissionSigningTarget(null); setSignatureInk(''); }} /></Panel>
+              <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
               {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
               {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard subscription={data.subscriptions.find((item) => item.orgId === currentOrg?.id)} onAction={updateSubscription} /></Panel>}
             </div>
@@ -5767,7 +5771,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <Panel title="Asmeninės apsaugos priemonės"><div className="grid gap-4 sm:grid-cols-2">{[['shoes', 'Batų dydis'], ['clothes', 'Drabužių dydis'], ['pants', 'Kelnių dydis'], ['jacket', 'Striukės dydis'], ['height', 'Ūgis (cm)'], ['weight', 'Svoris (kg)'], ['helmet', 'Šalmo dydis']].map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={currentEmployee?.sizes[key] ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, sizes: { ...employee.sizes, [key]: event.target.value } } : employee) }))} /></label>)}</div><button className={`${buttonClass} mt-5`} onClick={() => { const complete = hasCompleteAapSizes(currentEmployee); if (!complete) { setNotice('Užpildykite batų, drabužių, kelnių ir striukės dydžius.'); return; } setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, aapCompleted: true, status: employee.pin ? 'Aktyvus' : 'Pakviestas' } : employee) })); setNotice('AAP dydžiai išsaugoti. Dydžius galėsite atnaujinti vėliau.'); setActiveTab('uzduotys'); }}>Išsaugoti dydžius</button></Panel>
           </section>}
 
-          {activeTab === 'zurnalai' && userRole === 'vadovas' && <section className="space-y-5"><PageTitle title="Pasirašomi dokumentai" subtitle={`Čia rodomi darbuotojų dokumentai, kuriems trūksta vadovo parašo. Pasirašykite po vieną arba iki ${dssSignatureBatchSize} dokumentų vienu kartu.`} />
+          {activeTab === 'zurnalai' && userRole === 'vadovas' && <section className="space-y-5"><PageTitle title="Pasirašomi dokumentai" subtitle={`Čia rodomi darbuotojų ir komisijos dokumentai, kuriems reikia jūsų parašo. Pasirašykite po vieną arba iki ${dssSignatureBatchSize} dokumentų vienu kartu.`} />
             <Panel title={`${currentOrg?.name} · laukia vadovo parašo`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={paginatedManagerTasks.length > 0 && paginatedManagerTasks.every((task) => selectedManagerTaskIds.includes(task.id))} disabled={!paginatedManagerTasks.length} onChange={(event) => setSelectedManagerTaskIds((current) => event.target.checked
@@ -5791,6 +5795,45 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               })} empty="Vadovui pasirašytinų dokumentų nėra." />
               {currentManagerTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentManagerTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentManagerTaskPage * dssTaskPageSize, currentManagerTasks.length)} iš {currentManagerTasks.length} · pasirinkta {selectedCurrentManagerTasks.length}</p><nav className="flex items-center gap-2" aria-label="Vadovo pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentManagerTaskPage <= 1} onClick={() => setManagerTaskPage(Math.max(1, currentManagerTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentManagerTaskPage} / {managerTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentManagerTaskPage >= managerTaskPageCount} onClick={() => setManagerTaskPage(Math.min(managerTaskPageCount, currentManagerTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
             </Panel>
+            {pendingCommissionInvitations.length > 0 && <Panel title="Komisijos kvietimai">
+              <div className="space-y-3">{pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><p className="font-semibold">{invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">{invitation.role}</p></div><button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button></div>)}</div>
+            </Panel>}
+            {(pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos protokolai">
+              <div className="space-y-3">
+                {pendingCommissionTasks.map((task) => {
+                  const resource = data.resources.find((item) => item.id === task.resourceId);
+                  return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
+                    <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                  </div>;
+                })}
+                {completedCommissionTasks.map((task) => {
+                  const resource = data.resources.find((item) => item.id === task.resourceId);
+                  return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
+                    {resource && <button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-900" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti pasirašytą protokolą</button>}
+                  </div>;
+                })}
+              </div>
+            </Panel>}
+            {pendingLegacyCommissionTasks.length > 0 && <Panel title="Kiti komisijai pasirašomi dokumentai">
+              <div className="space-y-3">
+                {pendingLegacyCommissionTasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+                  <div><p className="font-semibold">{task.resource.title}</p><p className="mt-1 text-sm text-slate-600">{task.employee.name} · {task.commissionMember}</p></div>
+                  <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => openResourcePreview(task.resource, { employeeId: task.employee.id })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestCommissionSign(task.employee, task.resource, task.commissionMember)}><FileSignature size={15} />Pasirašyti</button></div>
+                </div>)}
+              </div>
+            </Panel>}
+            {commissionSigningTarget?.orgId === currentOrg?.id && <Panel title="Komisijos parašas">
+              <p className="mb-3 text-sm text-slate-600">{commissionSigningTarget.member} · {data.resources.find((item) => item.id === commissionSigningTarget.resourceId)?.title}</p>
+              <SignaturePad value={signatureInk} onChange={setSignatureInk} />
+              <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={confirmCommissionSign}>
+                <label className="text-sm font-medium">Seno dokumento komisijos PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={commissionSignPin} onChange={(event) => setCommissionSignPin(event.target.value)} required /></label>
+                <button className={buttonClass}><FileSignature size={15} />Pasirašyti</button>
+                <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setCommissionSigningTarget(null); setCommissionSignPin(''); setSignatureInk(''); }}>Atšaukti</button>
+              </form>
+              {commissionSignError && <p role="alert" className="mt-2 text-sm text-rose-700">{commissionSignError}</p>}
+            </Panel>}
           </section>}
 
           {activeTab === 'zurnalai' && userRole === 'dss' && <section className="space-y-5"><PageTitle title="Įmonės žurnalai ir parašai" subtitle={`Pasirašykite dokumentus po vieną arba partijomis iki ${dssSignatureBatchSize}. Kiekvieną pasirinktą dokumentą peržiūrėkite prieš pasirašydami.`} />
@@ -7775,7 +7818,7 @@ function SubscriptionCard({ subscription, onAction }) {
     </div>
   </div>;
 }
-function CommissionEditor({ org, employees = [], specialists = [], managerName = '', cloudUserId = '', canAssignEmployeeChair = false, assignments = [], onInvite, onInviteSpecialist, onAppointManager, onRevoke, cloudMode = false, commissionPinStatus = {}, onSetPin, signingTarget, signPin, setSignPin, signError, onSign, onCancel }) {
+function CommissionEditor({ org, employees = [], specialists = [], managerName = '', cloudUserId = '', canAssignEmployeeChair = false, assignments = [], onInvite, onInviteSpecialist, onAppointManager, onRevoke, cloudMode = false, commissionPinStatus = {}, onSetPin }) {
   const [employeeId, setEmployeeId] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [employeeRole, setEmployeeRole] = useState('Komisijos narys');
@@ -7849,13 +7892,12 @@ function CommissionEditor({ org, employees = [], specialists = [], managerName =
     </div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">DSS komisijos nariai dar nepaskirti.</p>}
     {!!org.commission?.length && <details className="rounded-lg border border-slate-200 p-4">
       <summary className="cursor-pointer text-sm font-semibold">Senų dokumentų komisijos parašų PIN</summary>
-      <p className="mt-2 text-xs text-slate-500">Šis PIN valdymas paliktas senesniems dokumentams, kurių parašų eiga dar nėra susieta su darbuotojo komisijos paskyrimu. Naujų protokolų komisijos parašus darbuotojai tvirtina savo paskyrose.</p>
+      <p className="mt-2 text-xs text-slate-500">Šis atskiras PIN reikalingas tik senų, su paskyromis nesusietų dokumentų parašams. Paskirti komisijos nariai naujus protokolus pasirašo savo paskyros PIN kodu; jo iš naujo kurti nereikia.</p>
       <div className="mt-3 space-y-3">{org.commission.map((member) => <form className="grid gap-2 border-b border-slate-100 pb-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" key={member} onSubmit={(event) => saveLegacyPin(event, member)}>
         <div className="self-center text-sm font-semibold">{member}<small className="block font-normal text-slate-500">{(cloudMode ? commissionPinStatus[member] : org.commissionPins?.[member]) ? 'PIN nustatytas' : 'PIN nenustatytas'}</small></div>
         <label className="text-xs font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={pins[member] ?? ''} onChange={(event) => setPins((current) => ({ ...current, [member]: event.target.value }))} required /></label>
         <div className="flex items-end gap-2"><label className="min-w-0 flex-1 text-xs font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPins[member] ?? ''} onChange={(event) => setConfirmPins((current) => ({ ...current, [member]: event.target.value }))} required /></label><button className={`${buttonClass} shrink-0`} aria-label={`Nustatyti ${member} PIN`}><LockKeyhole size={15} /></button></div>
       </form>)}</div>
-      {signingTarget?.orgId === org.id && <form onSubmit={onSign} className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4"><h3 className="font-semibold">Senas komisijos parašo veiksmas</h3><p className="mt-1 text-sm">{signingTarget.member} · {org.name}</p><label className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Asmeninis 4 skaitmenų PIN</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={signPin} onChange={(event) => setSignPin(event.target.value)} required /></label>{signError && <p className="mt-2 text-sm text-rose-700">{signError}</p>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={onCancel}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form>}
     </details>}
   </div>;
 }
