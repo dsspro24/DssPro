@@ -2028,7 +2028,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const employeeAapIssuances = (data.aapIssuances ?? [])
     .filter((issuance) => issuance.employeeId === currentEmployee?.id)
     .slice()
-    .sort((left, right) => new Date(right.issuedAt).getTime() - new Date(left.issuedAt).getTime());
+    .sort((left, right) => {
+      const pendingOrder = Number(left.status === 'signed') - Number(right.status === 'signed');
+      return pendingOrder || new Date(right.issuedAt).getTime() - new Date(left.issuedAt).getTime();
+    });
   const aapIssuancePageCount = Math.max(1, Math.ceil(employeeAapIssuances.length / aapIssuancePageSize));
   const currentAapIssuancePage = Math.min(aapIssuancePage, aapIssuancePageCount);
   const paginatedAapIssuances = employeeAapIssuances.slice(
