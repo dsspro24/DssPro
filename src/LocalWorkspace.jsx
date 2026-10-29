@@ -808,7 +808,7 @@ function loadData() {
       const employee = employees.find((item) => item.id === signature.employeeId);
       const org = organizations.find((item) => item.id === signature.orgId);
       const aapSnapshot = signature.aapSnapshot ?? (resource?.id === 'res-aap' && signature.role === 'Darbuotojas' ? createAapSnapshot(employee, org) : undefined);
-      return { ...defaults, ...signature, contractNumber: signature.contractNumber ?? employee?.contractNumber ?? '', aapSnapshot, validUntil: signature.validUntil ?? defaults?.validUntil ?? getValidityUntilFrom(signature.signedAt, resource?.validityMonths) };
+      return { ...defaults, ...signature, contractNumber: signature.contractNumber ?? employee?.contractNumber ?? '', positionSnapshot: signature.positionSnapshot ?? aapSnapshot?.position ?? employee?.position ?? defaults?.positionSnapshot, aapSnapshot, validUntil: signature.validUntil ?? defaults?.validUntil ?? getValidityUntilFrom(signature.signedAt, resource?.validityMonths) };
     });
     return { ...initialData, ...parsed, resourceTypes, resources, employees, organizations, signatures, archivedEmployees: parsed.archivedEmployees ?? [] };
   } catch {
@@ -965,6 +965,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         position: employee.position?.trim() || 'Darbuotojas',
         medicalCertificateReminderDate: getMedicalCertificateReminderDate(employee.medicalCertificateValidUntil),
       })),
+      signatures: (loadedData.signatures ?? []).map((signature) => {
+        const employee = loadedData.employees.find((person) => person.id === signature.employeeId);
+        return {
+          ...signature,
+          positionSnapshot: signature.positionSnapshot ?? signature.aapSnapshot?.position ?? employee?.position ?? 'Darbuotojas',
+        };
+      }),
     };
     if (!cloudMode || !creatorCatalog) return workspaceData;
 
@@ -1030,6 +1037,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeePositionSearch, setEmployeePositionSearch] = useState('');
   const [employeePositionFilter, setEmployeePositionFilter] = useState({ organizationId: '', position: '' });
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
   const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
@@ -1634,6 +1642,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       });
     return [...positions.values()].sort((left, right) => left.localeCompare(right, 'lt'));
   }, [currentOrg?.employeePositions, managerDashboardEmployees]);
+  const filteredEmployeePositionOptions = useMemo(() => employeePositionOptions.filter((position) => (
+    position.toLocaleLowerCase('lt').includes(employeePositionSearch.trim().toLocaleLowerCase('lt'))
+  )), [employeePositionOptions, employeePositionSearch]);
   const activeEmployeePositionFilter = employeePositionFilter.organizationId === currentOrg?.id
     ? employeePositionFilter.position
     : '';
@@ -2157,6 +2168,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     selectPosition(name);
     setNotice(`Pareigybė „${name}“ sukurta.`);
     return true;
+  };
+
+  const deleteEmployeePosition = (position) => {
+    const positionKey = normalizeEmployeePosition(position);
+    const employeeCount = employeePositionCounts[positionKey] ?? 0;
+    if (!currentOrg || employeeCount > 0) {
+      setNotice('Pareigybės ištrinti negalima, kol ji priskirta darbuotojams. Pirmiausia pakeiskite jų pareigas.');
+      return;
+    }
+    if (!window.confirm(`Ar tikrai norite ištrinti pareigybę „${position}“?`)) return;
+    updateOrg(currentOrg.id, (org) => ({
+      ...org,
+      employeePositions: (org.employeePositions ?? []).filter((item) => normalizeEmployeePosition(item) !== positionKey),
+    }));
+    if (normalizeEmployeePosition(activeEmployeePositionFilter) === positionKey) {
+      setEmployeePositionFilter({ organizationId: currentOrg.id, position: '' });
+      setEmployeePage(1);
+    }
+    setNotice(`Pareigybė „${position}“ ištrinta.`);
   };
 
   const setCreatorResourceDefault = async (resource, enabled) => {
@@ -2928,21 +2958,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const recordWorkerSignature = (employee, resource, savedSignature = null) => {
     const existing = hasCurrentWorkerSignature(employee.id, resource.id);
     if (existing) return;
-    const signature = savedSignature ?? {
-      id: `sig-${Date.now()}`,
-      orgId: employee.orgId,
-      employeeId: employee.id,
-      contractNumber: employee.contractNumber ?? '',
-      resourceId: resource.id,
-      aapSnapshot: resource.id === 'res-aap' ? createAapSnapshot(employee, data.organizations.find((org) => org.id === employee.orgId)) : undefined,
-      signer: employee.name,
-      role: 'Darbuotojas',
-      signatureMethod: 'PIN',
-      signedAt: new Date().toISOString(),
-      validUntil: getValidityUntil(resource.validityMonths),
-      signatureImage: signatureInk,
-      ...(resource.id === 'res-aap' ? { bothPagesConfirmed: true } : {}),
-      ip: '127.0.0.1 (demo)',
+    const signature = {
+      ...(savedSignature ?? {
+        id: `sig-${Date.now()}`,
+        orgId: employee.orgId,
+        employeeId: employee.id,
+        contractNumber: employee.contractNumber ?? '',
+        resourceId: resource.id,
+        aapSnapshot: resource.id === 'res-aap' ? createAapSnapshot(employee, data.organizations.find((org) => org.id === employee.orgId)) : undefined,
+        signer: employee.name,
+        role: 'Darbuotojas',
+        signatureMethod: 'PIN',
+        signedAt: new Date().toISOString(),
+        validUntil: getValidityUntil(resource.validityMonths),
+        signatureImage: signatureInk,
+        ...(resource.id === 'res-aap' ? { bothPagesConfirmed: true } : {}),
+        ip: '127.0.0.1 (demo)',
+      }),
+      positionSnapshot: savedSignature?.positionSnapshot ?? savedSignature?.aapSnapshot?.position ?? employee.position ?? 'Darbuotojas',
     };
     setData((current) => ({
       ...current,
@@ -4069,7 +4102,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setData(applyAssignmentsToWorkspace);
         setNotice(previousAutosaveError
           ? `Darbuotojo priskyrimai išsaugoti, tačiau ankstesnis bendras įmonės išsaugojimas nepavyko: ${previousAutosaveError.message}`
-          : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti.`);
+          : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
         closeEmployeeEditor();
       } catch (error) {
         setNotice(`Darbuotojo priskyrimų išsaugoti nepavyko: ${error.message}`);
@@ -4081,7 +4114,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
 
     setData(applyAssignmentsToWorkspace);
-    setNotice(`${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti.`);
+    setNotice(`${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
     closeEmployeeEditor();
   };
 
@@ -5352,18 +5385,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <div><h2 className="text-sm font-bold text-slate-900">Darbuotojai pagal pareigas</h2><p className="mt-1 text-xs text-slate-500">Pasirinkite pareigybę, kad matytumėte jai priskirtus darbuotojus.</p></div>
                     <span className="text-xs font-medium text-slate-500">{employeePositionOptions.length} pareigybės</span>
                   </div>
+                  {employeePositionOptions.length > 0 && <label className="relative mb-3 block w-full sm:max-w-xs"><span className="sr-only">Ieškoti pareigybių</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeePositionSearch} onChange={(event) => setEmployeePositionSearch(event.target.value)} placeholder="Ieškoti pareigybės..." /></label>}
                   <div className="flex flex-wrap gap-2">
                     <button type="button" aria-pressed={!activeEmployeePositionFilter} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${!activeEmployeePositionFilter ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: '' }); setEmployeePage(1); }}>
                       Visos pareigos <span className="ml-1 rounded-full bg-white/80 px-1.5 py-0.5 text-xs">{managerDashboardEmployees.length}</span>
                     </button>
-                    {employeePositionOptions.map((position) => {
+                    {filteredEmployeePositionOptions.map((position) => {
                       const selected = normalizeEmployeePosition(activeEmployeePositionFilter) === normalizeEmployeePosition(position);
-                      return <button type="button" key={position} aria-pressed={selected} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${selected ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: selected ? '' : position }); setEmployeePage(1); }}>
-                        {position} <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">{employeePositionCounts[normalizeEmployeePosition(position)] ?? 0}</span>
-                      </button>;
+                      const employeeCount = employeePositionCounts[normalizeEmployeePosition(position)] ?? 0;
+                      return <div key={position} className={`inline-flex items-center overflow-hidden rounded-lg border ${selected ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700'}`}>
+                        <button type="button" aria-pressed={selected} className="px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: selected ? '' : position }); setEmployeePage(1); }}>
+                          {position} <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">{employeeCount}</span>
+                        </button>
+                        <button type="button" aria-label={`Ištrinti pareigybę ${position}`} title={employeeCount ? 'Pirmiausia pakeiskite šią pareigybę turinčių darbuotojų pareigas' : 'Ištrinti pareigybę'} disabled={employeeCount > 0} className="self-stretch border-l border-slate-200 px-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => deleteEmployeePosition(position)}><Trash2 size={15} /></button>
+                      </div>;
                     })}
+                    {employeePositionOptions.length > 0 && !filteredEmployeePositionOptions.length && <p className="py-2 text-sm text-slate-500">Pagal paiešką pareigybių nerasta.</p>}
                     {!employeePositionOptions.length && <p className="py-2 text-sm text-slate-500">Pareigybių dar nėra. Pirmąją galite sukurti pridėdami darbuotoją.</p>}
                   </div>
+                  {employeePositionOptions.some((position) => (employeePositionCounts[normalizeEmployeePosition(position)] ?? 0) > 0) && <p className="mt-3 text-xs text-slate-500">Pareigybę galima ištrinti tik tada, kai ji nepriskirta darbuotojams. Pirmiausia pakeiskite jų pareigas darbuotojo redagavimo lange.</p>}
                 </div>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
@@ -5522,7 +5562,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </dialog>}
               {canManageSelectedWorkspace && <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
-                  <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /></div>
+                  <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /><p className="mt-1 text-xs text-slate-500">Pakeitus pareigas, jau pasirašyti dokumentai išsaugos ankstesnes pareigas, o būsimuose bus naudojamos naujos.</p></div>
                   <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai ir pasirašantieji</legend><ResourceSelectionList
                     resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))}
                     selectedIds={employeeResourceDraft}
@@ -5653,7 +5693,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </dialog>
             <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
-                <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /></div>
+                <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /><p className="mt-1 text-xs text-slate-500">Pakeitus pareigas, jau pasirašyti dokumentai išsaugos ankstesnes pareigas, o būsimuose bus naudojamos naujos.</p></div>
                 <div className="space-y-3">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => {
                   const isAssigned = employeeResourceDraft.includes(resource.id);
                   const selectedRoles = employeeSignerDraft[resource.id] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited);
@@ -6539,6 +6579,10 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   const findSignature = (item, role, signer) => signatures
     .filter((signature) => signature.employeeId === item.id && signature.resourceId === resource.id && signature.role === role && (!signer || signature.signer === signer))
     .sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
+  const positionFor = (item, signature = findSignature(item, 'Darbuotojas')) => signature?.positionSnapshot
+    ?? signature?.aapSnapshot?.position
+    ?? item.position
+    ?? 'Darbuotojas';
   const entriesFor = (item) => getRequiredSignerEntries(item, resource, org, signatures, Date.now(), specialists);
   const proof = (item, entry) => {
     if (!entry) return '';
@@ -6628,7 +6672,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           ?? employeeEntries.find((entry) => entry.signedAt)?.signedAt
           ?? permitEntries.find((entry) => entry.signedAt)?.signedAt),
         escapeHtml(item.name),
-        escapeHtml(item.position || 'Darbuotojas'),
+        escapeHtml(positionFor(item, latestWorkerSignature)),
         escapeHtml(instructionRows.map((instruction) => instruction.instructionNumber).filter(Boolean).join(', ')),
         isPeriodic ? 'Periodinis' : 'Pirminis',
         instructorNames || escapeHtml(settings.instructorName ?? ''),
@@ -6653,18 +6697,18 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         writeRow(row, [
           String(item.sequenceNumber ?? ''),
           escapeHtml(item.name),
-          escapeHtml(item.position || 'Darbuotojas'),
+          escapeHtml(positionFor(item)),
           escapeHtml(settings.periodicity || '1 kartą per 2 metus'),
           formatDate(item.medicalExamDate ?? item.lastMedicalExamDate),
           formatDate(item.nextMedicalExamDate ?? item.medicalCertificateValidUntil),
           workerProof,
         ]);
       } else if (resource.templateKind === 'familiarization-card') {
-        writeRow(row, [String(item.sequenceNumber ?? ''), workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerProof, instructorNames, instructorProofs]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), workerDate, escapeHtml(item.name), escapeHtml(positionFor(item)), workerProof, instructorNames, instructorProofs]);
       } else if (resource.templateKind === 'work-rules-journal') {
-        writeRow(row, [String(item.sequenceNumber ?? index + 1), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), workerDate, workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? index + 1), escapeHtml(item.name), escapeHtml(positionFor(item)), workerDate, workerProof]);
       } else if (resource.templateKind === 'intro-dss-journal') {
-        writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), instructorNames, instructors.map((entry) => escapeHtml(entry.role)).join('<br>'), workerProof, instructorProofs]);
+        writeRow(row, [workerDate, escapeHtml(item.name), escapeHtml(positionFor(item)), instructorNames, instructors.map((entry) => escapeHtml(entry.role)).join('<br>'), workerProof, instructorProofs]);
       } else if (resource.templateKind === 'workplace-dss-journal') {
         const settings = resource.defaultSettings ?? {};
         const fieldRoles = { ...workplaceDssSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
@@ -6682,7 +6726,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         writeRow(row, [
           formatDate(worker?.signedAt ?? instructor?.signedAt ?? independentWorkPermit?.signedAt),
           escapeHtml(item.name),
-          escapeHtml(item.position || 'Darbuotojas'),
+          escapeHtml(positionFor(item)),
           escapeHtml(settings.instructionNumber ?? ''),
           escapeHtml(settings.instructionTitle || resource.title),
           instructorLabel,
@@ -6692,7 +6736,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         ]);
       } else if (resource.templateKind === 'job-description-journal') {
         const settings = resource.defaultSettings ?? {};
-        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(settings.regulationNumber ?? ''), workerDate, workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(positionFor(item)), escapeHtml(settings.regulationNumber ?? ''), workerDate, workerProof]);
       } else if (resource.templateKind === 'internal-documents-register') {
         const related = getInternalRegisterRelatedResources(resource, allResources);
         const relatedSignature = (linkedResource, role) => linkedResource && signatures
@@ -6766,7 +6810,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         };
         writeRow(row, [
           escapeHtml(item.name),
-          escapeHtml(item.position || 'Darbuotojas'),
+          escapeHtml(positionFor(item)),
           formatDate(relatedDate(dssResource, dssInstructorRole, dssEmployeeRole)),
           relatedProof(dssResource, dssInstructor, dssInstructorRole),
           relatedProof(dssResource, dssWorker, dssEmployeeRole),
@@ -6792,7 +6836,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const configuredResource = { ...resource, relatedTestId };
         const result = getLatestPassedProtocolTestResult(item, configuredResource) ?? getLatestProtocolTestResult(item, configuredResource);
         const decision = result ? `${result.passed ? 'Išlaikė' : 'Neišlaikė'} · ${result.score}%` : relatedTestId ? 'Testo rezultato nėra' : '';
-        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(item.position || 'Darbuotojas'), escapeHtml(decision), workerProof]);
+        writeRow(row, [String(item.sequenceNumber ?? ''), escapeHtml(item.name), escapeHtml(positionFor(item)), escapeHtml(decision), workerProof]);
       } else if (resource.templateKind === 'chemical-safety-instruction-card') {
         const relatedTestId = getConfiguredResourceTestIds(resource, org, allResources)[0] ?? resource.relatedTestId;
         const testResult = (item.testResults ?? [])
@@ -6817,7 +6861,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           String(item.sequenceNumber ?? ''),
           formatDate(instructionDate),
           escapeHtml(item.name),
-          escapeHtml(item.position || 'Darbuotojas'),
+          escapeHtml(positionFor(item)),
           cardProof(workerSignature, item.name, hasCardAssignment),
           escapeHtml(instructorName),
           cardProof(instructorSignature, instructorName, hasCardAssignment && Boolean(org?.dss?.length)),
