@@ -1166,6 +1166,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   }, [validityCheckTime]);
 
+  const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId)
+    ?? data.employees.find((employee) => employee.orgId === selectedOrgId)
+    ?? data.employees[0];
   useEffect(() => {
     if (!cloudMode || userRole !== 'darbuotojas' || !selectedOrgId || !currentEmployee?.id) return undefined;
     let active = true;
@@ -1481,7 +1484,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       document.removeEventListener('visibilitychange', refreshOnFocus);
     };
   }, [cloudMode, userRole, creatorReadOnlyPreview, currentOrg?.id]);
-  const currentEmployee = data.employees.find((employee) => employee.id === selectedEmployeeId) ?? data.employees.find((employee) => employee.orgId === selectedOrgId) ?? data.employees[0];
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
   useEffect(() => {
     if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss' && dssOrganizationIsOpen)) return undefined;
