@@ -25,7 +25,7 @@ const defaultFamiliarizationTopics = [
   'Asmeninių apsauginių priemonių naudojimas. Nelaimingi atsitikimai.',
 ];
 const defaultTestTemplateLoaders = new Map([
-  ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
+  if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
   ['res-fire-knowledge-test', () => import('./assets/fire-knowledge-test.html?raw').then(({ default: html }) => html)],
   ['res-excavation-safety-test', () => import('./assets/excavation-safety-test.html?raw').then(({ default: html }) => html)],
@@ -7041,7 +7041,7 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     '{{ISSUE_ROWS}}': makeRows(true),
   };
   const html = Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), resource.html || '');
-  if (!workerSignature && !employerSignature) return html;
+  if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const insertSignatureImage = (labels, signature) => {
@@ -7072,25 +7072,6 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   };
   insertSignatureImage(['Darbdavys ar jo įgaliotas asmuo', 'Išdavė'], employerSignature);
   insertSignatureImage(['Vieną egzempliorių gavau', 'Gavo'], workerSignature);
-  const hideSignedName = (labels, signature) => {
-    if (!signature) return;
-    const entries = [...parsed.querySelectorAll('.signature-entry')]
-      .filter((entry) => labels.some((label) => entry.textContent?.includes(label)));
-    entries.forEach((entry) => {
-      const signedName = entry.querySelector('.signed-name');
-      if (!signedName) return;
-      const signatureRow = signedName.closest('.aap-signature-name-row');
-      if (signatureRow?.querySelector('img')) {
-        signedName.remove();
-      } else {
-        const nextElement = signedName.nextSibling;
-        if (nextElement?.nodeName === 'BR') nextElement.remove();
-        signedName.remove();
-      }
-    });
-  };
-  hideSignedName(['Darbdavys ar jo įgaliotas asmuo', 'Išdavė'], employerSignature);
-  hideSignedName(['Vieną egzempliorių gavau', 'Gavo'], workerSignature);
   const style = parsed.createElement('style');
   style.textContent = '.aap-signature-name-row{display:flex;align-items:center;gap:6px;min-height:22px}.aap-signature-name-row .signed-name{display:inline-block;min-height:0;line-height:1.2}';
   parsed.head.append(style);
