@@ -2531,15 +2531,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     document.getElementById('aap-issuance-dialog')?.showModal();
   };
 
-  const downloadAapIssuance = (issuance) => {
+  const downloadAapIssuance = async (issuance) => {
     const employee = data.employees.find((item) => item.id === issuance.employeeId);
     const org = data.organizations.find((item) => item.id === issuance.orgId);
     if (!employee || !org || issuance.status !== 'signed') {
       setNotice('Pasirašyto AAP išdavimo dokumento paruošti nepavyko.');
       return;
     }
-    printPdfHtml(buildAapIssuanceHtml(issuance, employee, org), `AAP_isdavimas_${employee.name}_${issuance.issuedAt}`)
-      .catch((error) => setNotice(`AAP išdavimo PDF paruošti nepavyko: ${error.message}`));
+    try {
+      const [hydratedIssuance] = await hydrateSignatureImages([issuance]);
+      await printPdfHtml(buildAapIssuanceHtml(hydratedIssuance, employee, org), `AAP_isdavimas_${employee.name}_${issuance.issuedAt}`);
+    } catch (error) {
+      setNotice(`AAP išdavimo PDF paruošti nepavyko: ${error.message}`);
+    }
   };
 
   const createAapIssuance = (event) => {
@@ -3383,7 +3387,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
     if (userRole === 'darbuotojas' && ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))) {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const accessError = getEmployeeProtocolAccessError(employee, resource);
@@ -3495,10 +3499,29 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? { ...currentOrg, ...archivedRecord.organization }
       : currentOrg;
     const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: archivedRecord ? [...data.resources, ...archivedRecord.resources] : data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
-    const previewEmployee = archivedRecord
+    const previewEmployee = employeeId
       ? previewEmployees.find((person) => person.id === employeeId)
       : currentEmployee;
     previewDocument.printHtml = prepareResourcePrintLayout(prepareResourcePrintHtml(buildResourcePreviewHtml(previewDocument, previewEmployee, previewOrganization, previewSignatures), resource.title));
+    if (includeAapIssuances && resource.id === 'res-aap' && employeeId) {
+      const signedIssuances = (data.aapIssuances ?? [])
+        .filter((issuance) => issuance.employeeId === employeeId && issuance.orgId === currentOrg?.id && issuance.status === 'signed')
+        .sort((left, right) => left.issuedAt.localeCompare(right.issuedAt) || String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? '')));
+      try {
+        const hydratedIssuances = await hydrateSignatureImages(signedIssuances);
+        const aapEmployee = previewEmployees.find((person) => person.id === employeeId)
+          ?? previewArchivedEmployees.find((person) => person.id === employeeId);
+        previewDocument.printHtml = appendAapIssuanceSheets(
+          previewDocument.printHtml,
+          hydratedIssuances,
+          aapEmployee,
+          previewOrganization,
+        );
+      } catch (error) {
+        setNotice(`AAP papildomų išdavimo lapų paruošti nepavyko: ${error.message}`);
+        return;
+      }
+    }
     const firstPreviewPage = getRecordPreviewPage(previewDocument.printHtml, 0);
     previewDocument.previewHtml = firstPreviewPage.html;
     previewDocument.previewPageCount = firstPreviewPage.pageCount;
@@ -5678,10 +5701,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {reportTestResources.length > 0 && <section className="space-y-3"><div><h2 className="font-bold">Testai</h2><p className="mt-1 text-sm text-slate-500">Pasirinkite testą ir peržiūrėkite darbuotojų rezultatus.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{reportTestResources.map((resource) => { const attempts = reportTestResults.filter((entry) => entry.resource.id === resource.id); return <ReportTestCard key={resource.id} resource={resource} attemptCount={attempts.length} passedCount={attempts.filter(({ result }) => result.passed).length} onSelect={() => setReportTestTargetId(resource.id)} />; })}</div></section>}
               {reportTypeFilter === 'Testas' && reportTestResources.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Įmonė testų dar nepriskyrė.</p>}
               {reportTypeFilter === 'Kortelė' && <div className="space-y-6">{reportCardGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
-              {reportTypeFilter === 'Kortelė' && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Ieškokite darbuotojo ir peržiūrėkite jo AAP kortelę. Atsisiuntimas pasiekiamas atidarius kortelės peržiūrą.</p></div><Panel title="AAP pagal darbuotoją">
+              {reportTypeFilter === 'Kortelė' && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Kiekvieno darbuotojo AAP PDF apima pasirašytą pirminę kortelę ir visus patvirtintus papildomų išdavimų lapus.</p></div><Panel title="AAP pagal darbuotoją">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><label className="block w-full max-w-xl text-sm font-medium">Ieškoti darbuotojo<div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={reportAapSearch} onChange={(event) => { setReportAapSearch(event.target.value); setReportAapPage(1); }} placeholder="Vardas, pavardė, pareigos arba sutarties Nr." /></div></label>{reportAapSearch && <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => { setReportAapSearch(''); setReportAapPage(1); }}>Išvalyti paiešką</button>}</div>
                 <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm text-slate-500"><span>Darbuotojai: <strong className="text-slate-800">{filteredReportAapEmployees.length}</strong></span></div>
-                {filteredReportAapEmployees.length ? <div className="divide-y divide-slate-100">{paginatedReportAapEmployees.map((employee) => <div key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-48 flex-1"><p className="font-semibold text-slate-900">{employee.name}</p><p className="mt-0.5 text-sm text-slate-500">{employee.position || 'Darbuotojas'}{employee.contractNumber ? ` · Sutartis ${employee.contractNumber}` : ''}</p></div><span className={`text-xs font-semibold ${hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'text-emerald-700' : 'text-amber-700'}`}>{hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'AAP kortelė pasirašyta' : 'Laukia darbuotojo parašo'}</span><button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(reportAapResource, { employeeId: employee.id })}><Eye size={15} />Peržiūrėti</button></div>)}</div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">{reportAapEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'AAP kortelės dar nepriskirtos darbuotojams.'}</p>}
+                {filteredReportAapEmployees.length ? <div className="divide-y divide-slate-100">{paginatedReportAapEmployees.map((employee) => {
+                  const signedIssuanceCount = (data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === employee.id && issuance.status === 'signed').length;
+                  const canIssueAap = data.employees.some((activeEmployee) => activeEmployee.id === employee.id);
+                  return <div key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-48 flex-1"><p className="font-semibold text-slate-900">{employee.name}</p><p className="mt-0.5 text-sm text-slate-500">{employee.position || 'Darbuotojas'}{employee.contractNumber ? ` · Sutartis ${employee.contractNumber}` : ''}</p><p className="mt-1 text-xs text-slate-500">{signedIssuanceCount ? `Papildomi gavimo lapai: ${signedIssuanceCount}` : 'Papildomų gavimo lapų nėra'}</p></div>
+                    <span className={`text-xs font-semibold ${hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'text-emerald-700' : 'text-amber-700'}`}>{hasCurrentWorkerSignature(employee.id, 'res-aap') ? 'AAP kortelė pasirašyta' : 'Laukia darbuotojo parašo'}</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(reportAapResource, { employeeId: employee.id, includeAapIssuances: true })}><Eye size={15} />AAP PDF ir papildomi lapai</button>
+                      {canIssueAap && <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50" onClick={() => openAapIssueForm(employee)}><Plus size={15} />Išduoti papildomą AAP</button>}
+                    </div>
+                  </div>;
+                })}</div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">{reportAapEmployees.length ? 'Pagal paiešką darbuotojų nerasta.' : 'AAP kortelės dar nepriskirtos darbuotojams.'}</p>}
                 {filteredReportAapEmployees.length > reportAapPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentReportAapPage - 1) * reportAapPageSize + 1}–{Math.min(currentReportAapPage * reportAapPageSize, filteredReportAapEmployees.length)} iš {filteredReportAapEmployees.length}</p><nav className="flex items-center gap-2" aria-label="AAP darbuotojų puslapiavimas"><button type="button" aria-label="Ankstesnis AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage <= 1} onClick={() => setReportAapPage(Math.max(1, currentReportAapPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentReportAapPage} / {reportAapPageCount}</span><button type="button" aria-label="Kitas AAP darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportAapPage >= reportAapPageCount} onClick={() => setReportAapPage(Math.min(reportAapPageCount, currentReportAapPage + 1))}><ChevronRight size={17} /></button></nav></div>}
               </Panel></section>}
               {reportTypeFilter === 'Protokolas' && <div className="space-y-6">{reportProtocolGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} />)}</div></section>)}</div>}
@@ -7085,6 +7119,24 @@ function buildAapIssuanceHtml(issuance, employee, org) {
   const rows = issuance.items.map((item, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason || '')}</td><td>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td><td>${escapeHtml(item.validity || '')}</td></tr>`).join('');
   const signedAt = issuance.signedAt ? new Date(issuance.signedAt).toLocaleString('lt-LT') : '';
   return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.signature-image{display:block;width:220px;height:80px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>AAP gavimą patvirtino darbuotojas</strong>${signatureImageHtml(issuance)}<p>${escapeHtml(issuance.signer || employee.name)}</p></section><section><strong>Pasirašyta PIN kodu</strong><p>${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
+}
+function appendAapIssuanceSheets(html, issuances, employee, org) {
+  if (!issuances.length) return html;
+  if (!employee || !org) throw new Error('Darbuotojo arba įmonės duomenys nerasti.');
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  issuances.forEach((issuance) => {
+    const issuanceDocument = new DOMParser().parseFromString(buildAapIssuanceHtml(issuance, employee, org), 'text/html');
+    issuanceDocument.head.querySelectorAll('style').forEach((style) => parsed.head.append(parsed.importNode(style, true)));
+    const page = issuanceDocument.querySelector('main.sheet');
+    if (!page) throw new Error('AAP išdavimo lapas netinkamas.');
+    const appendedPage = parsed.importNode(page, true);
+    appendedPage.classList.add('aap-additional-issuance-sheet');
+    parsed.body.append(appendedPage);
+  });
+  const pageBreakStyle = parsed.createElement('style');
+  pageBreakStyle.textContent = '.aap-additional-issuance-sheet{break-before:page;page-break-before:always}';
+  parsed.head.append(pageBreakStyle);
+  return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
 function TestForm({ questions, answers, setAnswers, onSubmit }) {
   const [validationError, setValidationError] = useState('');
