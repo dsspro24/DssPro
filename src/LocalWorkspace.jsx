@@ -798,6 +798,7 @@ function loadData() {
       commissionPins: org.commissionPins ?? {},
       resourceSettings: org.resourceSettings ?? {},
       aapItems: (org.aapItems ?? defaultAapItems).map((item) => ({ ...defaultAapItems.find((defaultItem) => defaultItem.id === item.id), ...item, code: item.code ?? '' })),
+      employeePositions: Array.isArray(org.employeePositions) ? org.employeePositions : [],
       employeeAssignmentPresets: Array.isArray(org.employeeAssignmentPresets) ? org.employeeAssignmentPresets : [],
       dssInvitations: org.dssInvitations ?? [],
     }));
@@ -822,6 +823,43 @@ function loadData() {
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40';
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100';
+const normalizeEmployeePosition = (position) => String(position ?? '').trim().toLocaleLowerCase('lt');
+function EmployeePositionPicker({ options, value, onChange, onCreate }) {
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+
+  const createPosition = () => {
+    const position = draft.trim();
+    if (!position) {
+      setError('Įrašykite pareigybės pavadinimą.');
+      return;
+    }
+    if (options.some((option) => normalizeEmployeePosition(option) === normalizeEmployeePosition(position))) {
+      setError('Tokia pareigybė jau yra sąraše.');
+      return;
+    }
+    if (!onCreate(position)) return;
+    setDraft('');
+    setError('');
+    setCreating(false);
+  };
+
+  return <div className="mt-1 space-y-2">
+    <select aria-label="Pareigos" className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} required>
+      <option value="">Pasirinkite pareigas</option>
+      {options.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+    <button type="button" className="text-sm font-semibold text-emerald-800 hover:underline" onClick={() => { setCreating((current) => !current); setError(''); }}>
+      {creating ? 'Atšaukti' : '+ Sukurti naują pareigybę'}
+    </button>
+    {creating && <div className="flex flex-col gap-2 sm:flex-row">
+      <input className={inputClass} aria-label="Naujos pareigybės pavadinimas" maxLength={80} value={draft} onChange={(event) => { setDraft(event.target.value); setError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') event.preventDefault(); }} placeholder="Pvz., Statybininkas" />
+      <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50" onClick={createPosition}><Plus size={15} />Pridėti</button>
+      {error && <span role="alert" className="text-xs font-medium text-rose-700 sm:basis-full">{error}</span>}
+    </div>}
+  </div>;
+}
 const signerRoleOptions = [
   { value: 'Darbuotojas', label: 'Darbuotojas' },
   { value: 'Vadovas', label: 'Įmonės vadovas' },
@@ -916,6 +954,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         commissionPins: organization.commissionPins ?? {},
         dss: organization.dss ?? [],
         dssInvitations: organization.dssInvitations ?? [],
+        employeePositions: organization.employeePositions ?? [],
         employeeAssignmentPresets: organization.employeeAssignmentPresets ?? [],
         resourceSettings: organization.resourceSettings ?? {},
         resources: organization.resources ?? [],
@@ -923,6 +962,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       })),
       employees: loadedData.employees.map((employee) => ({
         ...employee,
+        position: employee.position?.trim() || 'Darbuotojas',
         medicalCertificateReminderDate: getMedicalCertificateReminderDate(employee.medicalCertificateValidUntil),
       })),
     };
@@ -990,6 +1030,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeePositionFilter, setEmployeePositionFilter] = useState({ organizationId: '', position: '' });
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
   const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
   const [deletingCreatorAccountId, setDeletingCreatorAccountId] = useState('');
@@ -1583,6 +1624,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...orgEmployees,
     ...pendingEmployeeInvites.filter((employee) => employee.orgId === currentOrg?.id),
   ], [orgEmployees, pendingEmployeeInvites, currentOrg?.id]);
+  const employeePositionOptions = useMemo(() => {
+    const positions = new Map();
+    [...(currentOrg?.employeePositions ?? []), ...managerDashboardEmployees.map((employee) => employee.position)]
+      .forEach((position) => {
+        const label = String(position ?? '').trim();
+        const key = normalizeEmployeePosition(label);
+        if (key && !positions.has(key)) positions.set(key, label);
+      });
+    return [...positions.values()].sort((left, right) => left.localeCompare(right, 'lt'));
+  }, [currentOrg?.employeePositions, managerDashboardEmployees]);
+  const activeEmployeePositionFilter = employeePositionFilter.organizationId === currentOrg?.id
+    ? employeePositionFilter.position
+    : '';
+  const employeePositionCounts = useMemo(() => managerDashboardEmployees.reduce((counts, employee) => {
+    const key = normalizeEmployeePosition(employee.position || 'Darbuotojas');
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {}), [managerDashboardEmployees]);
   const archivedOrgEmployees = useMemo(() => (data.archivedEmployees ?? []).filter((record) => record.orgId === currentOrg?.id), [data.archivedEmployees, currentOrg?.id]);
   const archivePageRequest = {
     organizationId: currentOrg?.id ?? '',
@@ -1937,7 +1996,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!statuses.length) return { label: 'Nepradėta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
     return { label: 'Neužbaigta', cls: 'bg-amber-100 text-amber-800', Icon: CircleAlert };
   };
-  const filteredOrgEmployees = useMemo(() => managerDashboardEmployees.filter((employee) => `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'))), [managerDashboardEmployees, employeeSearch]);
+  const filteredOrgEmployees = useMemo(() => managerDashboardEmployees.filter((employee) => {
+    const matchesSearch = `${employee.name} ${employee.email} ${employee.contractNumber} ${employee.position}`.toLocaleLowerCase('lt').includes(employeeSearch.trim().toLocaleLowerCase('lt'));
+    const matchesPosition = !activeEmployeePositionFilter || normalizeEmployeePosition(employee.position || 'Darbuotojas') === normalizeEmployeePosition(activeEmployeePositionFilter);
+    return matchesSearch && matchesPosition;
+  }), [managerDashboardEmployees, employeeSearch, activeEmployeePositionFilter]);
   const employeePageCount = Math.max(1, Math.ceil(filteredOrgEmployees.length / employeePageSize));
   const currentEmployeePage = Math.min(employeePage, employeePageCount);
   const creatorMembershipsByOrg = useMemo(() => {
@@ -2082,6 +2145,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const createEmployeePosition = (name, selectPosition) => {
+    if (!currentOrg) return false;
+    const key = normalizeEmployeePosition(name);
+    if (employeePositionOptions.some((position) => normalizeEmployeePosition(position) === key)) return false;
+    updateOrg(currentOrg.id, (org) => ({
+      ...org,
+      employeePositions: [...(org.employeePositions ?? []), name].sort((left, right) => left.localeCompare(right, 'lt')),
+    }));
+    selectPosition(name);
+    setNotice(`Pareigybė „${name}“ sukurta.`);
+    return true;
+  };
 
   const setCreatorResourceDefault = async (resource, enabled) => {
     try {
@@ -3653,7 +3729,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const name = `${employeeForm.firstName.trim()} ${employeeForm.lastName.trim()}`.trim();
     const email = employeeForm.email.trim().toLowerCase();
     const contractNumber = employeeForm.contractNumber.trim();
-    if (!name || !email || !contractNumber || employeeEmailError || employeeContractNumberError || rehireLookupPending) return;
+    if (!name || !email || !contractNumber || !employeeForm.position.trim() || employeeEmailError || employeeContractNumberError || rehireLookupPending) return;
     const rehireRecord = matchingArchivedEmployee;
     const invitedAt = new Date().toISOString();
     const assignedResourceIds = expandProtocolResourceAssignments(
@@ -3667,7 +3743,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return [resourceId, [...new Set(['Darbuotojas', ...roles])]];
     }));
     const invitedEmployee = {
-      id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim() || 'Darbuotojas', status: rehireRecord ? 'Aktyvus' : 'Pakviestas', inviteCount: 1, invitedAt,
+      id: `emp-${crypto.randomUUID()}`, orgId: currentOrg.id, name, email, contractNumber, position: employeeForm.position.trim(), status: rehireRecord ? 'Aktyvus' : 'Pakviestas', inviteCount: 1, invitedAt,
       medicalCertificateValidUntil: employeeForm.medicalCertificateValidUntil || '',
       medicalCertificateReminderDate: getMedicalCertificateReminderDate(employeeForm.medicalCertificateValidUntil),
       resourceIds: assignedResourceIds, requiredSignersByResource, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, progressByResource: {}, testResults: [], pin: rehireRecord?.employee.pin ?? '',
@@ -5271,6 +5347,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>
               </Panel>}
               {canManageSelectedWorkspace && <Panel title="">
+                <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                    <div><h2 className="text-sm font-bold text-slate-900">Darbuotojai pagal pareigas</h2><p className="mt-1 text-xs text-slate-500">Pasirinkite pareigybę, kad matytumėte jai priskirtus darbuotojus.</p></div>
+                    <span className="text-xs font-medium text-slate-500">{employeePositionOptions.length} pareigybės</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" aria-pressed={!activeEmployeePositionFilter} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${!activeEmployeePositionFilter ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: '' }); setEmployeePage(1); }}>
+                      Visos pareigos <span className="ml-1 rounded-full bg-white/80 px-1.5 py-0.5 text-xs">{managerDashboardEmployees.length}</span>
+                    </button>
+                    {employeePositionOptions.map((position) => {
+                      const selected = normalizeEmployeePosition(activeEmployeePositionFilter) === normalizeEmployeePosition(position);
+                      return <button type="button" key={position} aria-pressed={selected} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${selected ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => { setEmployeePositionFilter({ organizationId: currentOrg.id, position: selected ? '' : position }); setEmployeePage(1); }}>
+                        {position} <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs">{employeePositionCounts[normalizeEmployeePosition(position)] ?? 0}</span>
+                      </button>;
+                    })}
+                    {!employeePositionOptions.length && <p className="py-2 text-sm text-slate-500">Pareigybių dar nėra. Pirmąją galite sukurti pridėdami darbuotoją.</p>}
+                  </div>
+                </div>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
@@ -5361,7 +5455,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <label className="text-sm font-medium">Pavardė<input className={`${inputClass} mt-1`} value={employeeForm.lastName} onChange={(event) => setEmployeeForm({ ...employeeForm, lastName: event.target.value })} required /></label>
                     <label className="text-sm font-medium">El. paštas<input className={`${inputClass} mt-1 ${employeeEmailError ? 'border-rose-400' : ''}`} type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })} aria-invalid={Boolean(employeeEmailError)} aria-describedby={employeeEmailError ? 'employee-email-error' : undefined} required />{employeeEmailError && <span id="employee-email-error" role="alert" className="mt-1 block text-xs font-medium text-rose-700">{employeeEmailError}</span>}</label>
                     <label className="text-sm font-medium">Darbo sutarties Nr.<input className={`${inputClass} mt-1 ${employeeContractNumberError ? 'border-rose-400' : ''}`} value={employeeForm.contractNumber} onChange={(event) => setEmployeeForm({ ...employeeForm, contractNumber: event.target.value })} aria-invalid={Boolean(employeeContractNumberError)} aria-describedby={employeeContractNumberError ? 'employee-contract-number-error' : undefined} required />{employeeContractNumberError && <span id="employee-contract-number-error" role="alert" className="mt-1 block text-xs font-medium text-rose-700">{employeeContractNumberError}</span>}</label>
-                    <label className="text-sm font-medium">Pareigos<input className={`${inputClass} mt-1`} value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })} placeholder="Darbuotojas" /></label>
+                    <div><span className="text-sm font-medium">Pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeeForm.position} onChange={(position) => setEmployeeForm((current) => ({ ...current, position }))} onCreate={(position) => createEmployeePosition(position, (createdPosition) => setEmployeeForm((current) => ({ ...current, position: createdPosition })))}/></div>
                     <label className="text-sm font-medium">Med. pažymėjimas · galioja iki<input className={`${inputClass} mt-1`} type="date" value={employeeForm.medicalCertificateValidUntil} onChange={(event) => setEmployeeForm({ ...employeeForm, medicalCertificateValidUntil: event.target.value })} /></label>
                   </div>
                   <label className="block text-sm font-medium">Darbuotojo ruošinys<select className={`${inputClass} mt-1`} value={selectedAssignmentPresetId} onChange={(event) => { const presetId = event.target.value; const preset = (currentOrg.employeeAssignmentPresets ?? []).find((item) => item.id === presetId); setSelectedAssignmentPresetId(presetId); if (preset) setInviteResourceIds(preset.resourceIds.filter((id) => currentOrg.resources.includes(id))); }}><option value="">Pasirinkti ruošinį</option>{(currentOrg.employeeAssignmentPresets ?? []).map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · {preset.resourceIds.length} dokumentai</option>)}</select>{!(currentOrg.employeeAssignmentPresets ?? []).length && <span className="mt-1 block text-xs font-normal text-slate-500">Ruošinius susikurkite darbuotojų sąrašo skiltyje „Ruošiniai“.</span>}</label>
@@ -5428,7 +5522,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </dialog>}
               {canManageSelectedWorkspace && <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
-                  <label className="block text-sm font-medium">Darbuotojo pareigos<input className={`${inputClass} mt-1`} value={employeePositionDraft} onChange={(event) => setEmployeePositionDraft(event.target.value)} placeholder="Darbuotojas" /></label>
+                  <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /></div>
                   <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai ir pasirašantieji</legend><ResourceSelectionList
                     resources={data.resources.filter((resource) => currentOrg.resources.includes(resource.id))}
                     selectedIds={employeeResourceDraft}
@@ -5512,7 +5606,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="text-sm font-medium">Pavardė<input className={`${inputClass} mt-1`} value={employeeForm.lastName} onChange={(event) => setEmployeeForm({ ...employeeForm, lastName: event.target.value })} required /></label>
                   <label className="text-sm font-medium">El. paštas<input className={`${inputClass} mt-1 ${employeeEmailError ? 'border-rose-400' : ''}`} type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })} aria-invalid={Boolean(employeeEmailError)} aria-describedby={employeeEmailError ? 'employee-email-error' : undefined} required />{employeeEmailError && <span id="employee-email-error" role="alert" className="mt-1 block text-xs font-medium text-rose-700">{employeeEmailError}</span>}</label>
                   <label className="text-sm font-medium">Darbo sutarties Nr.<input className={`${inputClass} mt-1 ${employeeContractNumberError ? 'border-rose-400' : ''}`} value={employeeForm.contractNumber} onChange={(event) => setEmployeeForm({ ...employeeForm, contractNumber: event.target.value })} aria-invalid={Boolean(employeeContractNumberError)} aria-describedby={employeeContractNumberError ? 'employee-contract-number-error' : undefined} required />{employeeContractNumberError && <span id="employee-contract-number-error" role="alert" className="mt-1 block text-xs font-medium text-rose-700">{employeeContractNumberError}</span>}</label>
-                  <label className="text-sm font-medium">Pareigos<input className={`${inputClass} mt-1`} value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })} placeholder="Darbuotojas" /></label>
+                  <div><span className="text-sm font-medium">Pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeeForm.position} onChange={(position) => setEmployeeForm((current) => ({ ...current, position }))} onCreate={(position) => createEmployeePosition(position, (createdPosition) => setEmployeeForm((current) => ({ ...current, position: createdPosition })))}/></div>
                   <label className="text-sm font-medium">Med. pažymėjimas · galioja iki<input className={`${inputClass} mt-1`} type="date" value={employeeForm.medicalCertificateValidUntil} onChange={(event) => setEmployeeForm({ ...employeeForm, medicalCertificateValidUntil: event.target.value })} /></label>
                 </div>
                   <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold">Priskiriami dokumentai ir pasirašantieji</legend><ResourceSelectionList
@@ -5559,7 +5653,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </dialog>
             <dialog id="employee-edit-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               {employeeBeingEdited && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Priskyrimai · {employeeBeingEdited.name}</h2><p className="mt-1 text-sm text-slate-500">Redaguokite darbuotojo pareigas, dokumentus ir pasirašančiuosius.</p></div><button type="button" aria-label="Uždaryti priskyrimų redagavimą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={closeEmployeeEditor}><X size={20} /></button></div>
-                <label className="block text-sm font-medium">Darbuotojo pareigos<input className={`${inputClass} mt-1`} value={employeePositionDraft} onChange={(event) => setEmployeePositionDraft(event.target.value)} placeholder="Darbuotojas" /></label>
+                <div><span className="block text-sm font-medium">Darbuotojo pareigos</span><EmployeePositionPicker options={employeePositionOptions} value={employeePositionDraft} onChange={setEmployeePositionDraft} onCreate={(position) => createEmployeePosition(position, setEmployeePositionDraft)} /></div>
                 <div className="space-y-3">{data.resources.filter((resource) => currentOrg.resources.includes(resource.id)).map((resource) => {
                   const isAssigned = employeeResourceDraft.includes(resource.id);
                   const selectedRoles = employeeSignerDraft[resource.id] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited);
