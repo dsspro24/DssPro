@@ -1632,15 +1632,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
   const currentCommissionAssignments = useMemo(() => (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id), [data.commissionAssignments, currentOrg?.id]);
   const orgEmployees = useMemo(() => data.employees.filter((employee) => employee.orgId === currentOrg?.id), [data.employees, currentOrg?.id]);
-  const pendingLegacyCommissionTasks = userRole === 'vadovas'
-    ? orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
-      const resource = data.resources.find((item) => item.id === resourceId);
-      if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
-      return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
-        .filter((signer) => signer.role === 'Komisijos narys' && signer.status !== 'signed')
-        .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, employee, resource, commissionMember: signer.name }));
-    }))
-    : [];
   const managerDashboardEmployees = useMemo(() => [
     ...orgEmployees,
     ...pendingEmployeeInvites.filter((employee) => employee.orgId === currentOrg?.id),
@@ -1960,6 +1951,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : resource;
     return getResourceWorkflowStatus(employee, configuredResource, data.signatures, data.organizations, validityCheckTime, data.specialists);
   };
+  const pendingLegacyCommissionTasks = userRole === 'vadovas'
+    ? orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
+      const resource = data.resources.find((item) => item.id === resourceId);
+      if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
+      return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
+        .filter((signer) => signer.role === 'Komisijos narys' && signer.status !== 'signed')
+        .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, employee, resource, commissionMember: signer.name }));
+    }))
+    : [];
   const getEmployeeProtocolAccessError = (employee, resource) => {
     const org = data.organizations.find((organization) => organization.id === employee?.orgId);
     const isLinkedResource = ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource));
