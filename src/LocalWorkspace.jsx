@@ -823,6 +823,11 @@ function loadData() {
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40';
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100';
+const employeeDocumentSignerRoles = ['Darbuotojas', 'Vadovas', 'DSS specialistas', 'Komisijos narys'];
+const normalizeEmployeeDocumentSignerRoles = (roles) => [...new Set([
+  'Darbuotojas',
+  ...(Array.isArray(roles) ? roles.filter((role) => employeeDocumentSignerRoles.includes(role)) : []),
+])];
 const normalizeEmployeePosition = (position) => String(position ?? '').trim().toLocaleLowerCase('lt');
 function EmployeePositionPicker({ options, value, onChange, onCreate }) {
   const [creating, setCreating] = useState(false);
@@ -864,7 +869,6 @@ const signerRoleOptions = [
   { value: 'Darbuotojas', label: 'Darbuotojas' },
   { value: 'Vadovas', label: 'Įmonės vadovas' },
   { value: 'DSS specialistas', label: 'DSS specialistas' },
-  { value: 'Komisijos pirmininkas', label: 'Komisijos pirmininkas' },
   { value: 'Komisijos narys', label: 'Komisijos nariai' },
 ];
 const internalRegisterSignatureFieldLabels = [
@@ -4029,8 +4033,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const requiredSignersByResource = Object.fromEntries(resourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       const roles = employeeSignerDraft[resourceId] ?? getRequiredSigners(resource, currentOrg, employeeBeingEdited);
-      return [resourceId, [...new Set(['Darbuotojas', ...roles])]];
+      return [resourceId, normalizeEmployeeDocumentSignerRoles(roles)];
     }));
+    const unsupportedSignerRoles = [...new Set(resourceIds.flatMap((resourceId) => [
+      employeeBeingEdited.requiredSignersByResource?.[resourceId],
+      currentOrg.resourceSettings?.[resourceId]?.requiredSigners,
+      data.resources.find((item) => item.id === resourceId)?.requiredSigners,
+    ].flatMap((roles) => Array.isArray(roles) ? roles : [])
+      .filter((role) => !employeeDocumentSignerRoles.includes(role))))];
     const position = employeePositionDraft.trim() || 'Darbuotojas';
     const employee = data.employees.find((item) => item.id === employeeBeingEdited.id);
     if (!employee) return;
@@ -4100,7 +4110,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
         skipNextWorkspaceAutosaveRef.current = !hasPendingWorkspaceChanges;
         setData(applyAssignmentsToWorkspace);
-        setNotice(previousAutosaveError
+        setNotice(unsupportedSignerRoles.length
+          ? `${employeeBeingEdited.name} pareigos ir priskyrimai išsaugoti. Nepalaikomi pasirašančiųjų vaidmenys pašalinti: ${unsupportedSignerRoles.join(', ')}.`
+          : previousAutosaveError
           ? `Darbuotojo priskyrimai išsaugoti, tačiau ankstesnis bendras įmonės išsaugojimas nepavyko: ${previousAutosaveError.message}`
           : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
         closeEmployeeEditor();
@@ -4114,7 +4126,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
 
     setData(applyAssignmentsToWorkspace);
-    setNotice(`${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
+    setNotice(unsupportedSignerRoles.length
+      ? `${employeeBeingEdited.name} pareigos ir priskyrimai išsaugoti. Nepalaikomi pasirašančiųjų vaidmenys pašalinti: ${unsupportedSignerRoles.join(', ')}.`
+      : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
     closeEmployeeEditor();
   };
 
@@ -6409,7 +6423,7 @@ function getRequiredSigners(resource, org, employee) {
     ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
   }
   if (resource?.templateKind === 'internal-documents-register' && Array.isArray(organizationRequiredSigners)) {
-    return [...new Set(['Darbuotojas', ...organizationRequiredSigners])];
+    return normalizeEmployeeDocumentSignerRoles(organizationRequiredSigners);
   }
   const assignedRoles = Array.isArray(employee?.requiredSignersByResource?.[resource?.id])
     ? employee.requiredSignersByResource[resource.id]
@@ -6420,7 +6434,7 @@ function getRequiredSigners(resource, org, employee) {
       : ['Žurnalas', 'Kortelė'].includes(resource.type) && org?.dss?.length
         ? ['DSS specialistas']
         : [];
-  return [...new Set(['Darbuotojas', ...assignedRoles])];
+  return normalizeEmployeeDocumentSignerRoles(assignedRoles);
 }
 function getRequiredSignerEntries(employee, resource, org, signatures, now, specialists = []) {
   const resourceSignatures = signatures.filter((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id);
