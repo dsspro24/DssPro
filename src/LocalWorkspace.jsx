@@ -1008,6 +1008,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [aapIssueQuantities, setAapIssueQuantities] = useState({});
   const [aapIssueDate, setAapIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [aapIssueIssuer, setAapIssueIssuer] = useState('');
+  const [aapIssueSubmitting, setAapIssueSubmitting] = useState(false);
   const [aapIssueSigningTarget, setAapIssueSigningTarget] = useState(null);
   const [aapIssueSignError, setAapIssueSignError] = useState('');
   const [aapIssueSignSubmitting, setAapIssueSignSubmitting] = useState(false);
@@ -1164,6 +1165,50 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [validityCheckTime]);
+
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'darbuotojas' || !selectedOrgId || !currentEmployee?.id) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshAapIssuances = async () => {
+      if (requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const { data: issuances, error } = await supabase.rpc('get_employee_aap_issuances');
+        if (error) throw error;
+        if (!active) return;
+        setData((current) => {
+          const currentIssuances = current.aapIssuances ?? [];
+          const refreshedIssuances = new Map((issuances ?? []).map((issuance) => [issuance.id, issuance]));
+          currentIssuances
+            .filter((issuance) => issuance.employeeId === currentEmployee.id && issuance.status === 'signed')
+            .forEach((issuance) => {
+              const refreshed = refreshedIssuances.get(issuance.id);
+              if (refreshed?.status !== 'signed') refreshedIssuances.set(issuance.id, issuance);
+            });
+          return {
+            ...current,
+            aapIssuances: [
+              ...currentIssuances.filter((issuance) => issuance.employeeId !== currentEmployee.id),
+              ...refreshedIssuances.values(),
+            ],
+          };
+        });
+      } catch (error) {
+        if (active) setNotice(`AAP išdavimų atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshAapIssuances();
+    const intervalId = window.setInterval(refreshAapIssuances, 15_000);
+    document.addEventListener('visibilitychange', refreshAapIssuances);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshAapIssuances);
+    };
+  }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id]);
 
   useEffect(() => {
     if (!cloudMode || userRole !== 'dss' || !onLoadDssOrganization || !dssOrganizationIsOpen || !selectedOrgId) return undefined;
@@ -2546,8 +2591,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
-  const createAapIssuance = (event) => {
+  const createAapIssuance = async (event) => {
     event.preventDefault();
+    if (aapIssueSubmitting) return;
     const employee = data.employees.find((item) => item.id === aapIssueEmployeeId);
     const org = data.organizations.find((item) => item.id === employee?.orgId);
     const items = org?.aapItems ?? [];
@@ -2577,7 +2623,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-    setData((current) => ({ ...current, aapIssuances: [...(current.aapIssuances ?? []), issuance] }));
+    setAapIssueSubmitting(true);
+    try {
+      let savedIssuance = issuance;
+      if (cloudMode) {
+        const { data: createdIssuance, error } = await supabase.rpc('create_manager_aap_issuance', {
+          input_issuance: issuance,
+        });
+        if (error) throw error;
+        if (!createdIssuance?.id) throw new Error('AAP išdavimo įrašo išsaugoti nepavyko.');
+        savedIssuance = createdIssuance;
+      }
+      setData((current) => ({ ...current, aapIssuances: [...(current.aapIssuances ?? []), savedIssuance] }));
+    } catch (error) {
+      setNotice(`AAP išdavimo užklausos išsaugoti nepavyko: ${error.message}`);
+      return;
+    } finally {
+      setAapIssueSubmitting(false);
+    }
     setAapIssueEmployeeId(null);
     setAapIssueSelectedItemIds([]);
     setAapIssueQuantities({});
@@ -5912,7 +5975,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <label className="text-xs font-medium text-slate-600">Kiekis<input className={`${inputClass} mt-1`} type="number" min="1" step="1" value={aapIssueQuantities[item.id] ?? item.quantity ?? 1} onChange={(event) => setAapIssueQuantities((current) => ({ ...current, [item.id]: event.target.value }))} disabled={!aapIssueSelectedItemIds.includes(item.id)} /></label>
           </div>) : <p className="text-sm text-slate-500">AAP šablone nėra priemonių. Pirmiausia jas įrašykite įmonės bibliotekoje.</p>}</fieldset>
           <p className="text-xs text-slate-500">Įrašas bus išsaugotas atskirai. Darbuotojas patvirtins būtent šių priemonių gavimą savo paskyroje.</p>
-          <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => document.getElementById('aap-issuance-dialog')?.close()}>Atšaukti</button><button type="submit" className={buttonClass} disabled={!aapIssueSelectedItemIds.length || !aapIssueOrganization?.aapItems?.length}><Plus size={15} />Registruoti išdavimą</button></div>
+          <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={aapIssueSubmitting} onClick={() => document.getElementById('aap-issuance-dialog')?.close()}>Atšaukti</button><button type="submit" className={buttonClass} disabled={aapIssueSubmitting || !aapIssueSelectedItemIds.length || !aapIssueOrganization?.aapItems?.length}>{aapIssueSubmitting ? 'Išsaugoma…' : <><Plus size={15} />Registruoti išdavimą</>}</button></div>
         </form>}
       </dialog>
       {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
@@ -6983,13 +7046,19 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     const entries = [...parsed.querySelectorAll('.signature-entry')]
       .filter((entry) => labels.some((label) => entry.textContent?.includes(label)));
     entries.forEach((entry) => {
-      const line = entry.querySelector('.sig-line');
       const signedName = entry.querySelector('.signed-name');
-      if (!line || !signedName || entry.querySelector('.signature-image')) return;
-      const image = parsed.createElement('img');
+      if (!signedName) return;
+      const image = entry.querySelector('.signature-image') ?? parsed.createElement('img');
       image.className = 'signature-image';
       image.src = signature.signatureImage;
       image.alt = `${signature.signer} parašas`;
+      image.style.setProperty('display', 'inline-block', 'important');
+      image.style.setProperty('width', '64px', 'important');
+      image.style.setProperty('height', '20px', 'important');
+      image.style.setProperty('max-width', '64px', 'important');
+      image.style.setProperty('max-height', '20px', 'important');
+      image.style.setProperty('object-fit', 'contain', 'important');
+      image.style.setProperty('object-position', 'left center', 'important');
       const nameBreak = signedName.nextSibling;
       if (nameBreak?.nodeName === 'BR') nameBreak.remove();
       const signatureRow = parsed.createElement('div');
@@ -7001,7 +7070,7 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   insertSignatureImage(['Darbdavys ar jo įgaliotas asmuo', 'Išdavė'], employerSignature);
   insertSignatureImage(['Vieną egzempliorių gavau', 'Gavo'], workerSignature);
   const style = parsed.createElement('style');
-  style.textContent = '.aap-signature-name-row{display:flex;align-items:center;gap:8px;min-height:24px}.aap-signature-name-row .signed-name{display:inline-block;min-height:0;line-height:1.2}.aap-signature-name-row .signature-image{display:inline-block;width:90px;height:24px;object-fit:contain;object-position:left center}';
+  style.textContent = '.aap-signature-name-row{display:flex;align-items:center;gap:6px;min-height:22px}.aap-signature-name-row .signed-name{display:inline-block;min-height:0;line-height:1.2}';
   parsed.head.append(style);
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
