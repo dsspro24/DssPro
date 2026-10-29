@@ -1889,7 +1889,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? [
         ...roleNavigation.dss.filter(([id]) => id !== 'paskyra' && (id !== 'archyvas' || canViewCompanyArchive)),
         ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis' && id !== 'archyvas' && id !== 'zurnalai') : []),
-      ].map(([id, label, Icon]) => [id, id === 'skydelis' ? 'Būklės pasas' : label, Icon])
+      ].sort((left, right) => ['skydelis', 'zurnalai', 'ataskaitos', 'parasai', 'archyvas', 'biblioteka', 'imone'].indexOf(left[0]) - ['skydelis', 'zurnalai', 'ataskaitos', 'parasai', 'archyvas', 'biblioteka', 'imone'].indexOf(right[0]))
+        .map(([id, label, Icon]) => [id, id === 'skydelis' ? 'Būklės pasas' : label, Icon])
       : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
     : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
   const signatureIsCurrent = (signature) => !signature.validUntil || new Date(signature.validUntil).getTime() >= validityCheckTime;
