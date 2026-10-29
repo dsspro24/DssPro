@@ -25,7 +25,7 @@ const defaultFamiliarizationTopics = [
   'Asmeninių apsauginių priemonių naudojimas. Nelaimingi atsitikimai.',
 ];
 const defaultTestTemplateLoaders = new Map([
-  if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
+  ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
   ['res-fire-knowledge-test', () => import('./assets/fire-knowledge-test.html?raw').then(({ default: html }) => html)],
   ['res-excavation-safety-test', () => import('./assets/excavation-safety-test.html?raw').then(({ default: html }) => html)],
@@ -139,11 +139,6 @@ function workspaceForDatabase(workspace) {
     delete databaseSignature.signatureImage;
     return databaseSignature;
   };
-  const cleanAapIssuance = (issuance) => {
-    const databaseIssuance = { ...issuance };
-    delete databaseIssuance.signatureImage;
-    return databaseIssuance;
-  };
   return {
     ...databaseWorkspace,
     organizations: (workspace.organizations ?? []).map((organization) => {
@@ -153,7 +148,6 @@ function workspaceForDatabase(workspace) {
     }),
     resources: (workspace.resources ?? []).map(resourceForDatabase),
     signatures: (workspace.signatures ?? []).map(cleanSignature),
-    aapIssuances: (workspace.aapIssuances ?? []).map(cleanAapIssuance),
   };
 }
 
