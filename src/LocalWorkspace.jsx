@@ -2029,8 +2029,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     .filter((issuance) => issuance.employeeId === currentEmployee?.id)
     .slice()
     .sort((left, right) => {
-      const pendingOrder = Number(left.status === 'signed') - Number(right.status === 'signed');
-      return pendingOrder || new Date(right.issuedAt).getTime() - new Date(left.issuedAt).getTime();
+      const leftDate = new Date(left.signedAt || left.issuedAt).getTime();
+      const rightDate = new Date(right.signedAt || right.issuedAt).getTime();
+      return rightDate - leftDate;
     });
   const aapIssuancePageCount = Math.max(1, Math.ceil(employeeAapIssuances.length / aapIssuancePageSize));
   const currentAapIssuancePage = Math.min(aapIssuancePage, aapIssuancePageCount);
