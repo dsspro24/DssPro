@@ -6984,18 +6984,24 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       .filter((entry) => labels.some((label) => entry.textContent?.includes(label)));
     entries.forEach((entry) => {
       const line = entry.querySelector('.sig-line');
-      if (!line || entry.querySelector('.signature-image')) return;
+      const signedName = entry.querySelector('.signed-name');
+      if (!line || !signedName || entry.querySelector('.signature-image')) return;
       const image = parsed.createElement('img');
       image.className = 'signature-image';
       image.src = signature.signatureImage;
       image.alt = `${signature.signer} parašas`;
-      line.before(image);
+      const nameBreak = signedName.nextSibling;
+      if (nameBreak?.nodeName === 'BR') nameBreak.remove();
+      const signatureRow = parsed.createElement('div');
+      signatureRow.className = 'aap-signature-name-row';
+      signatureRow.append(signedName, image);
+      entry.querySelector('.signed-date')?.before(signatureRow);
     });
   };
   insertSignatureImage(['Darbdavys ar jo įgaliotas asmuo', 'Išdavė'], employerSignature);
   insertSignatureImage(['Vieną egzempliorių gavau', 'Gavo'], workerSignature);
   const style = parsed.createElement('style');
-  style.textContent = '.signature-image{display:block;width:150px;height:30px;object-fit:contain;object-position:left center}';
+  style.textContent = '.aap-signature-name-row{display:flex;align-items:center;gap:8px;min-height:24px}.aap-signature-name-row .signed-name{display:inline-block;min-height:0;line-height:1.2}.aap-signature-name-row .signature-image{display:inline-block;width:90px;height:24px;object-fit:contain;object-position:left center}';
   parsed.head.append(style);
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
@@ -7118,7 +7124,7 @@ function escapeHtml(value) {
 function buildAapIssuanceHtml(issuance, employee, org) {
   const rows = issuance.items.map((item, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason || '')}</td><td>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td><td>${escapeHtml(item.validity || '')}</td></tr>`).join('');
   const signedAt = issuance.signedAt ? new Date(issuance.signedAt).toLocaleString('lt-LT') : '';
-  return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.signature-image{display:block;width:220px;height:80px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>AAP gavimą patvirtino darbuotojas</strong>${signatureImageHtml(issuance)}<p>${escapeHtml(issuance.signer || employee.name)}</p></section><section><strong>Pasirašyta PIN kodu</strong><p>${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
+  return `<!doctype html><html lang="lt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAP išdavimo patvirtinimas</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;color:#17202a;font:14px/1.5 Arial,sans-serif}.sheet{max-width:900px;margin:0 auto}h1{text-align:center;font-size:21px;margin:0 0 24px}.details{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:22px}.details p{margin:0}.details strong{display:inline-block;min-width:130px}table{width:100%;border-collapse:collapse;margin:14px 0 28px}th,td{border:1px solid #94a3b8;padding:8px;text-align:left;vertical-align:top}th{background:#f1f5f9}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.signatures section{border-top:1px solid #64748b;padding-top:8px}.worker-signature-line{display:flex;align-items:center;gap:8px;margin:6px 0}.worker-signature-line p{margin:0}.signatures .signature-image{display:inline-block;width:90px;height:24px;object-fit:contain;object-position:left center}.audit{font-size:12px;color:#475569;margin-top:16px}@media print{body{padding:0}.sheet{max-width:none}tr{break-inside:avoid}}</style></head><body><main class="sheet"><h1>AAP PRIEMONIŲ IŠDAVIMO PATVIRTINIMAS</h1><section class="details"><p><strong>Įmonė:</strong> ${escapeHtml(org.name)}</p><p><strong>Įmonės kodas:</strong> ${escapeHtml(org.companyCode || '')}</p><p><strong>Darbuotojas:</strong> ${escapeHtml(employee.name)}</p><p><strong>Pareigos:</strong> ${escapeHtml(employee.position || 'Darbuotojas')}</p><p><strong>Darbo sutarties Nr.:</strong> ${escapeHtml(employee.contractNumber || '')}</p><p><strong>Išdavimo data:</strong> ${escapeHtml(formatProtocolDate(issuance.issuedAt))}</p><p><strong>Išdavė:</strong> ${escapeHtml(issuance.issuedBy)}</p></section><table><thead><tr><th>Nr.</th><th>AAP priemonė</th><th>Išdavimo pagrindas</th><th>Kiekis</th><th>Tinkamumo terminas</th></tr></thead><tbody>${rows}</tbody></table><section class="signatures"><section><strong>AAP gavimą patvirtino darbuotojas</strong><div class="worker-signature-line"><p>${escapeHtml(issuance.signer || employee.name)}</p>${signatureImageHtml(issuance)}</div><p>Pasirašyta PIN kodu · ${escapeHtml(signedAt)}</p><p>IP: ${escapeHtml(issuance.ip || 'Nenurodytas')}</p></section></section><p class="audit">Įrašo Nr.: ${escapeHtml(issuance.id)} · Išdavė: ${escapeHtml(issuance.issuedBy)}</p></main></body></html>`;
 }
 function appendAapIssuanceSheets(html, issuances, employee, org) {
   if (!issuances.length) return html;
