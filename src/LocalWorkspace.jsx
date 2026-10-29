@@ -1149,6 +1149,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [commissionPinStatus, setCommissionPinStatus] = useState({ organizationId: null, members: {} });
   const [commissionInvitationTarget, setCommissionInvitationTarget] = useState(null);
   const [protocolCommissionTaskTarget, setProtocolCommissionTaskTarget] = useState(null);
+  const [protocolCommissionSigningTasks, setProtocolCommissionSigningTasks] = useState([]);
+  const [selectedCommissionTaskIds, setSelectedCommissionTaskIds] = useState([]);
+  const [commissionTaskPage, setCommissionTaskPage] = useState(1);
+  const [commissionReviewConfirmed, setCommissionReviewConfirmed] = useState(false);
   const [commissionConsentChecked, setCommissionConsentChecked] = useState(false);
   const [commissionActionSubmitting, setCommissionActionSubmitting] = useState(false);
   const [commissionActionError, setCommissionActionError] = useState('');
@@ -1630,6 +1634,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .filter(Boolean));
   const pendingCommissionTasks = commissionProtocolTasks.filter((task) => !task.hasSigned);
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
+  const commissionProtocolTaskId = (task) => `${task.assignmentId}-${task.batchId}`;
+  const commissionTaskPageCount = Math.max(1, Math.ceil(pendingCommissionTasks.length / dssTaskPageSize));
+  const currentCommissionTaskPage = Math.min(commissionTaskPage, commissionTaskPageCount);
+  const paginatedPendingCommissionTasks = pendingCommissionTasks.slice(
+    (currentCommissionTaskPage - 1) * dssTaskPageSize,
+    currentCommissionTaskPage * dssTaskPageSize,
+  );
+  const selectedCurrentCommissionTasks = pendingCommissionTasks.filter((task) => selectedCommissionTaskIds.includes(commissionProtocolTaskId(task)));
   const currentCommissionAssignments = useMemo(() => (data.commissionAssignments ?? []).filter((assignment) => assignment.organizationId === currentOrg?.id), [data.commissionAssignments, currentOrg?.id]);
   const orgEmployees = useMemo(() => data.employees.filter((employee) => employee.orgId === currentOrg?.id), [data.employees, currentOrg?.id]);
   const managerDashboardEmployees = useMemo(() => [
@@ -2625,71 +2637,125 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
+  const requestProtocolCommissionSign = (tasks) => {
+    const pendingTasks = tasks.filter((task) => pendingCommissionTasks.some((pendingTask) => (
+      commissionProtocolTaskId(pendingTask) === commissionProtocolTaskId(task)
+    )));
+    if (!pendingTasks.length) {
+      setNotice('Pasirašytinų komisijos protokolų nebėra.');
+      return;
+    }
+    setProtocolCommissionSigningTasks(pendingTasks);
+    setProtocolCommissionTaskTarget(pendingTasks[0]);
+    setSignatureInk('');
+    setWorkerSignPin('');
+    setCommissionReviewConfirmed(false);
+    setCommissionActionError('');
+  };
+
   const signProtocolCommissionTask = async (event) => {
     event.preventDefault();
-    const task = protocolCommissionTaskTarget;
-    if (!task || !signatureInk) {
-      setCommissionActionError('Nupieškite parašą prieš pasirašydami protokolą.');
+    const tasksToSign = protocolCommissionSigningTasks.filter((task) => pendingCommissionTasks.some((pendingTask) => (
+      commissionProtocolTaskId(pendingTask) === commissionProtocolTaskId(task)
+    )));
+    if (!tasksToSign.length) {
+      setCommissionActionError('Pasirašytinų komisijos protokolų nebėra.');
+      return;
+    }
+    if (!commissionReviewConfirmed) {
+      setCommissionActionError('Patvirtinkite, kad peržiūrėjote visus pasirinktus protokolus.');
+      return;
+    }
+    if (!signatureInk) {
+      setCommissionActionError('Nupieškite parašą prieš pasirašydami protokolus.');
       return;
     }
     const isUuid = (value) => typeof value === 'string'
       && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-    const assignmentId = task.assignmentId ?? task.commissionAssignments?.find((assignment) =>
-      assignment.employeeId === task.employeeId && assignment.role === task.role)?.id;
-    if (!isUuid(task.organizationId) || !isUuid(assignmentId) || !task.batchId) {
+    const tasksWithAssignments = tasksToSign.map((task) => ({
+      task,
+      assignmentId: task.assignmentId ?? task.commissionAssignments?.find((assignment) =>
+        assignment.employeeId === task.employeeId && assignment.role === task.role)?.id,
+    }));
+    if (cloudMode && tasksWithAssignments.some(({ task, assignmentId }) => (
+      !isUuid(task.organizationId) || !isUuid(assignmentId) || !task.batchId
+    ))) {
       setCommissionActionError('Nepavyko paruošti komisijos parašo duomenų. Uždarykite langą ir atnaujinkite puslapį.');
       return;
     }
     setCommissionActionSubmitting(true);
     setCommissionActionError('');
+    let completedCount = 0;
     let uploadedSignature = null;
     try {
-      if (cloudMode) {
-        uploadedSignature = await uploadSignatureDataUrl(task.organizationId, signatureInk);
-        const { data: signature, error } = await supabase.rpc(task.userId
-          ? 'record_account_commission_protocol_signature'
-          : 'record_employee_protocol_commission_signature', {
-          input_assignment_id: assignmentId,
-          input_batch_id: task.batchId,
-          input_pin: workerSignPin,
-          input_signature_path: uploadedSignature.path,
-        });
-        if (error || !signature) throw new Error(error?.message || 'PIN kodas neteisingas arba per daug kartų bandyta.');
-        setData((current) => ({
-          ...current,
-          protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), { ...signature, signaturePath: uploadedSignature.path }],
-          commissionTasks: (current.commissionTasks ?? []).map((item) => item.assignmentId === assignmentId && item.batchId === task.batchId
-            ? { ...item, hasSigned: true, protocolCommissionSignatures: [...(item.protocolCommissionSignatures ?? []), { ...signature, signaturePath: uploadedSignature.path }] }
-            : item),
-        }));
-      } else {
-        if (workerSignPin !== currentEmployee?.pin) throw new Error('PIN kodas neteisingas.');
-        const signature = {
-          id: `protocol-commission-${crypto.randomUUID()}`,
-          orgId: task.organizationId,
-          batchId: task.batchId,
-          assignmentId: task.assignmentId,
-          employeeId: currentEmployee.id,
-          signer: currentEmployee.name,
-          role: task.role,
-          signatureMethod: 'PIN',
-          signedAt: new Date().toISOString(),
-          ip: '127.0.0.1 (demo)',
-          signatureImage: signatureInk,
-        };
-        setData((current) => ({
-          ...current,
-          protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), signature],
-          commissionTasks: (current.commissionTasks ?? []).filter((item) => item.assignmentId !== task.assignmentId || item.batchId !== task.batchId),
-        }));
+      for (const { task, assignmentId } of tasksWithAssignments) {
+        if (cloudMode) {
+          uploadedSignature = await uploadSignatureDataUrl(task.organizationId, signatureInk);
+          const { data: signature, error } = await supabase.rpc(task.userId
+            ? 'record_account_commission_protocol_signature'
+            : 'record_employee_protocol_commission_signature', {
+            input_assignment_id: assignmentId,
+            input_batch_id: task.batchId,
+            input_pin: workerSignPin,
+            input_signature_path: uploadedSignature.path,
+          });
+          if (error || !signature) throw new Error(error?.message || 'PIN kodas neteisingas arba per daug kartų bandyta.');
+          const signaturePath = uploadedSignature.path;
+          uploadedSignature = null;
+          setData((current) => ({
+            ...current,
+            protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), { ...signature, signaturePath }],
+            commissionTasks: (current.commissionTasks ?? []).map((item) => item.assignmentId === assignmentId && item.batchId === task.batchId
+              ? { ...item, hasSigned: true, protocolCommissionSignatures: [...(item.protocolCommissionSignatures ?? []), { ...signature, signaturePath }] }
+              : item),
+          }));
+        } else {
+          if (workerSignPin !== currentEmployee?.pin) throw new Error('PIN kodas neteisingas.');
+          const signature = {
+            id: `protocol-commission-${crypto.randomUUID()}`,
+            orgId: task.organizationId,
+            batchId: task.batchId,
+            assignmentId: task.assignmentId,
+            employeeId: currentEmployee.id,
+            signer: currentEmployee.name,
+            role: task.role,
+            signatureMethod: 'PIN',
+            signedAt: new Date().toISOString(),
+            ip: '127.0.0.1 (demo)',
+            signatureImage: signatureInk,
+          };
+          setData((current) => ({
+            ...current,
+            protocolCommissionSignatures: [...(current.protocolCommissionSignatures ?? []), signature],
+            commissionTasks: (current.commissionTasks ?? []).filter((item) => item.assignmentId !== task.assignmentId || item.batchId !== task.batchId),
+          }));
+        }
+        completedCount += 1;
       }
       setProtocolCommissionTaskTarget(null);
+      setProtocolCommissionSigningTasks([]);
+      setSelectedCommissionTaskIds((current) => current.filter((id) => !tasksToSign.some((task) => commissionProtocolTaskId(task) === id)));
       setWorkerSignPin('');
       setSignatureInk('');
-      setNotice('Protokolas pasirašytas PIN kodu.');
+      setCommissionReviewConfirmed(false);
+      setNotice(`Komisijos protokolai pasirašyti PIN kodu: ${completedCount}.`);
     } catch (error) {
-      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
-      setCommissionActionError(error.message || 'Protokolo parašo įrašyti nepavyko.');
+      if (uploadedSignature?.path) {
+        try {
+          await removeSignatureAsset(uploadedSignature.path);
+        } catch (cleanupError) {
+          setCommissionActionError(`Parašo įrašyti nepavyko: ${error.message}. Įkelto parašo failo pašalinti nepavyko: ${cleanupError.message}`);
+          return;
+        }
+      }
+      if (completedCount > 0) {
+        const remainingTasks = tasksToSign.slice(completedCount);
+        setProtocolCommissionSigningTasks(remainingTasks);
+        setProtocolCommissionTaskTarget(remainingTasks[0] ?? null);
+      }
+      setCommissionActionError(completedCount
+        ? `Pasirašymas sustojo po ${completedCount} iš ${tasksToSign.length} protokolų: ${error.message}`
+        : error.message || 'Protokolo parašo įrašyti nepavyko.');
     } finally {
       setCommissionActionSubmitting(false);
     }
@@ -5172,6 +5238,34 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setArchiveDetailsId(recordId);
   };
 
+  const commissionTaskSelectionControls = <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <label className="flex items-center gap-2 text-sm font-medium">
+      <input
+        type="checkbox"
+        checked={paginatedPendingCommissionTasks.length > 0 && paginatedPendingCommissionTasks.every((task) => selectedCommissionTaskIds.includes(commissionProtocolTaskId(task)))}
+        disabled={!paginatedPendingCommissionTasks.length}
+        onChange={(event) => setSelectedCommissionTaskIds((current) => event.target.checked
+          ? [...new Set([...current, ...paginatedPendingCommissionTasks.map(commissionProtocolTaskId)])]
+          : current.filter((id) => !paginatedPendingCommissionTasks.some((task) => commissionProtocolTaskId(task) === id)))}
+      />
+      Pasirinkti visus šiame puslapyje ({paginatedPendingCommissionTasks.length})
+    </label>
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="text-sm text-slate-600">Pasirinkta {selectedCurrentCommissionTasks.length} / {pendingCommissionTasks.length}</span>
+      <button type="button" className={buttonClass} disabled={!selectedCurrentCommissionTasks.length} onClick={() => requestProtocolCommissionSign(selectedCurrentCommissionTasks)}>
+        <FileSignature size={16} />Pasirašyti protokolus ({selectedCurrentCommissionTasks.length})
+      </button>
+    </div>
+  </div>;
+  const commissionTaskPagination = pendingCommissionTasks.length > dssTaskPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+    <p className="text-sm text-slate-500">Rodoma {(currentCommissionTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentCommissionTaskPage * dssTaskPageSize, pendingCommissionTasks.length)} iš {pendingCommissionTasks.length}</p>
+    <nav className="flex items-center gap-2" aria-label="Komisijos protokolų puslapiavimas">
+      <button type="button" aria-label="Ankstesnis komisijos protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentCommissionTaskPage <= 1} onClick={() => setCommissionTaskPage(Math.max(1, currentCommissionTaskPage - 1))}><ChevronLeft size={17} /></button>
+      <span className="text-sm tabular-nums">{currentCommissionTaskPage} / {commissionTaskPageCount}</span>
+      <button type="button" aria-label="Kitas komisijos protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentCommissionTaskPage >= commissionTaskPageCount} onClick={() => setCommissionTaskPage(Math.min(commissionTaskPageCount, currentCommissionTaskPage + 1))}><ChevronRight size={17} /></button>
+    </nav>
+  </div>;
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
       <aside className="sticky top-0 z-40 flex w-full shrink-0 flex-col bg-emerald-950 px-3 py-2 text-white shadow-lg sm:px-4 sm:py-3 lg:static lg:z-auto lg:w-64 lg:px-4 lg:py-5 lg:shadow-none print:hidden">
@@ -5239,10 +5333,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         return;
                       }
                       if (item.commissionTask) {
-                        setProtocolCommissionTaskTarget(item.commissionTask);
-                        setSignatureInk('');
-                        setWorkerSignPin('');
-                        setCommissionActionError('');
+                        requestProtocolCommissionSign([item.commissionTask]);
                         return;
                       }
                       if (item.aapIssuance) {
@@ -5266,10 +5357,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       }
                       if (item.commissionTask) {
                         setActiveTab('zurnalai');
-                        setProtocolCommissionTaskTarget(item.commissionTask);
-                        setSignatureInk('');
-                        setWorkerSignPin('');
-                        setCommissionActionError('');
+                        requestProtocolCommissionSign([item.commissionTask]);
                         return;
                       }
                       if (!cloudMode && !currentSpecialist?.pin) {
@@ -5285,10 +5373,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       requestManagerSign([item.managerTask]);
                     } else if (userRole === 'vadovas' && item.commissionTask) {
                       setActiveTab('zurnalai');
-                      setProtocolCommissionTaskTarget(item.commissionTask);
-                      setSignatureInk('');
-                      setWorkerSignPin('');
-                      setCommissionActionError('');
+                      requestProtocolCommissionSign([item.commissionTask]);
                     } else if (userRole === 'vadovas' && item.dssOrganizationRequest) {
                       setActiveTab('imone');
                     } else if (userRole === 'vadovas' && item.employee && item.resource && item.commissionMember) {
@@ -5341,17 +5426,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </div>}
           {protocolCommissionTaskTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-protocol-title">
             <form onSubmit={signProtocolCommissionTask} className="my-auto max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
-              <div className="flex items-start justify-between gap-4"><div><h2 id="commission-protocol-title" className="text-xl font-bold">Komisijos protokolo parašas</h2><p className="mt-1 text-sm text-slate-600">{protocolCommissionTaskTarget.resourceTitle} · protokolas Nr. {protocolCommissionTaskTarget.batchNumber}</p></div><button type="button" aria-label="Uždaryti pasirašymo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolCommissionTaskTarget(null)}><X size={20} /></button></div>
-              <p className="mt-3 text-sm text-slate-700">Jūsų parašas bus įrašytas vieną kartą visam protokolui jūsų, kaip {protocolCommissionTaskTarget.role.toLocaleLowerCase('lt')}, vardu.</p>
-              {protocolCommissionTaskTarget.employeeNames?.length > 0 && <p className="mt-2 text-sm text-slate-600">Darbuotojai: {protocolCommissionTaskTarget.employeeNames.join(', ')}</p>}
-              {(() => {
-                const resource = data.resources.find((item) => item.id === protocolCommissionTaskTarget.resourceId);
-                return resource && <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 underline" onClick={() => openResourcePreview(resource, { protocolBatchId: protocolCommissionTaskTarget.batchId, commissionAssignments: protocolCommissionTaskTarget.commissionAssignments, protocolCommissionSignatures: protocolCommissionTaskTarget.protocolCommissionSignatures })}><Eye size={16} />Peržiūrėti visą protokolą</button>;
-              })()}
+              <div className="flex items-start justify-between gap-4"><div><h2 id="commission-protocol-title" className="text-xl font-bold">Komisijos protokolo parašas</h2><p className="mt-1 text-sm text-slate-600">{protocolCommissionTaskTarget.resourceTitle} · protokolas Nr. {protocolCommissionTaskTarget.batchNumber}</p></div><button type="button" aria-label="Uždaryti pasirašymo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { setProtocolCommissionTaskTarget(null); setProtocolCommissionSigningTasks([]); setCommissionReviewConfirmed(false); }}><X size={20} /></button></div>
+              <p className="mt-3 text-sm text-slate-700">Jūsų parašas bus įrašytas {protocolCommissionSigningTasks.length > 1 ? `${protocolCommissionSigningTasks.length} protokolams` : 'protokolui'} jūsų, kaip {protocolCommissionTaskTarget.role.toLocaleLowerCase('lt')}, vardu.</p>
+              <div className="mt-2 space-y-2 text-sm text-slate-600">{protocolCommissionSigningTasks.map((task) => {
+                const resource = data.resources.find((item) => item.id === task.resourceId);
+                return <div key={commissionProtocolTaskId(task)} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
+                  <p>{task.resourceTitle} · protokolas Nr. {task.batchNumber}{task.employeeNames?.length ? ` · Darbuotojai: ${task.employeeNames.join(', ')}` : ''}</p>
+                  {resource && <button type="button" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} />Peržiūrėti</button>}
+                </div>;
+              })}</div>
               <label className="mt-4 block text-sm font-medium">Protokolo parašas</label><SignaturePad value={signatureInk} onChange={setSignatureInk} />
               <label className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium"><span>Paskyros PIN (jau sukurtas registruojantis)</span><input className={`${inputClass} mt-0 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+              <label className="mt-4 flex items-start gap-2 text-sm text-slate-700"><input className="mt-0.5" type="checkbox" checked={commissionReviewConfirmed} onChange={(event) => setCommissionReviewConfirmed(event.target.checked)} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus protokolus.</span></label>
               {commissionActionError && <p role="alert" className="mt-3 text-sm text-rose-700">{commissionActionError}</p>}
-              <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => setProtocolCommissionTaskTarget(null)}>Atšaukti</button><button className={buttonClass} disabled={commissionActionSubmitting || !signatureInk || !/^\d{4}$/.test(workerSignPin)}>{commissionActionSubmitting ? 'Išsaugoma…' : 'Pasirašyti protokolą'} <FileSignature size={16} /></button></div>
+              <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={commissionActionSubmitting} onClick={() => { setProtocolCommissionTaskTarget(null); setProtocolCommissionSigningTasks([]); setCommissionReviewConfirmed(false); }}>Atšaukti</button><button className={buttonClass} disabled={commissionActionSubmitting || !signatureInk || !/^\d{4}$/.test(workerSignPin) || !commissionReviewConfirmed}>{commissionActionSubmitting ? 'Išsaugoma…' : `Pasirašyti protokol${protocolCommissionSigningTasks.length === 1 ? 'ą' : 'us'} (${protocolCommissionSigningTasks.length})`} <FileSignature size={16} /></button></div>
             </form>
           </div>}
 
@@ -5372,7 +5460,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     const resource = data.resources.find((item) => item.id === task.resourceId);
                     return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
                       <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
-                      <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti protokolą</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                      <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti protokolą</button><button type="button" className={buttonClass} onClick={() => requestProtocolCommissionSign([task])}><FileSignature size={15} />Pasirašyti</button></div>
                     </div>;
                   })}
                   {completedCommissionTasks.map((task) => {
@@ -5640,7 +5728,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <span>{person.name}<small className="block text-slate-500">{person.email}</small></span>
                     {userRole === 'vadovas' && cloudMode && <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                       <input type="checkbox" checked={management?.canManageWorkspace === true} disabled={dssManagementOrganizationId !== currentOrg?.id || dssManagementSavingId === person.id} onChange={(event) => setDssManagementPermission(person.id, event.target.checked)} />
-                      Gali tvarkyti įmonės darbo sritį
+                      Gali tvarkyti įmonės darbo sritį ir kviesti darbuotojus
                     </label>}
                     {userRole === 'vadovas' && cloudMode && <button type="button" className="shrink-0 rounded-md border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssRevokeSubmittingId === person.id} onClick={() => revokeDssSpecialist(person)}>{dssRevokeSubmittingId === person.id ? 'Šalinama…' : 'Pašalinti'}</button>}
                   </div>;
@@ -5653,7 +5741,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </div>)}
                 {userRole === 'vadovas' && (data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
                 {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
-                {userRole === 'vadovas' && cloudMode && <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={inviteDssCanManageWorkspace} onChange={(event) => setInviteDssCanManageWorkspace(event.target.checked)} /><span>Gali tvarkyti įmonės darbo sritį<small className="mt-0.5 block font-normal text-slate-500">Pažymėta pagal nutylėjimą. Teisę vėliau galėsite pakeisti prie priskirto DSS specialisto.</small></span></label>}
+                {userRole === 'vadovas' && cloudMode && <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={inviteDssCanManageWorkspace} onChange={(event) => setInviteDssCanManageWorkspace(event.target.checked)} /><span>Gali tvarkyti įmonės darbo sritį ir kviesti darbuotojus<small className="mt-0.5 block font-normal text-slate-500">Pažymėta pagal nutylėjimą. Teisę vėliau galėsite pakeisti prie priskirto DSS specialisto.</small></span></label>}
                 {userRole === 'vadovas' && <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
                 </label>}
@@ -5822,14 +5910,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="space-y-3">{pendingCommissionInvitations.map((invitation) => <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4"><div><p className="font-semibold">{invitation.organizationName}</p><p className="mt-1 text-sm text-slate-600">{invitation.role}</p></div><button type="button" className={buttonClass} onClick={() => { setCommissionInvitationTarget(invitation); setCommissionConsentChecked(false); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={16} />Peržiūrėti kvietimą</button></div>)}</div>
             </Panel>}
             {(pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos protokolai">
+              {pendingCommissionTasks.length > 0 && commissionTaskSelectionControls}
               <div className="space-y-3">
-                {pendingCommissionTasks.map((task) => {
+                {paginatedPendingCommissionTasks.map((task) => {
                   const resource = data.resources.find((item) => item.id === task.resourceId);
-                  return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
-                    <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                  const taskId = commissionProtocolTaskId(task);
+                  return <div key={taskId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-2"><input className="mt-1" type="checkbox" aria-label={`Pasirinkti protokolą Nr. ${task.batchNumber}`} checked={selectedCommissionTaskIds.includes(taskId)} onChange={(event) => setSelectedCommissionTaskIds((current) => event.target.checked ? [...new Set([...current, taskId])] : current.filter((id) => id !== taskId))} /><div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div></div>
+                    <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestProtocolCommissionSign([task])}><FileSignature size={15} />Pasirašyti</button></div>
                   </div>;
                 })}
+                {commissionTaskPagination}
                 {completedCommissionTasks.map((task) => {
                   const resource = data.resources.find((item) => item.id === task.resourceId);
                   return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
@@ -5885,19 +5976,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {currentDssTasks.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentDssTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentDssTaskPage * dssTaskPageSize, currentDssTasks.length)} iš {currentDssTasks.length} · pasirinkta {selectedCurrentDssTasks.length}</p><nav className="flex items-center gap-2" aria-label="DSS pasirašytinų dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage <= 1} onClick={() => setDssTaskPage(Math.max(1, currentDssTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentDssTaskPage} / {dssTaskPageCount}</span><button type="button" aria-label="Kitas pasirašytinų dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentDssTaskPage >= dssTaskPageCount} onClick={() => setDssTaskPage(Math.min(dssTaskPageCount, currentDssTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
           </Panel>
           {(pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos protokolai">
+            {pendingCommissionTasks.length > 0 && commissionTaskSelectionControls}
             <div className="space-y-3">
-              {pendingCommissionTasks.map((task) => {
+              {paginatedPendingCommissionTasks.map((task) => {
                 const resource = data.resources.find((item) => item.id === task.resourceId);
-                return <div key={`${task.assignmentId}-${task.batchId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div>
-                  <div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => { setProtocolCommissionTaskTarget(task); setSignatureInk(''); setWorkerSignPin(''); setCommissionActionError(''); }}><FileSignature size={15} />Pasirašyti</button></div>
+                const taskId = commissionProtocolTaskId(task);
+                return <div key={taskId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-2"><input className="mt-1" type="checkbox" aria-label={`Pasirinkti protokolą Nr. ${task.batchNumber}`} checked={selectedCommissionTaskIds.includes(taskId)} onChange={(event) => setSelectedCommissionTaskIds((current) => event.target.checked ? [...new Set([...current, taskId])] : current.filter((id) => id !== taskId))} /><div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-slate-600">{task.role} · protokolas Nr. {task.batchNumber} · {task.protocolDate || 'data nenurodyta'}</p></div></div>
+                  <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => resource && openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestProtocolCommissionSign([task])}><FileSignature size={15} />Pasirašyti</button></div>
                 </div>;
               })}
+              {commissionTaskPagination}
               {completedCommissionTasks.map((task) => {
                 const resource = data.resources.find((item) => item.id === task.resourceId);
                 return <div key={`${task.assignmentId}-${task.batchId}-signed`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                   <div><p className="font-semibold">{task.resourceTitle}</p><p className="mt-1 text-sm text-emerald-800">Protokolas Nr. {task.batchNumber} · pasirašyta kaip {task.role}</p></div>
-                  {resource && <button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-900" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={15} />Peržiūrėti pasirašytą protokolą</button>}
+                  {resource && <button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100" onClick={() => openResourcePreview(resource, { protocolBatchId: task.batchId, commissionAssignments: task.commissionAssignments, protocolCommissionSignatures: task.protocolCommissionSignatures })}><Eye size={14} className="shrink-0" />Peržiūrėti pasirašytą protokolą</button>}
                 </div>;
               })}
             </div>
@@ -6176,7 +6270,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
       {protocolSource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={saveCompanyProtocol} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{currentOrg?.name}</p><h2 className="mt-1 text-xl font-bold">Naujas protokolas</h2><p className="mt-1 text-sm text-slate-500">Ruošinys: {protocolSource.title}</p></div><button type="button" aria-label="Uždaryti" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setProtocolSource(null)}><X size={20} /></button></div><label className="block text-sm font-medium">Protokolo pavadinimas<input autoFocus required className={`${inputClass} mt-1`} value={protocolTitle} onChange={(event) => setProtocolTitle(event.target.value)} placeholder="Pvz., Gaisrinės saugos žinių patikrinimo protokolas" /></label><label className="mt-4 block text-sm font-medium">Susietas testas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedTestId} onChange={(event) => setProtocolRelatedTestId(event.target.value)}><option value="">Nesieti su testu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Testas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><label className="mt-4 block text-sm font-medium">Susietas žurnalas (nebūtina)<select className={`${inputClass} mt-1`} value={protocolRelatedJournalId} onChange={(event) => setProtocolRelatedJournalId(event.target.value)}><option value="">Nesieti su žurnalu</option>{data.resources.filter((resource) => currentOrg?.resources.includes(resource.id) && normalizeResourceType(resource) === 'Žurnalas').map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label><p className="mt-2 text-xs text-slate-500">Išsaugojus protokolas bus priskirtas įmonei. Susiejimą galite praleisti.</p><div className="mt-6 flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => { setProtocolSource(null); setProtocolRelatedTestId(''); setProtocolRelatedJournalId(''); }}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti protokolą</button></div></form></div>}
 
-      {previewResource && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}{previewResource.previewPageCount > 1 && <nav className="mb-3 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Dokumento puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex === 0} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.max(0, current.previewPageIndex - 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Ankstesnis</button><span>Puslapis {previewResource.previewPageIndex + 1} iš {previewResource.previewPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex >= previewResource.previewPageCount - 1} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.min(current.previewPageCount - 1, current.previewPageIndex + 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Kitas</button></nav>}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.previewHtml ?? previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
+      {previewResource && <div className={`fixed inset-0 ${protocolCommissionTaskTarget ? 'z-[90]' : 'z-50'} grid place-items-center bg-slate-950/60 p-4`}><section className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl bg-white p-5"><div className="mb-4 flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{previewResource.type} · {previewResource.category}</p><h2 className="text-xl font-bold">{previewResource.title}</h2></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => printPdfHtml(previewResource.printHtml, previewResource.title).catch((error) => setNotice(`PDF paruošti nepavyko: ${error.message}`))}><Download size={16} />Atsisiųsti PDF</button><button type="button" aria-label="Uždaryti peržiūrą" onClick={() => setPreviewResource(null)}><X /></button></div></div>{previewResource.image && <img src={previewResource.image} alt="" className="mb-4 max-h-56 w-full rounded-lg object-cover" />}{previewResource.previewPageCount > 1 && <nav className="mb-3 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm" aria-label="Dokumento puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex === 0} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.max(0, current.previewPageIndex - 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Ankstesnis</button><span>Puslapis {previewResource.previewPageIndex + 1} iš {previewResource.previewPageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40" disabled={previewResource.previewPageIndex >= previewResource.previewPageCount - 1} onClick={() => setPreviewResource((current) => { const previewPageIndex = Math.min(current.previewPageCount - 1, current.previewPageIndex + 1); return { ...current, previewPageIndex, previewHtml: getRecordPreviewPage(current.printHtml, previewPageIndex).html }; })}>Kitas</button></nav>}<iframe ref={previewFrameRef} title={previewResource.title} sandbox="allow-modals" srcDoc={previewResource.previewHtml ?? previewResource.printHtml} className={previewResource.id === 'res-aap' ? 'h-[75vh] w-full rounded-lg border border-slate-200 bg-white' : 'h-64 w-full rounded-lg border border-slate-200'} />{userRole === 'darbuotojas' && (previewResource.type === 'Testas' ? <div className="mt-4 space-y-3">{previewResource.questions?.length ? <TestForm questions={previewResource.questions} answers={quizAnswers} setAnswers={setQuizAnswers} onSubmit={submitQuiz} /> : <p className="text-sm text-amber-800">Šiam testui dar nesukonfigūruoti klausimai.</p>}{quizResult?.resourceId === previewResource.id && <p className={`text-sm font-semibold ${quizResult.passed ? 'text-emerald-800' : 'text-rose-700'}`}>{quizResult.passed ? `Testas išlaikytas: ${quizResult.score}%.` : `Nepakanka teisingų atsakymų: ${quizResult.score}%. Bandykite dar kartą.`}</p>}{quizResult?.resourceId === previewResource.id && quizResult.passed && <button className={buttonClass} onClick={() => { requestWorkerSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Patvirtinti PIN parašu</button>}</div> : <div className="mt-4 space-y-3"><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} />Susipažinau su dokumento turiniu ir patvirtinu jį savo PIN kodu.</label><button disabled={!readConfirmed} className={buttonClass} onClick={() => { completeReadThenSign(currentEmployee, previewResource); setPreviewResource(null); }}><FileSignature size={15} />Pereiti prie PIN parašo</button></div>)}</section></div>}
       <dialog id="aap-issuance-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60" onClose={() => { setAapIssueEmployeeId(null); setAapIssueSelectedItemIds([]); }}>
         {aapIssueEmployee && <form onSubmit={createAapIssuance} className="space-y-5">
           <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Naujas AAP išdavimas</h2><p className="mt-1 text-sm text-slate-500">{aapIssueEmployee.name} · ankstesni pasirašyti įrašai nekeičiami.</p></div><button type="button" aria-label="Uždaryti AAP išdavimo formą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => document.getElementById('aap-issuance-dialog')?.close()}><X size={20} /></button></div>
