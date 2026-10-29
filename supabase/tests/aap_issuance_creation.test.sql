@@ -48,6 +48,10 @@ select lives_ok(
   'manager can create a second AAP issuance for the same employee'
 );
 
+update public.organization_data
+set data = data - 'aapIssuances'
+where organization_id = '95000000-0000-4000-8000-000000000010';
+
 select is(
   (
     select count(*)::integer
