@@ -2029,6 +2029,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     .filter((issuance) => issuance.employeeId === currentEmployee?.id)
     .slice()
     .sort((left, right) => {
+      const leftPending = left.status !== 'signed';
+      const rightPending = right.status !== 'signed';
+      if (leftPending !== rightPending) return leftPending ? -1 : 1;
       const leftDate = new Date(left.signedAt || left.issuedAt).getTime();
       const rightDate = new Date(right.signedAt || right.issuedAt).getTime();
       return rightDate - leftDate;
