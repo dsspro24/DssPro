@@ -750,7 +750,7 @@ const assistantCreatedResourceIds = new Set(initialData.resources
 
 const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadovas: 'Įmonės vadovas', kurejas: 'Turinio kūrėjas' };
 const roleNavigation = {
-  darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP dydžiai', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
+  darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
@@ -1049,6 +1049,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [creatorAccountPage, setCreatorAccountPage] = useState(1);
   const [employeeSort, setEmployeeSort] = useState({ key: 'resource-type:Kortelė', direction: 'asc' });
   const [employeePage, setEmployeePage] = useState(1);
+  const [aapIssuancePage, setAapIssuancePage] = useState(1);
   const [employeeDetailsId, setEmployeeDetailsId] = useState(null);
   const [aapIssueEmployeeId, setAapIssueEmployeeId] = useState(null);
   const [aapIssueSelectedItemIds, setAapIssueSelectedItemIds] = useState([]);
@@ -2023,6 +2024,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }), [managerDashboardEmployees, employeeSearch, activeEmployeePositionFilter]);
   const employeePageCount = Math.max(1, Math.ceil(filteredOrgEmployees.length / employeePageSize));
   const currentEmployeePage = Math.min(employeePage, employeePageCount);
+  const aapIssuancePageSize = 5;
+  const employeeAapIssuances = (data.aapIssuances ?? [])
+    .filter((issuance) => issuance.employeeId === currentEmployee?.id)
+    .slice()
+    .sort((left, right) => new Date(right.issuedAt).getTime() - new Date(left.issuedAt).getTime());
+  const aapIssuancePageCount = Math.max(1, Math.ceil(employeeAapIssuances.length / aapIssuancePageSize));
+  const currentAapIssuancePage = Math.min(aapIssuancePage, aapIssuancePageCount);
+  const paginatedAapIssuances = employeeAapIssuances.slice(
+    (currentAapIssuancePage - 1) * aapIssuancePageSize,
+    currentAapIssuancePage * aapIssuancePageSize,
+  );
   const creatorMembershipsByOrg = useMemo(() => {
     const membershipsByOrg = new Map();
     for (const account of creatorAccounts) {
@@ -5748,10 +5760,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'aap' && userRole === 'darbuotojas' && <section className="max-w-3xl space-y-5">
-            <PageTitle title="Mano AAP dydžiai" subtitle="Užpildykite dydžius, reikalingus AAP kortelei; juos galėsite pakeisti vėliau." />
+            <PageTitle title="Mano AAP" subtitle="Užpildykite dydžius, reikalingus AAP kortelei; juos galėsite pakeisti vėliau." />
             <Panel title="AAP gavimų istorija">
-              {(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).length
-                ? <div className="space-y-3">{(data.aapIssuances ?? []).filter((issuance) => issuance.employeeId === currentEmployee?.id).slice().sort((left, right) => right.issuedAt.localeCompare(left.issuedAt)).map((issuance) => <article className="rounded-lg border border-slate-200 p-4" key={issuance.id}>
+              {employeeAapIssuances.length
+                ? <><div className="space-y-3">{paginatedAapIssuances.map((issuance) => <article className="rounded-lg border border-slate-200 p-4" key={issuance.id}>
                   <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Išduota {formatProtocolDate(issuance.issuedAt)}</h2><span className={issuance.status === 'signed' ? 'text-sm font-semibold text-emerald-800' : 'text-sm font-semibold text-amber-800'}>{issuance.status === 'signed' ? 'Patvirtinta' : 'Laukia jūsų patvirtinimo'}</span></div>
                   <ul className="mt-2 list-inside list-disc text-sm text-slate-700">{issuance.items.map((item) => <li key={item.id}>{item.name} · {item.quantity} {item.unit}{item.reason ? ` · ${item.reason}` : ''}{item.validity ? ` · ${item.validity}` : ''}</li>)}</ul>
                   <p className="mt-2 text-xs text-slate-500">Išdavė: {issuance.issuedBy}</p>
@@ -5760,6 +5772,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <SignatureImagePreview signature={issuance} />
                   {issuance.status === 'signed' && <button type="button" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:underline" onClick={() => downloadAapIssuance(issuance)}><Download size={15} />PDF patvirtinimas</button>}
                 </article>)}</div>
+                  {employeeAapIssuances.length > aapIssuancePageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <p className="text-sm text-slate-500">Rodoma {(currentAapIssuancePage - 1) * aapIssuancePageSize + 1}–{Math.min(currentAapIssuancePage * aapIssuancePageSize, employeeAapIssuances.length)} iš {employeeAapIssuances.length}</p>
+                    <nav className="flex items-center gap-2" aria-label="AAP gavimų istorijos puslapiavimas">
+                      <button type="button" aria-label="Ankstesnis AAP istorijos puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentAapIssuancePage <= 1} onClick={() => setAapIssuancePage(Math.max(1, currentAapIssuancePage - 1))}><ChevronLeft size={17} /></button>
+                      <span className="text-sm tabular-nums">{currentAapIssuancePage} / {aapIssuancePageCount}</span>
+                      <button type="button" aria-label="Kitas AAP istorijos puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentAapIssuancePage >= aapIssuancePageCount} onClick={() => setAapIssuancePage(Math.min(aapIssuancePageCount, currentAapIssuancePage + 1))}><ChevronRight size={17} /></button>
+                    </nav>
+                  </div>}
+                </>
                 : <p className="text-sm text-slate-500">Naujų AAP išdavimų dar nėra.</p>}
             </Panel>
             <Panel title="Asmeninės apsaugos priemonės"><div className="grid gap-4 sm:grid-cols-2">{[['shoes', 'Batų dydis'], ['clothes', 'Drabužių dydis'], ['pants', 'Kelnių dydis'], ['jacket', 'Striukės dydis'], ['height', 'Ūgis (cm)'], ['weight', 'Svoris (kg)'], ['helmet', 'Šalmo dydis']].map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={currentEmployee?.sizes[key] ?? ''} onChange={(event) => setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, sizes: { ...employee.sizes, [key]: event.target.value } } : employee) }))} /></label>)}</div><button className={`${buttonClass} mt-5`} onClick={() => { const complete = hasCompleteAapSizes(currentEmployee); if (!complete) { setNotice('Užpildykite batų, drabužių, kelnių ir striukės dydžius.'); return; } setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === currentEmployee.id ? { ...employee, aapCompleted: true, status: employee.pin ? 'Aktyvus' : 'Pakviestas' } : employee) })); setNotice('AAP dydžiai išsaugoti. Dydžius galėsite atnaujinti vėliau.'); setActiveTab('uzduotys'); }}>Išsaugoti dydžius</button></Panel>
