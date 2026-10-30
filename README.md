@@ -21,7 +21,7 @@ Atidarykite Vite parodytą vietinį adresą. Tailwind CSS įkompiliuojamas kartu
 
 Izoliuotame sandbox galima persijungti tarp vienos fiktyvios įmonės vadovo, DSS specialisto ir aštuonių darbuotojų. Darbuotojo ir DSS PIN, parašai bei rodomas IP yra tik demo įrašai, ne teisiškai patvirtinti elektroniniai parašai. Prenumeratos veiksmai nekeičia realių mokėjimų, o kvietimai neišsiunčia el. laiškų.
 
-Viešo demo šablonai kraunami tik iš statinio `public/demo-content.json` failo; sandbox nekeičia ir neskaito Supabase duomenų. Prisijungęs turinio kūrėjas gali bendroje bibliotekoje pažymėti šablonus „Įtraukti į izoliuotą demo“ ir pasirinkti „Eksportuoti demo paketą“. Eksportuotame faile HTML bei nuotraukos įterpiami tiesiogiai, o paskyrų, įmonių ir parašų duomenys neįtraukiami. Prieš publikuodami peržiūrėkite eksportą, tada pakeiskite `public/demo-content.json` jo turiniu ir iš naujo įdiekite svetainę.
+Viešo demo vadovo bibliotekoje rodomi tik statiniame `public/demo-content.json` pakete esantys šablonai; bendrieji pradiniai demo šablonai į sandbox neįtraukiami. Sandbox pakeitimai lieka tik skirtuko React atmintyje ir pradingsta uždarius arba atnaujinus puslapį; demo nekeičia ir neskaito Supabase duomenų. Prisijungęs turinio kūrėjas gali bendroje bibliotekoje pažymėti šablonus „Įtraukti į izoliuotą demo“ ir pasirinkti „Eksportuoti demo paketą“. Eksportuotame faile HTML bei nuotraukos įterpiami tiesiogiai, o paskyrų, įmonių ir parašų duomenys neįtraukiami. Prieš publikuodami peržiūrėkite eksportą, tada pakeiskite `public/demo-content.json` jo turiniu ir iš naujo įdiekite svetainę.
 
 ## Supabase cloud režimas
 

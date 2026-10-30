@@ -780,14 +780,6 @@ const initialData = {
 
 const createSandboxWorkspaceData = (sandboxContent = null) => {
   const organizationId = 'org-demo-sandbox';
-  const defaultSandboxResourceIds = [
-    'res-fire',
-    'res-height',
-    'res-chemical',
-    'res-journal',
-    'res-workplace-dss-journal',
-    'res-aap',
-  ];
   const bundledResources = Array.isArray(sandboxContent?.resources)
     ? sandboxContent.resources.filter((resource) => resource && typeof resource.id === 'string' && typeof resource.title === 'string')
     : [];
@@ -820,12 +812,11 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
       id,
       defaultSettings,
       imageUrl: resource.image || undefined,
-      organizationId,
       ...(resource.relatedTestId ? { relatedTestId: relatedTestId ?? null } : {}),
       ...(resource.relatedJournalId ? { relatedJournalId: relatedJournalId ?? null } : {}),
     };
   });
-  const sandboxResourceIds = [...new Set([...defaultSandboxResourceIds, ...demoResources.map((resource) => resource.id)])];
+  const sandboxResourceIds = [...new Set(demoResources.map((resource) => resource.id))];
   const organizationEmployees = initialData.employees
     .filter((employee) => employee.orgId === 'org-statybu');
   const extraEmployees = [
@@ -853,7 +844,7 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     status: 'Aktyvus',
     pin: '1234',
     resourceIds: sandboxResourceIds,
-    progressByResource: index === 0 ? { 'res-height': 'started', 'res-aap': 'completed' } : {},
+    progressByResource: {},
     testResults: [],
   }));
   const organization = {
@@ -876,10 +867,6 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     email: 'dss@demo.invalid',
     pin: '1234',
   };
-  const employeeIds = new Set(employees.map((employee) => employee.id));
-  const resourcesById = new Map(initialData.resources.map((resource) => [resource.id, resource]));
-  demoResources.forEach((resource) => resourcesById.set(resource.id, resource));
-
   return {
     ...initialData,
     organizations: [organization],
@@ -892,10 +879,8 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     commissionInvitations: [],
     commissionTasks: [],
     specialists: [specialist],
-    resources: [...resourcesById.values()],
-    signatures: initialData.signatures
-      .filter((signature) => signature.orgId === 'org-statybu' && employeeIds.has(signature.employeeId))
-      .map((signature) => ({ ...signature, orgId: organizationId })),
+    resources: demoResources,
+    signatures: [],
     subscriptions: [{ id: 'sub-demo', orgId: organizationId, plan: 'Pro', status: 'Demo', price: 0, endsAt: '' }],
   };
 };
