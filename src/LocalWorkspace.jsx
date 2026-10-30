@@ -831,7 +831,6 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     ...extraEmployees.map((employee, index) => ({
       ...organizationEmployees[index % organizationEmployees.length],
       ...employee,
-      email: `darbuotojas${index + 4}@demo.invalid`,
       contractNumber: `DEMO-00${index + 4}`,
       sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' },
       aapCompleted: false,
@@ -839,7 +838,16 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
   ].map((employee, index) => ({
     ...employee,
     orgId: organizationId,
-    email: index < organizationEmployees.length ? `darbuotojas${index + 1}@demo.invalid` : employee.email,
+    email: [
+      'jonas@dsspro.lt',
+      'petras@dsspro.lt',
+      'rasa.kazlauskiene@dsspro.lt',
+      'ieva.petrauskiene@dsspro.lt',
+      'tomas.vaitkus@dsspro.lt',
+      'aiste.rimkute@dsspro.lt',
+      'darius.jankauskas@dsspro.lt',
+      'lukas.kazlauskas@dsspro.lt',
+    ][index],
     contractNumber: index < organizationEmployees.length ? `DEMO-00${index + 1}` : employee.contractNumber,
     status: 'Aktyvus',
     pin: '1234',
@@ -853,6 +861,7 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     name: 'UAB „Demo sauga“',
     companyCode: '000000000',
     manager: 'Darius Vaitkus',
+    managerEmail: 'darius.vaitkus@dsspro.lt',
     managerPin: '1234',
     dss: ['spec-demo-dss'],
     dssInvitations: [],
@@ -864,7 +873,7 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     ...initialData.specialists[0],
     id: 'spec-demo-dss',
     name: 'Rasa Norkienė',
-    email: 'dss@demo.invalid',
+    email: 'rasa.norkiene@dsspro.lt',
     pin: '1234',
   };
   return {
@@ -6058,7 +6067,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'imone' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Įmonės nustatymai" subtitle="Vadovas, DSS specialistai ir darbuotojų saugos komisija." />
             <div className="grid gap-4 md:grid-cols-2">
-              <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p></Panel>
+              <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p>{sandboxMode && <p className="mt-1 text-sm text-slate-500">{currentOrg?.managerEmail}</p>}</Panel>
               <Panel title="DSS specialistai">
                 {cloudMode && <div className="mb-3 flex justify-end"><button type="button" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={dssRefreshSubmitting} onClick={refreshDssAssignments}>{dssRefreshSubmitting ? 'Atnaujinama…' : 'Atnaujinti sąrašą'}</button></div>}
                 {userRole === 'vadovas' && cloudMode && !creatorReadOnlyPreview && <label className="mb-3 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={currentOrg?.dssRequestsEnabled !== false} disabled={dssRequestVisibilitySaving} onChange={(event) => setDssRequestVisibility(event.target.checked)} /><span>Leisti DSS specialistams rasti šią įmonę ir siųsti priežiūros prašymus<small className="mt-0.5 block font-normal text-slate-500">Išjungus nauji specialistų prašymai nebus priimami. Esami prašymai ir paskirti DSS specialistai nebus pakeisti.</small></span></label>}
