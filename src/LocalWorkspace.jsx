@@ -7669,16 +7669,38 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   }
 
   if (resource.templateKind === 'knowledge-assessment-protocol') {
-    const assignments = (resource.previewCommissionAssignments ?? [])
-      .filter((assignment) => assignment.status === 'accepted')
-      .sort((left, right) => (left.role === 'Komisijos pirmininkas' ? -1 : 1) - (right.role === 'Komisijos pirmininkas' ? -1 : 1));
+    const assignmentsBySigner = new Map();
+    (resource.previewCommissionAssignments ?? [])
+      .filter((assignment) => assignment.status === 'accepted'
+        && (!assignment.batchId || assignment.batchId === resource.protocolBatchId))
+      .sort((left, right) => (left.role === 'Komisijos pirmininkas' ? -1 : 1) - (right.role === 'Komisijos pirmininkas' ? -1 : 1))
+      .forEach((assignment) => {
+        const name = assignment.employeeName?.trim() || 'Komisijos narys';
+        const key = `${assignment.role}:${name.toLocaleLowerCase('lt')}`;
+        const existing = assignmentsBySigner.get(key);
+        assignmentsBySigner.set(key, existing
+          ? { ...existing, ...assignment, employeeName: name }
+          : { ...assignment, employeeName: name });
+      });
+    const assignments = [...assignmentsBySigner.values()];
     const batchSignatures = (resource.previewProtocolCommissionSignatures ?? [])
       .filter((signature) => signature.batchId === resource.protocolBatchId);
     const chair = assignments.find((assignment) => assignment.role === 'Komisijos pirmininkas');
     const members = assignments.filter((assignment) => assignment.role === 'Komisijos narys');
     const historicalSigners = batchSignatures
-      .filter((signature) => !assignments.some((assignment) => assignment.id === signature.assignmentId))
-      .map((signature) => ({ id: signature.assignmentId, employeeName: signature.signer, role: signature.role }));
+      .filter((signature) => !assignments.some((assignment) =>
+        assignment.id === signature.assignmentId
+        || assignment.userId && assignment.userId === (signature.userId ?? signature.signerUserId)
+        || assignment.employeeId && assignment.employeeId === signature.employeeId
+        || assignment.role === signature.role
+          && assignment.employeeName?.trim().toLocaleLowerCase('lt') === signature.signer?.trim().toLocaleLowerCase('lt')))
+      .map((signature) => ({
+        id: signature.assignmentId,
+        userId: signature.userId ?? signature.signerUserId,
+        employeeId: signature.employeeId,
+        employeeName: signature.signer,
+        role: signature.role,
+      }));
     const chairSigners = [...(chair ? [chair] : []), ...historicalSigners.filter((signer) => signer.role === 'Komisijos pirmininkas')];
     const memberSigners = [...members, ...historicalSigners.filter((signer) => signer.role === 'Komisijos narys')];
     const commissionLines = parsed.querySelectorAll('.commission-row .line');
@@ -7702,7 +7724,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       if (!content) return;
       content.replaceChildren();
       signers.forEach((assignment) => {
-        const signature = batchSignatures.find((item) => item.assignmentId === assignment.id);
+        const signature = batchSignatures.find((item) =>
+          assignment.id && item.assignmentId === assignment.id
+          || assignment.userId && assignment.userId === (item.userId ?? item.signerUserId)
+          || assignment.employeeId && assignment.employeeId === item.employeeId
+          || item.role === assignment.role
+            && assignment.employeeName?.trim().toLocaleLowerCase('lt') === item.signer?.trim().toLocaleLowerCase('lt'));
         const pair = parsed.createElement('div');
         pair.className = 'commission-signature-proof';
         const name = parsed.createElement('strong');
@@ -7714,7 +7741,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           image.alt = `${assignment.employeeName || 'Komisijos narys'} parašas`;
           image.className = 'signature-image';
           pair.append(image);
-        } else {
+        } else if (!signature?.signedAt) {
           const pending = parsed.createElement('span');
           pending.textContent = 'Laukia parašo';
           pair.append(pending);
