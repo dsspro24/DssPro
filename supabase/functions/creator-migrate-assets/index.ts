@@ -5,6 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Origin': '*',
 };
+const maxSignatureBytes = 10 * 1024;
 
 const response = (status: number, body: Record<string, unknown>) => new Response(JSON.stringify(body), {
   status,
@@ -50,11 +51,15 @@ async function migrateSignatureImages(
     }
     const signature = { ...(rawSignature as Record<string, unknown>) };
     const dataUrl = typeof signature.signatureImage === 'string' ? signature.signatureImage : '';
-    if (dataUrl.startsWith('data:image/png;base64,')) {
+    if (dataUrl.startsWith('data:image/png;base64,') || dataUrl.startsWith('data:image/svg+xml;base64,')) {
       const { contentType, bytes } = asBase64Bytes(dataUrl);
+      if (bytes.byteLength > maxSignatureBytes) {
+        throw new Error('Signature image exceeds the 10 KB limit');
+      }
       const signatureId = String(signature.id ?? crypto.randomUUID());
       const safeFileId = signatureId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const path = `${organizationId}/${safeFileId}.png`;
+      const extension = contentType === 'image/svg+xml' ? 'svg' : 'png';
+      const path = `${organizationId}/${safeFileId}.${extension}`;
       await client.storage.from('signature-assets').upload(path, bytes, {
         contentType,
         cacheControl: '31536000',

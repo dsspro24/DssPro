@@ -47,6 +47,8 @@ Turinio kūrėjas bibliotekos šablonus gali pažymėti kaip numatytuosius įmon
 
 Cloud parašų istorija kraunama iš normalizuotos `document_signatures` lentelės puslapiais po 25 įrašus. Ekrane pirmiausia rodomi parašo metaduomenys, o saugyklos URL ir vaizdas įkeliami tik paspaudus „Peržiūrėti parašą“. Darbo eigos būsenos ir kitos funkcijos kol kas tebenaudoja darbo srities `signatures` metaduomenis.
 
+Nauji parašai saugomi kaip raiškai nepriklausomi SVG failai, kurių dydis ribojamas iki 10 KB; įmonės darbo srities JSON saugomas tik parašo metaduomenų ir failo kelias, o ne vaizdo turinys. „Supabase Storage“ migracija leidžia SVG ir palieka esamus PNG parašus suderinamus.
+
 `organization_data` JSON darbo sritis paliekama dabartiniams nustatymams ir suderinamumui su dar neperkeltomis funkcijomis. Didesnės istorijos ir sąrašai gali būti palaipsniui perkeliami į normalizuotas lenteles atskirais, suderinamais žingsniais; vienu pakeitimu visos darbo srities schema nekeičiama. Šiuo metu parašų istorijos skaitymas jau naudoja normalizuotą lentelę, tačiau kitos parašų darbo eigos dalys dar remiasi JSON metaduomenimis.
 
 Vadovo ir DSS specialisto darbo sričių įkėlimas bendrų šablonų nebeskaito iš kiekvienos įmonės `organization_data.resources` JSON kopijos: bendri šablonai imami iš katalogo, o įmonės dokumentai iš `organization_documents`. Likę darbo srities duomenys ir jų autosave dar palaiko esamą JSON formatą; šis suderinamumo sluoksnis bus šalinamas atskirais etapais. Esamoje nuotolinėje DB `resources` laukas sudarė apie 38 KB vienai darbo sričiai, todėl pirmas etapas pašalina šį dubliuotą lauką iš vadovo ir DSS darbo sričių įkėlimo atsako.

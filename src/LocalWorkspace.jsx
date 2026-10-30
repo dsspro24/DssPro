@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
-import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureDataUrl } from './lib/storageAssets.js';
+import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
@@ -2565,7 +2565,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     let uploadedSignature = null;
     let taskRefreshError = '';
     try {
-      if (cloudMode && accept) uploadedSignature = await uploadSignatureDataUrl(invitation.organizationId, signatureInk);
+      if (cloudMode && accept) uploadedSignature = await uploadSignatureSvg(invitation.organizationId, signatureInk);
       if (cloudMode) {
         const accountCommissionInvitation = Boolean(invitation.userId);
         const responseResult = accountCommissionInvitation
@@ -2690,7 +2690,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     try {
       for (const { task, assignmentId } of tasksWithAssignments) {
         if (cloudMode) {
-          uploadedSignature = await uploadSignatureDataUrl(task.organizationId, signatureInk);
+          uploadedSignature = await uploadSignatureSvg(task.organizationId, signatureInk);
           const { data: signature, error } = await supabase.rpc(task.userId
             ? 'record_account_commission_protocol_signature'
             : 'record_employee_protocol_commission_signature', {
@@ -2864,7 +2864,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setAapIssueSignSubmitting(true);
     try {
       if (cloudMode) {
-        const uploadedSignature = await uploadSignatureDataUrl(issuance.orgId, signatureInk);
+        const uploadedSignature = await uploadSignatureSvg(issuance.orgId, signatureInk);
         try {
           const { data: signedIssuance, error } = await supabase.rpc('record_employee_aap_issuance_signature', {
             input_issuance_id: issuance.id,
@@ -3145,7 +3145,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       let uploadedSignature;
       try {
-        uploadedSignature = await uploadSignatureDataUrl(employee.orgId, signatureInk);
+        uploadedSignature = await uploadSignatureSvg(employee.orgId, signatureInk);
       } catch (error) {
         setWorkerSignError(`Parašo įkelti nepavyko: ${error.message}`);
         return;
@@ -4510,7 +4510,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         for (const [index, task] of tasksToSign.entries()) {
           let uploadedSignature;
           try {
-            uploadedSignature = await uploadSignatureDataUrl(task.orgId, signatureInk);
+            uploadedSignature = await uploadSignatureSvg(task.orgId, signatureInk);
           } catch (error) {
             if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
             setDssSigningError(`Parašo įkelti nepavyko: ${error.message}`);
@@ -4611,7 +4611,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         for (const [index, task] of tasksToSign.entries()) {
           let uploadedSignature;
           try {
-            uploadedSignature = await uploadSignatureDataUrl(task.orgId, signatureInk);
+            uploadedSignature = await uploadSignatureSvg(task.orgId, signatureInk);
           } catch (error) {
             if (signatures.length) setData((current) => ({ ...current, signatures: [...current.signatures, ...signatures] }));
             setManagerSigningError(`Parašo įkelti nepavyko: ${error.message}`);
@@ -4748,7 +4748,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (cloudMode) {
       let uploadedSignature;
       try {
-        uploadedSignature = await uploadSignatureDataUrl(org.id, signatureInk);
+        uploadedSignature = await uploadSignatureSvg(org.id, signatureInk);
       } catch (error) {
         setEmployerSignError(`Parašo įkelti nepavyko: ${error.message}`);
         return;
@@ -4853,7 +4853,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (cloudMode) {
       let uploadedSignature;
       try {
-        uploadedSignature = await uploadSignatureDataUrl(org.id, signatureInk);
+        uploadedSignature = await uploadSignatureSvg(org.id, signatureInk);
       } catch (error) {
         setCommissionSignError(`Parašo įkelti nepavyko: ${error.message}`);
         return;

@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js';
 
 const signatureBucket = 'signature-assets';
+const maxSignatureBytes = 10 * 1024;
 
 export async function uploadCreatorAsset(file) {
   if (!supabase) throw new Error('Supabase nėra sukonfigūruotas.');
@@ -15,15 +16,18 @@ export async function uploadCreatorAsset(file) {
   return { path, publicUrl: supabase.storage.from('dsspro-assets').getPublicUrl(path).data.publicUrl };
 }
 
-export async function uploadSignatureDataUrl(organizationId, dataUrl) {
+export async function uploadSignatureSvg(organizationId, dataUrl) {
   if (!supabase) throw new Error('Supabase nėra sukonfigūruotas.');
-  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) {
-    throw new Error('Parašo vaizdo formatas neteisingas.');
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/svg+xml;base64,')) {
+    throw new Error('Parašo SVG formatas neteisingas.');
   }
   const blob = await (await fetch(dataUrl)).blob();
-  const path = `${organizationId}/${crypto.randomUUID()}.png`;
+  if (blob.size > maxSignatureBytes) {
+    throw new Error('Parašas viršija didžiausią 10 KB dydį.');
+  }
+  const path = `${organizationId}/${crypto.randomUUID()}.svg`;
   const { error: uploadError } = await supabase.storage.from(signatureBucket).upload(path, blob, {
-    contentType: 'image/png',
+    contentType: 'image/svg+xml',
     cacheControl: '31536000',
     upsert: false,
   });

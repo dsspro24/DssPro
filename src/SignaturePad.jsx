@@ -1,11 +1,67 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eraser } from 'lucide-react';
 
+const MAX_SAVED_POINTS = 180;
+const MAX_SIGNATURE_BYTES = 10 * 1024;
+
+const pointCount = (strokes) => strokes.reduce((count, stroke) => count + stroke.length, 0);
+
+const compactStrokes = (strokes) => {
+  while (pointCount(strokes) > MAX_SAVED_POINTS) {
+    let simplified = false;
+    for (const stroke of strokes) {
+      if (stroke.length > 2) {
+        const lastPoint = stroke[stroke.length - 1];
+        stroke.splice(1, stroke.length - 2, ...stroke.slice(1, -1).filter((_, index) => index % 2 === 1));
+        if (stroke.at(-1) !== lastPoint) stroke.push(lastPoint);
+        simplified = true;
+      }
+    }
+    if (!simplified) {
+      const shortestStrokeIndex = strokes.reduce((shortest, stroke, index) => (
+        stroke.length < strokes[shortest].length ? index : shortest
+      ), 0);
+      strokes.splice(shortestStrokeIndex, 1);
+    }
+  }
+};
+
+const formatPoint = ({ x, y }) => `${x.toFixed(1)} ${y.toFixed(1)}`;
+
+const createSignatureDataUrl = (strokes, width, height) => {
+  const path = strokes.map((stroke) => {
+    if (stroke.length === 1) {
+      const point = formatPoint(stroke[0]);
+      return `M${point}l.1 .1`;
+    }
+    let pathData = `M${formatPoint(stroke[0])}`;
+    for (let index = 1; index < stroke.length - 1; index += 1) {
+      const current = stroke[index];
+      const next = stroke[index + 1];
+      const midpoint = {
+        x: (current.x + next.x) / 2,
+        y: (current.y + next.y) / 2,
+      };
+      pathData += `Q${formatPoint(current)} ${formatPoint(midpoint)}`;
+    }
+    pathData += `L${formatPoint(stroke.at(-1))}`;
+    return pathData;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path d="${path}" fill="none" stroke="#111827" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
+  if (dataUrl.length > MAX_SIGNATURE_BYTES) {
+    throw new Error('Parašas per didelis. Pabandykite pasirašyti dar kartą.');
+  }
+  return dataUrl;
+};
+
 export default function SignaturePad({ value, onChange }) {
+  const [signatureError, setSignatureError] = useState('');
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
   const valueRef = useRef(value);
-  const lastRenderedValueRef = useRef(null);
+  const strokesRef = useRef([]);
+  const signatureSizeRef = useRef(null);
   const dimensionsRef = useRef({ width: 0, height: 0 });
   const renderTokenRef = useRef(0);
 
@@ -13,25 +69,17 @@ export default function SignaturePad({ value, onChange }) {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
-    const context = canvas.getContext('2d');
-    const drawImage = (dataUrl, width, height) => {
-      const renderToken = ++renderTokenRef.current;
-      if (!dataUrl) return;
-      const image = new Image();
-      image.onload = () => {
-        if (renderToken !== renderTokenRef.current || !canvasRef.current) return;
-        context.drawImage(image, 0, 0, width, height);
-      };
-      image.src = dataUrl;
-    };
-    const resize = () => {
+    const render = () => {
       const bounds = canvas.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
-      if (dimensionsRef.current.width === bounds.width && dimensionsRef.current.height === bounds.height) return;
-      const previousImage = dimensionsRef.current.width ? canvas.toDataURL('image/png') : valueRef.current;
+      const sizeChanged = dimensionsRef.current.width !== bounds.width
+        || dimensionsRef.current.height !== bounds.height;
+      if (!sizeChanged) return;
+
       const pixelRatio = window.devicePixelRatio || 1;
       canvas.width = Math.round(bounds.width * pixelRatio);
       canvas.height = Math.round(bounds.height * pixelRatio);
+      const context = canvas.getContext('2d');
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       context.clearRect(0, 0, bounds.width, bounds.height);
       context.strokeStyle = '#111827';
@@ -39,51 +87,81 @@ export default function SignaturePad({ value, onChange }) {
       context.lineCap = 'round';
       context.lineJoin = 'round';
       dimensionsRef.current = { width: bounds.width, height: bounds.height };
-      lastRenderedValueRef.current = previousImage;
-      drawImage(previousImage, bounds.width, bounds.height);
+
+      if (strokesRef.current.length && signatureSizeRef.current) {
+        const signatureSize = signatureSizeRef.current;
+        context.scale(bounds.width / signatureSize.width, bounds.height / signatureSize.height);
+        for (const stroke of strokesRef.current) {
+          if (!stroke.length) continue;
+          context.beginPath();
+          context.moveTo(stroke[0].x, stroke[0].y);
+          for (const point of stroke.slice(1)) context.lineTo(point.x, point.y);
+          if (stroke.length === 1) context.lineTo(stroke[0].x + 0.1, stroke[0].y + 0.1);
+          context.stroke();
+        }
+        return;
+      }
+
+      const dataUrl = valueRef.current;
+      if (!dataUrl) return;
+      const renderToken = ++renderTokenRef.current;
+      const image = new Image();
+      image.onload = () => {
+        if (renderToken !== renderTokenRef.current || !canvasRef.current) return;
+        context.drawImage(image, 0, 0, bounds.width, bounds.height);
+      };
+      image.src = dataUrl;
     };
 
-    const observer = new ResizeObserver(resize);
+    const observer = new ResizeObserver(render);
     observer.observe(canvas);
-    resize();
+    render();
     return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
     valueRef.current = value;
-    if (value === lastRenderedValueRef.current) return;
+    if (strokesRef.current.length || !canvasRef.current) return;
+
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
     const { width, height } = dimensionsRef.current;
+    if (!width || !height) return;
+    const context = canvas.getContext('2d');
     context.clearRect(0, 0, width, height);
-    if (!value) {
-      lastRenderedValueRef.current = '';
-      renderTokenRef.current += 1;
-      return;
-    }
-    const renderToken = ++renderTokenRef.current;
+    renderTokenRef.current += 1;
+    if (!value) return;
+
+    const renderToken = renderTokenRef.current;
     const image = new Image();
     image.onload = () => {
       if (renderToken !== renderTokenRef.current || !canvasRef.current) return;
       context.drawImage(image, 0, 0, width, height);
-      lastRenderedValueRef.current = value;
     };
     image.src = value;
   }, [value]);
 
   const getPoint = (event) => {
     const bounds = canvasRef.current.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    const signatureSize = signatureSizeRef.current;
+    return {
+      x: (event.clientX - bounds.left) * signatureSize.width / bounds.width,
+      y: (event.clientY - bounds.top) * signatureSize.height / bounds.height,
+    };
   };
 
   const startDrawing = (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    setSignatureError('');
     const canvas = canvasRef.current;
     canvas.setPointerCapture(event.pointerId);
+    if (!signatureSizeRef.current) {
+      const bounds = canvas.getBoundingClientRect();
+      signatureSizeRef.current = { width: bounds.width, height: bounds.height };
+    }
     drawingRef.current = true;
     const point = getPoint(event);
+    strokesRef.current.push([point]);
     const context = canvas.getContext('2d');
     context.beginPath();
     context.moveTo(point.x, point.y);
@@ -95,6 +173,15 @@ export default function SignaturePad({ value, onChange }) {
     if (!drawingRef.current) return;
     event.preventDefault();
     const point = getPoint(event);
+    const currentStroke = strokesRef.current.at(-1);
+    const lastPoint = currentStroke.at(-1);
+    if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 0.6) return;
+    currentStroke.push(point);
+
+    if (pointCount(strokesRef.current) > MAX_SAVED_POINTS * 2) {
+      compactStrokes(strokesRef.current);
+    }
+
     const context = canvasRef.current.getContext('2d');
     context.lineTo(point.x, point.y);
     context.stroke();
@@ -105,18 +192,34 @@ export default function SignaturePad({ value, onChange }) {
     drawingRef.current = false;
     const canvas = canvasRef.current;
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-    const image = canvas.toDataURL('image/png');
+
+    let image;
+    try {
+      compactStrokes(strokesRef.current);
+      const signatureSize = signatureSizeRef.current;
+      image = createSignatureDataUrl(strokesRef.current, signatureSize.width, signatureSize.height);
+    } catch (error) {
+      strokesRef.current = [];
+      signatureSizeRef.current = null;
+      valueRef.current = '';
+      onChange('');
+      const context = canvas.getContext('2d');
+      const { width, height } = dimensionsRef.current;
+      context.clearRect(0, 0, width, height);
+      setSignatureError(error.message);
+      return;
+    }
     valueRef.current = image;
-    lastRenderedValueRef.current = image;
     onChange(image);
   };
 
   const clear = () => {
     const canvas = canvasRef.current;
-    const bounds = canvas.getBoundingClientRect();
-    canvas.getContext('2d').clearRect(0, 0, bounds.width, bounds.height);
+    const { width, height } = dimensionsRef.current;
+    canvas.getContext('2d').clearRect(0, 0, width, height);
+    strokesRef.current = [];
+    signatureSizeRef.current = null;
     valueRef.current = '';
-    lastRenderedValueRef.current = '';
     renderTokenRef.current += 1;
     onChange('');
   };
@@ -139,6 +242,8 @@ export default function SignaturePad({ value, onChange }) {
         onPointerCancel={stopDrawing}
       />
     </div>
-    {!value && <p className="text-xs text-slate-500">Nupieškite parašą prieš patvirtindami PIN.</p>}
+    {signatureError
+      ? <p role="alert" className="text-xs text-rose-700">{signatureError}</p>
+      : !value && <p className="text-xs text-slate-500">Nupieškite parašą prieš patvirtindami PIN.</p>}
   </div>;
 }
