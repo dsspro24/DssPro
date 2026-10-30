@@ -1766,6 +1766,51 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   }, [cloudMode, userRole, creatorReadOnlyPreview, currentOrg?.id]);
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'darbuotojas' || !selectedOrgId) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshCommissionStatus = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const { data: status, error } = await supabase.rpc('get_employee_protocol_commission_status');
+        if (error) throw error;
+        if (!active) return;
+        setData((current) => {
+          const batchIds = new Set((current.protocolBatches ?? [])
+            .filter((batch) => batch.orgId === selectedOrgId && batch.employeeIds?.includes(currentEmployee?.id))
+            .map((batch) => batch.id));
+          const commissionAssignments = [
+            ...(current.commissionAssignments ?? []).filter((assignment) => !batchIds.has(assignment.batchId)),
+            ...(status?.commissionAssignments ?? []),
+          ];
+          const protocolCommissionSignatures = [
+            ...(current.protocolCommissionSignatures ?? []).filter((signature) => !batchIds.has(signature.batchId)),
+            ...(status?.protocolCommissionSignatures ?? []),
+          ];
+          if (JSON.stringify(commissionAssignments) === JSON.stringify(current.commissionAssignments ?? [])
+            && JSON.stringify(protocolCommissionSignatures) === JSON.stringify(current.protocolCommissionSignatures ?? [])) return current;
+          return { ...current, commissionAssignments, protocolCommissionSignatures };
+        });
+      } catch (error) {
+        if (active) setNotice(`Komisijos parašų būsenos atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshCommissionStatus();
+    const intervalId = window.setInterval(refreshCommissionStatus, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshCommissionStatus();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id]);
   const hydrateWorkspaceSignatures = async (signatures) => (
     sandboxMode ? signatures ?? [] : hydrateSignatureImages(signatures)
   );
@@ -2201,13 +2246,23 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const configuredResource = ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))
       ? { ...resource, relatedTestId: getConfiguredResourceTestIds(resource, org, data.resources)[0] ?? null }
       : resource;
-    return getResourceWorkflowStatus(employee, configuredResource, data.signatures, data.organizations, validityCheckTime, data.specialists);
+    return getResourceWorkflowStatus(employee, configuredResource, data.signatures, data.organizations, validityCheckTime, data.specialists, {
+      resources: data.resources,
+      protocolBatches: data.protocolBatches,
+      commissionAssignments: data.commissionAssignments,
+      protocolCommissionSignatures: data.protocolCommissionSignatures,
+    });
   };
   const pendingLegacyCommissionTasks = userRole === 'vadovas'
     ? orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       if (!resource || getTaskStatus(employee, resource).key !== 'awaitingCommission') return [];
-      return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists)
+      return getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists, {
+        resources: data.resources,
+        protocolBatches: data.protocolBatches,
+        commissionAssignments: data.commissionAssignments,
+        protocolCommissionSignatures: data.protocolCommissionSignatures,
+      })
         .filter((signer) => signer.role === 'Komisijos narys' && signer.status !== 'signed')
         .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, employee, resource, commissionMember: signer.name }));
     }))
@@ -2407,7 +2462,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ? orgEmployees.flatMap((employee) => (employee.resourceIds ?? []).flatMap((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       if (!resource) return [];
-      const signers = getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists);
+      const signers = getRequiredSignerEntries(employee, resource, currentOrg, data.signatures, validityCheckTime, data.specialists, {
+        resources: data.resources,
+        protocolBatches: data.protocolBatches,
+        commissionAssignments: data.commissionAssignments,
+        protocolCommissionSignatures: data.protocolCommissionSignatures,
+      });
       const workerSigner = signers.find((signer) => signer.role === 'Darbuotojas');
       const managerSigner = signers.find((signer) => signer.role === 'Vadovas');
       if (workerSigner?.status !== 'signed' || managerSigner?.status !== 'missing') return [];
@@ -6116,7 +6176,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     if (!resource) return null;
                     const status = getTaskStatus(employeeDetails, resource);
                     const signatures = data.signatures.filter((signature) => signature.employeeId === employeeDetails.id && signature.resourceId === resourceId).sort((left, right) => new Date(left.signedAt) - new Date(right.signedAt));
-                    return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} />{signatures.length ? <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">{signatures.map((signature) => <p className="text-xs text-slate-500" key={signature.id}>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')} · IP {signature.ip ?? 'Nenurodytas'}</p>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
+                    return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} commissionContext={{ resources: data.resources, protocolBatches: data.protocolBatches, commissionAssignments: data.commissionAssignments, protocolCommissionSignatures: data.protocolCommissionSignatures }} />{signatures.length ? <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">{signatures.map((signature) => <p className="text-xs text-slate-500" key={signature.id}>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')} · IP {signature.ip ?? 'Nenurodytas'}</p>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
                   })}</div> : <p className="text-sm text-slate-500">Darbuotojui dokumentai nepriskirti.</p>}</div>
                 </div>}
               </dialog>}
@@ -6247,7 +6307,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   if (!resource) return null;
                   const status = getTaskStatus(employeeDetails, resource);
                   const signatures = data.signatures.filter((signature) => signature.employeeId === employeeDetails.id && signature.resourceId === resourceId).sort((left, right) => new Date(left.signedAt) - new Date(right.signedAt));
-                  return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} />{signatures.length ? <div className="mt-2 space-y-1">{signatures.map((signature) => <p className="text-xs text-slate-500" key={signature.id}>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')}</p>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
+                  return <div className="rounded-md border border-slate-200 p-3" key={resourceId}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{resource.title}</span><WorkflowBadge status={status} /></div><RequiredSignerList employee={employeeDetails} resource={resource} org={currentOrg} signatures={data.signatures} now={validityCheckTime} specialists={data.specialists} commissionContext={{ resources: data.resources, protocolBatches: data.protocolBatches, commissionAssignments: data.commissionAssignments, protocolCommissionSignatures: data.protocolCommissionSignatures }} />{signatures.length ? <div className="mt-2 space-y-1">{signatures.map((signature) => <p className="text-xs text-slate-500" key={signature.id}>{signature.signer} · {signature.role} · {new Date(signature.signedAt).toLocaleString('lt-LT')}</p>)}</div> : <p className="mt-2 text-xs text-rose-700">Parašų dar nėra</p>}</div>;
                 })}</div> : <p className="text-sm text-slate-500">Darbuotojui dokumentai nepriskirti.</p>}</div>
               </div>}
             </dialog>
@@ -7022,13 +7082,13 @@ function CommissionProtocolSignatureHistory({ signatures, tasks, batches, resour
     </div>
   </div>;
 }
-function getResourceWorkflowStatus(employee, resource, signatures, organizations, now, specialists = []) {
+function getResourceWorkflowStatus(employee, resource, signatures, organizations, now, specialists = [], commissionContext = {}) {
   if (!employee || !resource) return { key: 'todo', label: 'Nepradėta' };
   const workerSignature = signatures.filter((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id && signature.role === 'Darbuotojas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
   if (workerSignature) {
     if (workerSignature.validUntil && new Date(workerSignature.validUntil).getTime() < now) return { key: 'expired', label: 'Galiojimas pasibaigė' };
     const org = organizations.find((item) => item.id === employee.orgId);
-    const missingSigners = getRequiredSignerEntries(employee, resource, org, signatures, now, specialists).filter((signer) => signer.status !== 'signed');
+    const missingSigners = getRequiredSignerEntries(employee, resource, org, signatures, now, specialists, commissionContext).filter((signer) => signer.status !== 'signed');
     if (resource.templateKind === 'intro-dss-journal' && missingSigners.some((signer) => signer.role !== 'Darbuotojas')) {
       return { key: 'awaitingSignatures', label: 'Laukia instruktoriaus parašo' };
     }
@@ -7102,7 +7162,7 @@ function getRequiredSigners(resource, org, employee) {
         : [];
   return normalizeEmployeeDocumentSignerRoles(assignedRoles);
 }
-function getRequiredSignerEntries(employee, resource, org, signatures, now, specialists = []) {
+function getRequiredSignerEntries(employee, resource, org, signatures, now, specialists = [], commissionContext = {}) {
   const resourceSignatures = signatures.filter((signature) => signature.employeeId === employee.id && signature.resourceId === resource.id);
   const workerSignature = resourceSignatures.filter((signature) => signature.role === 'Darbuotojas').sort((left, right) => new Date(right.signedAt) - new Date(left.signedAt))[0];
   const signedAfterWorker = workerSignature ? resourceSignatures.filter((signature) => signature.role !== 'Darbuotojas' && new Date(signature.signedAt) >= new Date(workerSignature.signedAt) && (!signature.validUntil || new Date(signature.validUntil).getTime() >= now)) : [];
@@ -7147,7 +7207,59 @@ function getRequiredSignerEntries(employee, resource, org, signatures, now, spec
       return [{ role, name: signature?.signer ?? (assignedSpecialists.join(', ') || 'Nepriskirtas DSS specialistas'), signedBy: signature?.signer, signedAt: signature?.signedAt, status: signature ? 'signed' : 'missing' }];
     }
     if (role === 'Komisijos narys' || role === 'Komisijos nariai') {
+      const protocolResources = (commissionContext.resources ?? []).filter((item) =>
+        item.templateKind === 'knowledge-assessment-protocol'
+        && (item.id === resource.id || getConfiguredProtocolTestId(item, org, commissionContext.resources) === resource.id));
+      const protocolBatch = (commissionContext.protocolBatches ?? [])
+        .filter((batch) => batch.orgId === employee.orgId
+          && batch.employeeIds?.includes(employee.id)
+          && protocolResources.some((protocol) => protocol.id === batch.resourceId))
+        .sort((left, right) => String(right.protocolDate ?? '').localeCompare(String(left.protocolDate ?? ''))
+          || Number(right.number ?? 0) - Number(left.number ?? 0))[0];
+      const batchAssignments = protocolBatch
+        ? (commissionContext.commissionAssignments ?? []).filter((assignment) =>
+          assignment.batchId === protocolBatch.id
+          && assignment.role === 'Komisijos narys'
+          && assignment.status === 'accepted')
+        : [];
+      const batchSignatures = protocolBatch
+        ? (commissionContext.protocolCommissionSignatures ?? []).filter((signature) =>
+          signature.batchId === protocolBatch.id && signature.role === 'Komisijos narys')
+        : [];
+      if (protocolBatch && batchAssignments.length) {
+        return batchAssignments.map((assignment) => {
+          const signature = batchSignatures.find((item) => item.assignmentId === (assignment.id ?? assignment.assignmentId));
+          return {
+            role: 'Komisijos narys',
+            name: assignment.employeeName ?? signature?.signer ?? 'Komisijos narys',
+            signedBy: signature?.signer,
+            signedAt: signature?.signedAt,
+            status: signature ? 'signed' : 'missing',
+          };
+        });
+      }
       const members = org?.commission ?? [];
+      if (protocolBatch && members.length) {
+        return members.map((name) => {
+          const signature = batchSignatures.find((item) => item.signer === name);
+          return {
+            role: 'Komisijos narys',
+            name,
+            signedBy: signature?.signer,
+            signedAt: signature?.signedAt,
+            status: signature ? 'signed' : 'missing',
+          };
+        });
+      }
+      if (protocolBatch && batchSignatures.length) {
+        return batchSignatures.map((signature) => ({
+          role: 'Komisijos narys',
+          name: signature.signer,
+          signedBy: signature.signer,
+          signedAt: signature.signedAt,
+          status: 'signed',
+        }));
+      }
       if (!members.length) return [{ role: 'Komisijos narys', name: 'Komisijos nariai nepriskirti', status: 'missing' }];
       return members.map((name) => {
         const signature = signerForRole('Komisijos narys', name);
@@ -8410,8 +8522,8 @@ function WorkflowBadge({ status }) {
   };
   return <span className={`inline-flex w-fit items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold ${tones[status.key] ?? tones.todo}`}><span className="size-1.5 rounded-full bg-current" />{status.label}</span>;
 }
-function RequiredSignerList({ employee, resource, org, signatures, now, specialists }) {
-  const signers = getRequiredSignerEntries(employee, resource, org, signatures, now, specialists);
+function RequiredSignerList({ employee, resource, org, signatures, now, specialists, commissionContext }) {
+  const signers = getRequiredSignerEntries(employee, resource, org, signatures, now, specialists, commissionContext);
   return <div className="mt-2 grid grid-cols-1 gap-1" aria-label="Reikalingi parašai">{signers.map((signer) => {
     const signature = signer.signedAt && signatures.find((item) => item.employeeId === employee.id && item.resourceId === resource.id && item.role === signer.role && item.signer === signer.signedBy && item.signedAt === signer.signedAt);
     const statusLabel = signer.status === 'signed' ? 'pasirašė PIN kodu' : signer.status === 'expired' ? 'galiojimas baigėsi' : 'trūksta';

@@ -278,25 +278,34 @@ async function loadManagerWorkspace(user) {
       { data: aapIssuances, error: aapIssuancesError },
       { data: commissionInvitations, error: commissionInvitationsError },
       { data: commissionTasks, error: commissionTasksError },
+      { data: commissionStatus, error: commissionStatusError },
       { data: employeeSequenceNumber, error: employeeSequenceNumberError },
     ] = await Promise.all([
       supabase.rpc('get_employee_workspace'),
       supabase.rpc('get_employee_aap_issuances'),
       supabase.rpc('get_employee_commission_invitations'),
       supabase.rpc('get_employee_protocol_commission_tasks'),
+      supabase.rpc('get_employee_protocol_commission_status'),
       supabase.rpc('get_employee_sequence_number'),
     ]);
     if (employeeWorkspaceError) throw employeeWorkspaceError;
     if (aapIssuancesError) throw aapIssuancesError;
     if (commissionInvitationsError) throw commissionInvitationsError;
     if (commissionTasksError) throw commissionTasksError;
+    if (commissionStatusError) throw commissionStatusError;
     if (employeeSequenceNumberError) throw employeeSequenceNumberError;
     const normalizedCommissionTasks = normalizeProtocolCommissionTasks(
       commissionTasks ?? [],
       employeeWorkspace.organization?.id ?? employeeMembership.organization_id,
     );
-    const employeeCommissionAssignments = [...new Map(normalizedCommissionTasks.flatMap((task) => task.commissionAssignments ?? []).map((assignment) => [assignment.id ?? assignment.assignment_id, assignment])).values()];
-    const employeeProtocolSignatures = [...new Map(normalizedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []).map((signature) => [signature.id, signature])).values()];
+    const employeeCommissionAssignments = [...new Map([
+      ...normalizedCommissionTasks.flatMap((task) => task.commissionAssignments ?? []),
+      ...(commissionStatus?.commissionAssignments ?? []),
+    ].map((assignment) => [`${assignment.batchId ?? ''}:${assignment.id ?? assignment.assignment_id}`, assignment])).values()];
+    const employeeProtocolSignatures = [...new Map([
+      ...normalizedCommissionTasks.flatMap((task) => task.protocolCommissionSignatures ?? []),
+      ...(commissionStatus?.protocolCommissionSignatures ?? []),
+    ].map((signature) => [signature.id, signature])).values()];
     const employeeData = await hydrateWorkspaceAssets({
       ...employeeWorkspace.data,
       employees: employeeWorkspace.data.employees.map((employee) => ({ ...employee, sequenceNumber: employeeSequenceNumber })),
