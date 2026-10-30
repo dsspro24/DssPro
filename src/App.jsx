@@ -56,6 +56,9 @@ function DemoApp({ cloudMode = false }) {
   // Navigation / Tabs state
   const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'app'
   const [sandboxMode, setSandboxMode] = useState(false);
+  const [sandboxContent, setSandboxContent] = useState(null);
+  const [sandboxStarting, setSandboxStarting] = useState(false);
+  const [sandboxStartError, setSandboxStartError] = useState('');
   const [userRole, setUserRole] = useState('darbuotojas'); // 'darbuotojas' | 'dss' | 'vadovas' | 'kurejas'
   const [activeTab, setActiveTab] = useState('skydelis'); 
   const [courseFilter, setCourseFilter] = useState('visi'); // 'visi' | 'mano' | 'baigti'
@@ -72,6 +75,28 @@ function DemoApp({ cloudMode = false }) {
       top: Math.max(0, signupSection.getBoundingClientRect().top + window.scrollY - 24),
       behavior: 'smooth',
     });
+  };
+
+  const startSandbox = async () => {
+    setSandboxStarting(true);
+    setSandboxStartError('');
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}demo-content.json`);
+      if (!response.ok) throw new Error(`Demo turinio paketo įkelti nepavyko (${response.status}).`);
+      const content = await response.json();
+      if (content?.version !== 1 || !Array.isArray(content.resources)) {
+        throw new Error('Demo turinio paketo formatas netinkamas.');
+      }
+      setSandboxContent(content);
+      setSandboxMode(true);
+      setUserRole('darbuotojas');
+      setCurrentPage('app');
+      setActiveTab('uzduotys');
+    } catch (error) {
+      setSandboxStartError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSandboxStarting(false);
+    }
   };
 
   // Interactive Mock States
@@ -305,17 +330,14 @@ function DemoApp({ cloudMode = false }) {
                     Peržiūrėti planus
                   </button>
                   <button 
-                    onClick={() => {
-                      setSandboxMode(true);
-                      setUserRole('darbuotojas');
-                      setCurrentPage('app');
-                      setActiveTab('uzduotys');
-                    }}
+                    onClick={startSandbox}
+                    disabled={sandboxStarting}
                     className="border border-white/30 hover:bg-white/10 text-white font-semibold px-6 py-3 rounded-xl text-xs transition-all cursor-pointer"
                   >
-                    Išbandyti be registracijos
+                    {sandboxStarting ? 'Ruošiama demo aplinka…' : 'Išbandyti be registracijos'}
                   </button>
                 </div>
+                {sandboxStartError && <p role="alert" className="mt-3 max-w-md text-sm text-rose-200">{sandboxStartError}</p>}
               </div>
 
               <div className="lg:col-span-6">
@@ -537,9 +559,11 @@ function DemoApp({ cloudMode = false }) {
   if (currentPage === 'app') {
     if (sandboxMode) return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliamas izoliuotas demo…</p></main>}><LocalWorkspace
       userRole={userRole}
+      sandboxContent={sandboxContent}
       onRoleChange={setUserRole}
       onExit={() => {
         setSandboxMode(false);
+        setSandboxContent(null);
         setUserRole('darbuotojas');
         setCurrentPage('landing');
       }}

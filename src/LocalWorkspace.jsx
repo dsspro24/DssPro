@@ -152,6 +152,86 @@ function workspaceForDatabase(workspace) {
 }
 
 const STORAGE_KEY = 'dsspro-local-demo-v1';
+const demoSnapshotSensitiveSettingKey = /(organization|company|employee|person|manager|instructor|approver|email|phone|address|pin|signature|ip|user|owner|name)/i;
+const sanitizeDemoSnapshotSettings = (settings) => {
+  if (Array.isArray(settings)) return settings.map(sanitizeDemoSnapshotSettings);
+  if (!settings || typeof settings !== 'object') return settings;
+  return Object.fromEntries(Object.entries(settings)
+    .filter(([key]) => !demoSnapshotSensitiveSettingKey.test(key))
+    .map(([key, value]) => [key, sanitizeDemoSnapshotSettings(value)]));
+};
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Vaizdo failo perskaityti nepavyko.'));
+        return;
+      }
+      resolve(reader.result);
+    }, { once: true });
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('Vaizdo failo perskaityti nepavyko.')), { once: true });
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function assetUrlToDataUrl(source, expectedType = 'image/', baseUrl = window.location.href) {
+  if (typeof source !== 'string' || !source.trim()) return '';
+  if (source.startsWith('data:image/')) return source;
+  const resolvedUrl = new URL(source, baseUrl).href;
+  const response = await fetch(resolvedUrl, { credentials: 'omit' });
+  if (!response.ok) throw new Error(`Failo atsisiųsti nepavyko (${response.status}): ${resolvedUrl}`);
+  const blob = await response.blob();
+  if (expectedType && !blob.type.startsWith(expectedType)) throw new Error(`Failo tipas netinkamas: ${resolvedUrl}`);
+  return blobToDataUrl(blob);
+}
+
+async function inlineDemoHtmlAssets(html, baseUrl) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  for (const link of parsed.querySelectorAll('link[rel="stylesheet"][href]')) {
+    const stylesheetUrl = new URL(link.getAttribute('href'), baseUrl).href;
+    const response = await fetch(stylesheetUrl, { credentials: 'omit' });
+    if (!response.ok) throw new Error(`HTML stiliaus įkelti nepavyko (${response.status}): ${stylesheetUrl}`);
+    const style = parsed.createElement('style');
+    style.textContent = await inlineDemoCssUrls(await response.text(), stylesheetUrl);
+    link.replaceWith(style);
+  }
+  for (const element of parsed.querySelectorAll('img[src], picture source[src], video[poster]')) {
+    const attribute = element.hasAttribute('src') ? 'src' : 'poster';
+    const source = element.getAttribute(attribute);
+    if (source && !source.startsWith('data:')) {
+      element.setAttribute(attribute, await assetUrlToDataUrl(source, 'image/', baseUrl));
+    }
+  }
+  for (const style of parsed.querySelectorAll('style')) {
+    style.textContent = await inlineDemoCssUrls(style.textContent ?? '', baseUrl);
+  }
+  const result = `<!doctype html>\n${parsed.documentElement.outerHTML}`;
+  if (/https?:\/\/[^"'()\s]*supabase\.(?:co|in)\//i.test(result)) {
+    throw new Error('HTML šablone liko išorinių Supabase nuorodų; jų saugiai įterpti nepavyko.');
+  }
+  return result;
+}
+
+async function inlineDemoCssUrls(originalCss, baseUrl) {
+  const cssUrlPattern = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
+  const matches = [...originalCss.matchAll(cssUrlPattern)];
+  let css = '';
+  let cursor = 0;
+  for (const match of matches) {
+    const source = match[2].trim();
+    css += originalCss.slice(cursor, match.index);
+    if (!source || source.startsWith('data:') || source.startsWith('#')) {
+      css += match[0];
+    } else {
+      css += `url("${await assetUrlToDataUrl(source, '', baseUrl)}")`;
+    }
+    cursor = match.index + match[0].length;
+  }
+  return css + originalCss.slice(cursor);
+}
+
 const defaultAapItems = [
   { id: 'aap-helmet', code: '', name: 'Galvos apdangalas (šalmas)', reason: '', quantity: 1, unit: 'Vnt.', validity: 'pagal gamintojo nurodymus', unitPrice: '' },
   { id: 'aap-boots', code: '', name: 'Darbo avalynė (pakietintais galais)', reason: '', quantity: 1, unit: 'Pora', validity: '24 mėn.', unitPrice: '' },
@@ -698,9 +778,9 @@ const initialData = {
   ],
 };
 
-const createSandboxWorkspaceData = () => {
+const createSandboxWorkspaceData = (sandboxContent = null) => {
   const organizationId = 'org-demo-sandbox';
-  const sandboxResourceIds = [
+  const defaultSandboxResourceIds = [
     'res-fire',
     'res-height',
     'res-chemical',
@@ -708,6 +788,27 @@ const createSandboxWorkspaceData = () => {
     'res-workplace-dss-journal',
     'res-aap',
   ];
+  const bundledResources = Array.isArray(sandboxContent?.resources)
+    ? sandboxContent.resources.filter((resource) => resource && typeof resource.id === 'string' && typeof resource.title === 'string')
+    : [];
+  const bundledResourceIds = new Map(bundledResources.map((resource, index) => {
+    const id = initialData.resources.some((item) => item.id === resource.id) ? resource.id : `demo-${resource.id || index}`;
+    return [resource.id, id];
+  }));
+  const demoResources = bundledResources.map((resource) => {
+    const id = bundledResourceIds.get(resource.id);
+    const relatedTestId = bundledResourceIds.get(resource.relatedTestId);
+    const relatedJournalId = bundledResourceIds.get(resource.relatedJournalId);
+    return {
+      ...resource,
+      id,
+      imageUrl: resource.image || undefined,
+      organizationId,
+      ...(resource.relatedTestId ? { relatedTestId: relatedTestId ?? null } : {}),
+      ...(resource.relatedJournalId ? { relatedJournalId: relatedJournalId ?? null } : {}),
+    };
+  });
+  const sandboxResourceIds = [...new Set([...defaultSandboxResourceIds, ...demoResources.map((resource) => resource.id)])];
   const organizationEmployees = initialData.employees
     .filter((employee) => employee.orgId === 'org-statybu');
   const extraEmployees = [
@@ -759,6 +860,8 @@ const createSandboxWorkspaceData = () => {
     pin: '1234',
   };
   const employeeIds = new Set(employees.map((employee) => employee.id));
+  const resourcesById = new Map(initialData.resources.map((resource) => [resource.id, resource]));
+  demoResources.forEach((resource) => resourcesById.set(resource.id, resource));
 
   return {
     ...initialData,
@@ -772,6 +875,7 @@ const createSandboxWorkspaceData = () => {
     commissionInvitations: [],
     commissionTasks: [],
     specialists: [specialist],
+    resources: [...resourcesById.values()],
     signatures: initialData.signatures
       .filter((signature) => signature.orgId === 'org-statybu' && employeeIds.has(signature.employeeId))
       .map((signature) => ({ ...signature, orgId: organizationId })),
@@ -993,7 +1097,7 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -1004,7 +1108,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
       : null;
     const loadedData = sandboxMode
-      ? createSandboxWorkspaceData()
+      ? createSandboxWorkspaceData(sandboxContent)
       : initialCloudData
       ? {
         ...(cloudDefaults ?? initialData),
@@ -1145,6 +1249,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const profileMenuRef = useRef(null);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
+  const [demoSnapshotResourceIds, setDemoSnapshotResourceIds] = useState([]);
+  const [demoSnapshotExporting, setDemoSnapshotExporting] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [employeePositionFilter, setEmployeePositionFilter] = useState({ organizationId: '', position: '' });
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
@@ -2226,6 +2332,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
     || isCompanyCreatedProtocol(resource, currentOrg?.id)
     || creatorReadOnlyPreview && resource.organizationId === currentOrg?.id);
+  const demoSnapshotResources = data.resources.filter((resource) => !resource.organizationId);
   const editingResourceTemplateKind = data.resources.find((resource) => resource.id === editingResourceId)?.templateKind;
   const editingInstructorTemplate = ['intro-dss-journal', 'workplace-dss-journal'].includes(editingResourceTemplateKind);
   const filteredLibraryResources = visibleLibraryResources.filter((resource) => {
@@ -2233,6 +2340,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const matchesSearch = `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(librarySearch.trim().toLocaleLowerCase('lt'));
     return matchesType && matchesSearch;
   });
+  const filteredDemoSnapshotResources = filteredLibraryResources.filter((resource) => !resource.organizationId);
   const dssTasks = useMemo(() => {
     const latestInstructorSignatureByTask = new Map();
     for (const signature of data.signatures) {
@@ -3384,6 +3492,72 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     } catch (error) {
       if (useCache) resourceHtmlCacheRef.current.delete(resource.id);
       throw error;
+    }
+  };
+
+  const exportDemoSnapshot = async () => {
+    if (!cloudMode || userRole !== 'kurejas' || demoSnapshotExporting) return;
+    const selectedResources = demoSnapshotResources.filter((resource) => demoSnapshotResourceIds.includes(resource.id));
+    if (!selectedResources.length) {
+      setNotice('Pasirinkite bent vieną bendros bibliotekos šabloną demo paketui.');
+      return;
+    }
+    if (!window.confirm('Pasirinktas šablonų turinys ir viršelio nuotraukos bus įtraukti į failą, kurį vėliau galima įdėti į viešą demo. Prieš publikuojant patikrinkite, kad HTML, klausimuose ir nuotraukose nebūtų įmonių, darbuotojų ar kitų privačių duomenų. Tęsti?')) return;
+
+    setDemoSnapshotExporting(true);
+    try {
+      const selectedIds = new Set(selectedResources.map((resource) => resource.id));
+      const exportedResources = [];
+      for (const resource of selectedResources) {
+        const completeResource = await getResourceWithHtml(resource);
+        const html = completeResource.html
+          ? await inlineDemoHtmlAssets(completeResource.html, completeResource.htmlUrl ?? window.location.href)
+          : '';
+        const imageSource = completeResource.imageUrl
+          ?? (typeof completeResource.image === 'string' ? completeResource.image : '');
+        const image = await assetUrlToDataUrl(imageSource);
+        const questions = (completeResource.questions ?? []).map((question) => ({
+          prompt: question.prompt,
+          options: question.options,
+          ...(Number.isInteger(question.correctIndex) ? { correctIndex: question.correctIndex } : {}),
+          ...(Array.isArray(question.correctIndices) ? { correctIndices: question.correctIndices } : {}),
+        }));
+        exportedResources.push({
+          id: completeResource.id,
+          title: completeResource.title,
+          type: completeResource.type,
+          category: completeResource.category,
+          duration: completeResource.duration,
+          html,
+          image,
+          signatures: completeResource.signatures === true,
+          validityMonths: completeResource.validityMonths,
+          questions,
+          ...(completeResource.templateKind ? { templateKind: completeResource.templateKind } : {}),
+          ...(Array.isArray(completeResource.requiredSigners) ? { requiredSigners: completeResource.requiredSigners } : {}),
+          ...(selectedIds.has(completeResource.relatedTestId) ? { relatedTestId: completeResource.relatedTestId } : {}),
+          ...(selectedIds.has(completeResource.relatedJournalId) ? { relatedJournalId: completeResource.relatedJournalId } : {}),
+          ...(completeResource.defaultSettings
+            ? { defaultSettings: sanitizeDemoSnapshotSettings(completeResource.defaultSettings) }
+            : {}),
+        });
+      }
+
+      const snapshot = {
+        version: 1,
+        resources: exportedResources,
+      };
+      const downloadUrl = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = 'dsspro-demo-content.json';
+      downloadLink.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setNotice(`Demo turinio paketas paruoštas (${exportedResources.length} šabl.). Jį reikia įkelti į svetainės statinį demo turinio failą; Supabase duomenų bazėje niekas nepakeista.`);
+    } catch (error) {
+      setNotice(`Demo turinio paketo paruošti nepavyko: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setDemoSnapshotExporting(false);
     }
   };
 
@@ -6408,8 +6582,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <p className="mt-3 text-xs text-slate-500">Failai iki 1,5 MB saugomi tik naršyklėje. HTML peržiūra izoliuota; testo vertinimo klausimus suveskite formoje. El. laiškai ir failų serveris bus prijungti vėliau.</p>
             </Panel>
             <LibraryFilters resources={data.resources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
+            <Panel title="Izoliuoto demo turinio paketas">
+              <p className="text-sm text-slate-600">Pasirinkite bendros bibliotekos šablonus, kuriuos norite rodyti lankytojams. Eksportas įterpia HTML ir nuotraukas į JSON failą; pats demo šį statinį failą perskaitys iš svetainės ir nekreipsis į Supabase.</p>
+              <p className="mt-2 text-xs text-amber-800">Prieš perduodami paketą peržiūrėkite šablonų tekstą, klausimus ir vaizdus: juose negali būti realių įmonių, darbuotojų ar kitų privačių duomenų. Eksportas nieko nekeičia duomenų bazėje.</p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => setDemoSnapshotResourceIds((current) => [...new Set([...current, ...filteredDemoSnapshotResources.map((resource) => resource.id)])])}>Pažymėti rodomus šablonus ({filteredDemoSnapshotResources.length})</button>
+                <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => setDemoSnapshotResourceIds([])}>Išvalyti pasirinkimą</button>
+                <button type="button" className={buttonClass} disabled={!demoSnapshotResourceIds.length || demoSnapshotExporting} onClick={exportDemoSnapshot}>
+                  <Download size={16} />{demoSnapshotExporting ? 'Ruošiamas paketas…' : `Eksportuoti demo paketą (${demoSnapshotResourceIds.length})`}
+                </button>
+              </div>
+            </Panel>
             <p className="text-sm text-slate-600">Pažymėkite varnele šablonus, kuriuos norite priskirti visoms esamoms ir naujoms įmonėms. Kūrėjo nustatymai bus numatytieji; vadovai gali išsisaugoti atskirus savo įmonės pasirinkimus.</p>
-            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} /><label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><input type="checkbox" checked={resource.defaultForOrganizations === true} onChange={(event) => setCreatorResourceDefault(resource, event.target.checked)} />Numatytasis įmonėms</label><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
+            {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div key={resource.id} className="flex h-full flex-col gap-2"><ResourceCard resource={resource} onPreview={() => openResourcePreview(resource)} onDelete={() => deleteCreatorResource(resource)} />{!resource.organizationId && <label className="flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm"><input type="checkbox" checked={demoSnapshotResourceIds.includes(resource.id)} onChange={(event) => setDemoSnapshotResourceIds((current) => event.target.checked ? [...new Set([...current, resource.id])] : current.filter((id) => id !== resource.id))} />Įtraukti į izoliuotą demo</label>}<label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><input type="checkbox" checked={resource.defaultForOrganizations === true} onChange={(event) => setCreatorResourceDefault(resource, event.target.checked)} />Numatytasis įmonėms</label><button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => editResource(resource)}><Pencil size={15} />Redaguoti šabloną</button></div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}
           </section>}
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'

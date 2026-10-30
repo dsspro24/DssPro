@@ -1,6 +1,6 @@
 # DSS Pro vietinis demo
 
-DSS Pro yra darbuotojų saugos ir sveikatos procesų demonstracinė sistema. Duomenys laikomi naršyklės `localStorage`; prisijungimo, laiškų siuntimo, mokėjimų ar serverio nėra.
+DSS Pro yra darbuotojų saugos ir sveikatos procesų sistema. Įprasta vietinė demonstracinė darbo sritis naudoja naršyklės `localStorage`, o landing puslapio „Išbandyti be registracijos“ sandbox pakeitimus laiko tik React atmintyje ir išvalo atnaujinus puslapį.
 
 ## Paleidimas
 
@@ -19,7 +19,9 @@ Atidarykite Vite parodytą vietinį adresą. Tailwind CSS įkompiliuojamas kartu
 - **Įmonės vadovas:** tvarkykite įmonės DSS specialistus ir komisiją, darbuotojus, biblioteką, priskyrimus, ataskaitas ir prenumeratą.
 - **Turinio kūrėjas:** įkelkite HTML ir nuotrauką, kurkite testų klausimus, nustatykite galiojimą, tvarkykite biblioteką bei demo prenumeratas.
 
-Rolių ir demo naudotojų pasirinkikliai palikti testavimui. Darbuotojo ir DSS PIN, parašai bei rodomas IP yra tik vietinio demo įrašai, ne teisiškai patvirtinti elektroniniai parašai. Prenumeratos veiksmai nekeičia realių mokėjimų, o kvietimai neišsiunčia el. laiškų.
+Izoliuotame sandbox galima persijungti tarp vienos fiktyvios įmonės vadovo, DSS specialisto ir aštuonių darbuotojų. Darbuotojo ir DSS PIN, parašai bei rodomas IP yra tik demo įrašai, ne teisiškai patvirtinti elektroniniai parašai. Prenumeratos veiksmai nekeičia realių mokėjimų, o kvietimai neišsiunčia el. laiškų.
+
+Viešo demo šablonai kraunami tik iš statinio `public/demo-content.json` failo; sandbox nekeičia ir neskaito Supabase duomenų. Prisijungęs turinio kūrėjas gali bendroje bibliotekoje pažymėti šablonus „Įtraukti į izoliuotą demo“ ir pasirinkti „Eksportuoti demo paketą“. Eksportuotame faile HTML bei nuotraukos įterpiami tiesiogiai, o paskyrų, įmonių ir parašų duomenys neįtraukiami. Prieš publikuodami peržiūrėkite eksportą, tada pakeiskite `public/demo-content.json` jo turiniu ir iš naujo įdiekite svetainę.
 
 ## Supabase cloud režimas
 
