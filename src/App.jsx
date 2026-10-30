@@ -55,6 +55,7 @@ function CloudLandingGate() {
 function DemoApp({ cloudMode = false }) {
   // Navigation / Tabs state
   const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'app'
+  const [sandboxMode, setSandboxMode] = useState(false);
   const [userRole, setUserRole] = useState('darbuotojas'); // 'darbuotojas' | 'dss' | 'vadovas' | 'kurejas'
   const [activeTab, setActiveTab] = useState('skydelis'); 
   const [courseFilter, setCourseFilter] = useState('visi'); // 'visi' | 'mano' | 'baigti'
@@ -304,10 +305,15 @@ function DemoApp({ cloudMode = false }) {
                     Peržiūrėti planus
                   </button>
                   <button 
-                    onClick={() => { setCurrentPage('app'); setActiveTab('biblioteka'); }}
+                    onClick={() => {
+                      setSandboxMode(true);
+                      setUserRole('darbuotojas');
+                      setCurrentPage('app');
+                      setActiveTab('uzduotys');
+                    }}
                     className="border border-white/30 hover:bg-white/10 text-white font-semibold px-6 py-3 rounded-xl text-xs transition-all cursor-pointer"
                   >
-                    Peržiūrėti demo
+                    Išbandyti be registracijos
                   </button>
                 </div>
               </div>
@@ -529,6 +535,16 @@ function DemoApp({ cloudMode = false }) {
   // SKYDELIS SU DINAMIŠKAIS MENIU SKIRTUKAIS PAGAL ROLE
   // ==========================================
   if (currentPage === 'app') {
+    if (sandboxMode) return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliamas izoliuotas demo…</p></main>}><LocalWorkspace
+      userRole={userRole}
+      onRoleChange={setUserRole}
+      onExit={() => {
+        setSandboxMode(false);
+        setUserRole('darbuotojas');
+        setCurrentPage('landing');
+      }}
+      sandboxMode
+    /></Suspense>;
     if (cloudMode) return <CloudEntry
       onExit={() => setCurrentPage('landing')}
       onBackToLanding={() => {

@@ -698,6 +698,87 @@ const initialData = {
   ],
 };
 
+const createSandboxWorkspaceData = () => {
+  const organizationId = 'org-demo-sandbox';
+  const sandboxResourceIds = [
+    'res-fire',
+    'res-height',
+    'res-chemical',
+    'res-journal',
+    'res-workplace-dss-journal',
+    'res-aap',
+  ];
+  const organizationEmployees = initialData.employees
+    .filter((employee) => employee.orgId === 'org-statybu');
+  const extraEmployees = [
+    { id: 'emp-demo-4', name: 'Ieva Petrauskienė', position: 'Apskaitininkė' },
+    { id: 'emp-demo-5', name: 'Tomas Vaitkus', position: 'Meistras' },
+    { id: 'emp-demo-6', name: 'Aistė Rimkutė', position: 'Biuro administratorė' },
+    { id: 'emp-demo-7', name: 'Darius Jankauskas', position: 'Vairuotojas' },
+    { id: 'emp-demo-8', name: 'Lukas Kazlauskas', position: 'Montuotojas' },
+  ];
+  const employees = [
+    ...organizationEmployees,
+    ...extraEmployees.map((employee, index) => ({
+      ...organizationEmployees[index % organizationEmployees.length],
+      ...employee,
+      email: `darbuotojas${index + 4}@demo.invalid`,
+      contractNumber: `DEMO-00${index + 4}`,
+      sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' },
+      aapCompleted: false,
+    })),
+  ].map((employee, index) => ({
+    ...employee,
+    orgId: organizationId,
+    email: index < organizationEmployees.length ? `darbuotojas${index + 1}@demo.invalid` : employee.email,
+    contractNumber: index < organizationEmployees.length ? `DEMO-00${index + 1}` : employee.contractNumber,
+    status: 'Aktyvus',
+    pin: '1234',
+    resourceIds: sandboxResourceIds,
+    progressByResource: index === 0 ? { 'res-height': 'started', 'res-aap': 'completed' } : {},
+    testResults: [],
+  }));
+  const organization = {
+    ...initialData.organizations[0],
+    id: organizationId,
+    name: 'UAB „Demo sauga“',
+    companyCode: '000000000',
+    manager: 'Darius Vaitkus',
+    managerPin: '1234',
+    dss: ['spec-demo-dss'],
+    dssInvitations: [],
+    commission: ['Tomas Vaitkus', 'Aistė Rimkutė'],
+    commissionPins: { 'Tomas Vaitkus': '1234', 'Aistė Rimkutė': '1234' },
+    resources: sandboxResourceIds,
+  };
+  const specialist = {
+    ...initialData.specialists[0],
+    id: 'spec-demo-dss',
+    name: 'Rasa Norkienė',
+    email: 'dss@demo.invalid',
+    pin: '1234',
+  };
+  const employeeIds = new Set(employees.map((employee) => employee.id));
+
+  return {
+    ...initialData,
+    organizations: [organization],
+    employees,
+    archivedEmployees: [],
+    protocolBatches: [],
+    aapIssuances: [],
+    commissionAssignments: [],
+    protocolCommissionSignatures: [],
+    commissionInvitations: [],
+    commissionTasks: [],
+    specialists: [specialist],
+    signatures: initialData.signatures
+      .filter((signature) => signature.orgId === 'org-statybu' && employeeIds.has(signature.employeeId))
+      .map((signature) => ({ ...signature, orgId: organizationId })),
+    subscriptions: [{ id: 'sub-demo', orgId: organizationId, plan: 'Pro', status: 'Demo', price: 0, endsAt: '' }],
+  };
+};
+
 function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = [], creatorResources = []) {
   const organizationTemplate = initialData.organizations[0];
   const planCode = organization.plan_code === 'pro' ? 'pro' : 'standard';
@@ -912,7 +993,8 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode = false, cloudUserId = '' }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false }) {
+  const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
@@ -921,7 +1003,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const cloudDefaults = cloudMode && cloudOrganization
       ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
       : null;
-    const loadedData = initialCloudData
+    const loadedData = sandboxMode
+      ? createSandboxWorkspaceData()
+      : initialCloudData
       ? {
         ...(cloudDefaults ?? initialData),
         ...initialCloudData,
@@ -1027,14 +1111,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       dssProWorkspaceTab: activeTab,
     }, '');
   }, [activeTab]);
-  const [selectedOrgId, setSelectedOrgId] = useState(cloudMode && userRole === 'vadovas'
+  const [selectedOrgId, setSelectedOrgId] = useState(sandboxMode
+    ? 'org-demo-sandbox'
+    : cloudMode && userRole === 'vadovas'
     ? cloudOrganization?.id ?? initialCloudData?.organizations?.[0]?.id ?? ''
     : initialCloudData?.organizations?.[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees?.[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
-  const [selectedSpecialistId, setSelectedSpecialistId] = useState(initialCloudData?.specialists?.[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState(sandboxMode
+    ? 'spec-demo-dss'
+    : initialCloudData?.specialists?.[0]?.id ?? (cloudMode ? '' : 'spec-rasa'));
   const dssOrganizationIsOpen = userRole === 'dss'
     && openedDssOrganizationId === selectedOrgId
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.dss.includes(selectedSpecialistId));
@@ -1045,6 +1133,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const notificationsRef = useRef(null);
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
+    if (sandboxMode) return [];
     try {
       const savedIds = JSON.parse(localStorage.getItem(managerNotificationsStorageKey) ?? '[]');
       return Array.isArray(savedIds) ? savedIds : [];
@@ -1354,6 +1443,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [notificationsOpen]);
 
   useEffect(() => {
+    if (sandboxMode) return undefined;
     if (!cloudMode) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       return undefined;
@@ -1429,7 +1519,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.clearTimeout(timeout);
       if (workspaceAutosaveTimeoutRef.current === timeout) workspaceAutosaveTimeoutRef.current = null;
     };
-  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview, canManageSelectedWorkspace]);
+  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, creatorReadOnlyPreview, canManageSelectedWorkspace, sandboxMode]);
 
   useLayoutEffect(() => {
     const frame = previewFrameRef.current;
@@ -1553,6 +1643,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   }, [cloudMode, userRole, creatorReadOnlyPreview, currentOrg?.id]);
   const currentSpecialist = data.specialists.find((person) => person.id === selectedSpecialistId) ?? data.specialists[0];
+  const hydrateWorkspaceSignatures = async (signatures) => (
+    sandboxMode ? signatures ?? [] : hydrateSignatureImages(signatures)
+  );
   useEffect(() => {
     if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss' && dssOrganizationIsOpen)) return undefined;
     let active = true;
@@ -2798,7 +2891,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     try {
-      const [hydratedIssuance] = await hydrateSignatureImages([issuance]);
+      const [hydratedIssuance] = await hydrateWorkspaceSignatures([issuance]);
       await printPdfHtml(buildAapIssuanceHtml(hydratedIssuance, employee, org), `AAP_isdavimas_${employee.name}_${issuance.issuedAt}`);
     } catch (error) {
       setNotice(`AAP išdavimo PDF paruošti nepavyko: ${error.message}`);
@@ -3777,8 +3870,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         && !resourceSignatures.some((signature) => signature.id === previewSignature.id)) {
         resourceSignatures.push(previewSignature);
       }
-      previewSignatures = await hydrateSignatureImages(resourceSignatures);
-      protocolCommissionSignatures = await hydrateSignatureImages(protocolCommissionSignatures);
+      previewSignatures = await hydrateWorkspaceSignatures(resourceSignatures);
+      protocolCommissionSignatures = await hydrateWorkspaceSignatures(protocolCommissionSignatures);
     }
     const workerSignedPreview = userRole === 'darbuotojas' && Boolean(currentEmployee && (
       hasCurrentWorkerSignature(currentEmployee.id, resource.id)
@@ -3797,7 +3890,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .filter((issuance) => issuance.employeeId === employeeId && issuance.orgId === currentOrg?.id && issuance.status === 'signed')
         .sort((left, right) => left.issuedAt.localeCompare(right.issuedAt) || String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? '')));
       try {
-        const hydratedIssuances = await hydrateSignatureImages(signedIssuances);
+        const hydratedIssuances = await hydrateWorkspaceSignatures(signedIssuances);
         const aapEmployee = previewEmployees.find((person) => person.id === employeeId)
           ?? previewArchivedEmployees.find((person) => person.id === employeeId);
         previewDocument.printHtml = appendAapIssuanceSheets(
@@ -3878,6 +3971,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const inviteEmployee = async (event) => {
     event.preventDefault();
+    if (sandboxMode) {
+      setNotice('Darbuotojų kvietimai el. paštu išjungti izoliuotame demo režime.');
+      return;
+    }
     const inviteDialog = event.currentTarget?.closest('dialog');
     const name = `${employeeForm.firstName.trim()} ${employeeForm.lastName.trim()}`.trim();
     const email = employeeForm.email.trim().toLowerCase();
@@ -4019,6 +4116,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const resendEmployeeInvite = (employeeId) => {
+    if (sandboxMode) {
+      setNotice('Darbuotojų kvietimai el. paštu išjungti izoliuotame demo režime.');
+      return;
+    }
     setData((current) => ({ ...current, employees: current.employees.map((employee) => employee.id === employeeId ? { ...employee, inviteCount: (employee.inviteCount ?? 1) + 1 } : employee) }));
     const employee = data.employees.find((person) => person.id === employeeId);
     setNotice(`Kvietimas ${employee?.email} paruoštas pakartotinai. El. laiško siuntimas neprijungtas.`);
@@ -4249,6 +4350,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const inviteSpecialist = async (specialist) => {
+    if (sandboxMode) {
+      setNotice('DSS specialistų kvietimai el. paštu išjungti izoliuotame demo režime.');
+      return;
+    }
     if (cloudMode) {
       const { data: invitation, error } = await supabase.functions.invoke('invite-dss-specialist', {
         body: {
@@ -4707,7 +4812,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     updateOrg(currentOrg.id, (org) => ({ ...org, managerPin: managerPinDraft }));
     setManagerPinDraft('');
     setManagerPinConfirm('');
-    setNotice('Vadovo pasirašymo PIN nustatytas šioje naršyklėje.');
+    setNotice(sandboxMode ? 'Demo vadovo PIN išsaugotas tik šio skirtuko atmintyje.' : 'Vadovo pasirašymo PIN nustatytas šioje naršyklėje.');
   };
 
   const changeCloudManagerPin = async (event) => {
@@ -4970,10 +5075,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     setPinDraft('');
     setPinConfirm('');
-    setNotice('Pasirašymo PIN nustatytas šioje naršyklėje.');
+    setNotice(sandboxMode ? 'Demo PIN išsaugotas tik šio skirtuko atmintyje.' : 'Pasirašymo PIN nustatytas šioje naršyklėje.');
   };
 
-  const changeDemoRole = (role) => {
+  const changeDemoRole = (role, accountId = '') => {
+    if (sandboxMode && role === 'kurejas') return;
     setActiveTab(role === 'darbuotojas' ? 'uzduotys' : 'skydelis');
     setOpenedDssOrganizationId('');
     setMobileMenuOpen(false);
@@ -4983,7 +5089,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (organizations[0]) {
       setSelectedOrgId(organizations[0].id);
       setAapDraft(organizations[0].aapItems ?? defaultAapItems);
-      if (role === 'darbuotojas') setSelectedEmployeeId(data.employees.find((employee) => employee.orgId === organizations[0].id)?.id ?? '');
+      if (role === 'darbuotojas') {
+        setSelectedEmployeeId(accountId || data.employees.find((employee) => employee.orgId === organizations[0].id)?.id || '');
+      }
+      if (role === 'dss' && accountId) setSelectedSpecialistId(accountId);
     }
     onRoleChange(role);
   };
@@ -4999,10 +5108,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         [userKey]: [...new Set([...(current.managerNotificationsReadByUser?.[userKey] ?? []), assignmentId])],
       },
     }));
-    try {
-      localStorage.setItem(managerNotificationsStorageKey, JSON.stringify(nextReadIds));
-    } catch {
-      // Notification can still be dismissed for the current session.
+    if (!sandboxMode) {
+      try {
+        localStorage.setItem(managerNotificationsStorageKey, JSON.stringify(nextReadIds));
+      } catch {
+        // Notification can still be dismissed for the current session.
+      }
     }
   };
 
@@ -5150,6 +5261,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ]
         : [];
   const displayName = userRole === 'dss' ? currentSpecialist?.name : userRole === 'vadovas' ? currentOrg?.manager : userRole === 'kurejas' ? 'DSS Pro komanda' : currentEmployee?.name;
+  const sandboxAccounts = [
+    { id: 'manager', name: currentOrg?.manager ?? 'Demo vadovas', role: 'vadovas' },
+    ...data.specialists.map((specialist) => ({ id: specialist.id, name: specialist.name, role: 'dss' })),
+    ...data.employees
+      .filter((employee) => employee.orgId === selectedOrgId)
+      .map((employee) => ({ id: employee.id, name: employee.name, role: 'darbuotojas' })),
+  ];
+  const selectedSandboxAccountId = userRole === 'vadovas'
+    ? 'manager'
+    : userRole === 'dss' ? selectedSpecialistId : selectedEmployeeId;
   const changeEmployeeSort = (key) => setEmployeeSort((current) => ({
     key,
     direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
@@ -5198,7 +5319,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         return;
       }
 
-      const signatures = await hydrateSignatureImages(record.signatures);
+      const signatures = await hydrateWorkspaceSignatures(record.signatures);
       const employee = record.employee;
       const organization = { ...currentOrg, ...record.organization };
       const documentParts = [];
@@ -5299,12 +5420,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <button type="button" aria-label={mobileMenuOpen ? 'Uždaryti meniu' : 'Atidaryti meniu'} aria-expanded={mobileMenuOpen} aria-controls="workspace-mobile-menu" className="grid size-10 place-items-center rounded-md border border-white/20 text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)}><Menu size={20} /></button>
         </div>
         <div id="workspace-mobile-menu" className={`${mobileMenuOpen ? 'block' : 'hidden'} mt-3 lg:contents`}>
-        {!cloudMode && <label className="mb-5 rounded-lg border border-white/15 bg-white/10 p-3 text-xs text-emerald-100">
-          Demonstracijos rolė
-          <select value={userRole} onChange={(event) => changeDemoRole(event.target.value)} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">
-            <option value="darbuotojas">Darbuotojas</option><option value="dss">DSS specialistas</option><option value="vadovas">Įmonės vadovas</option><option value="kurejas">Turinio kūrėjas</option>
-          </select>
-        </label>}
+        {sandboxMode
+          ? <label className="mb-5 rounded-lg border border-emerald-300/40 bg-emerald-400/10 p-3 text-xs text-emerald-50">
+            Demo paskyra · 10 fiktyvių naudotojų
+            <select aria-label="Pasirinkti demo paskyrą" value={selectedSandboxAccountId} onChange={(event) => {
+              const account = sandboxAccounts.find((item) => item.id === event.target.value);
+              if (account) changeDemoRole(account.role, account.id);
+            }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">
+              <optgroup label="Vadovas ir DSS specialistas">
+                {sandboxAccounts.filter((account) => account.role !== 'darbuotojas').map((account) => <option key={account.id} value={account.id}>{account.name} · {roleLabels[account.role]}</option>)}
+              </optgroup>
+              <optgroup label="Darbuotojai">
+                {sandboxAccounts.filter((account) => account.role === 'darbuotojas').map((account) => <option key={account.id} value={account.id}>{account.name} · Darbuotojas</option>)}
+              </optgroup>
+            </select>
+            <span className="mt-2 block text-[11px] text-emerald-100/80">Bandomasis PIN: 1234 · pakeitimai išnyks atnaujinus puslapį.</span>
+          </label>
+          : !cloudMode && <label className="mb-5 rounded-lg border border-white/15 bg-white/10 p-3 text-xs text-emerald-100">
+            Demonstracijos rolė
+            <select value={userRole} onChange={(event) => changeDemoRole(event.target.value)} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">
+              <option value="darbuotojas">Darbuotojas</option><option value="dss">DSS specialistas</option><option value="vadovas">Įmonės vadovas</option><option value="kurejas">Turinio kūrėjas</option>
+            </select>
+          </label>}
         {!cloudMode && userRole === 'dss' && <label className="mb-4 text-xs text-emerald-100">Demo DSS paskyra
           <select value={selectedSpecialistId} onChange={(event) => { setSelectedSpecialistId(event.target.value); setOpenedDssOrganizationId(''); const org = data.organizations.find((item) => item.dss.includes(event.target.value) || item.dssInvitations?.some((invite) => invite.specialistId === event.target.value)); if (org) setSelectedOrgId(org.id); setMobileMenuOpen(false); }} className="mt-2 w-full rounded-md bg-white px-2 py-2 font-semibold text-slate-900">{data.specialists.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
         </label>}
@@ -5434,6 +5571,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </div>
           </div>
         </header>
+        {sandboxMode && <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950 sm:px-5">
+          <span><strong>Izoliuotas demo.</strong> Visi pakeitimai lieka tik šiame skirtuke; Supabase, el. pašto kvietimai ir failų saugykla nenaudojami.</span>
+          <button type="button" className="rounded-md border border-sky-300 bg-white px-2.5 py-1 font-semibold hover:bg-sky-100" onClick={onExit}>Baigti demo</button>
+        </div>}
         <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
           {userRole === 'dss' && dssOrganizationIsOpen && onLoadDssOrganization && (dssWorkspaceLoadState.organizationId !== selectedOrgId || dssWorkspaceLoadState.status === 'loading') && <div role="status" className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">Įkeliami pasirinktos įmonės duomenys…</div>}
           {userRole === 'dss' && dssOrganizationIsOpen && onLoadDssOrganization && dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'error' && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950"><span>Įmonės darbo srities įkelti nepavyko: {dssWorkspaceLoadState.error}</span><button type="button" className="rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold hover:bg-rose-100" onClick={() => { setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'loading', error: '' }); setDssWorkspaceLoadAttempt((attempt) => attempt + 1); }}>Bandyti dar kartą</button></div>}
@@ -5470,7 +5611,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'skydelis' && (
             <section className="mx-auto w-full max-w-[1400px] space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? dssOrganizationIsOpen ? currentOrg?.name ?? 'Įmonės darbo vieta' : 'Pasirinkite įmonę' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : userRole === 'dss' && !dssOrganizationIsOpen ? 'Pasirinkite įmonę, kurią norite peržiūrėti ir tvarkyti.' : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div>{userRole === 'dss' && dssOrganizationIsOpen && <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={returnToDssOrganizations}><ChevronLeft size={16} />Grįžti į įmonių sąrašą</button><button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssOrganizationLeaveSubmitting} onClick={leaveDssOrganization}>{dssOrganizationLeaveSubmitting ? 'Vykdoma…' : 'Nebesu šios įmonės DSS specialistas'}</button></div>}</div>
+              <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? dssOrganizationIsOpen ? currentOrg?.name ?? 'Įmonės darbo vieta' : 'Pasirinkite įmonę' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : userRole === 'dss' && !dssOrganizationIsOpen ? 'Pasirinkite įmonę, kurią norite peržiūrėti ir tvarkyti.' : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : sandboxMode ? 'izoliuotas demo, pakeitimai tik šiame skirtuke' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div>{userRole === 'dss' && dssOrganizationIsOpen && <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={returnToDssOrganizations}><ChevronLeft size={16} />Grįžti į įmonių sąrašą</button><button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssOrganizationLeaveSubmitting} onClick={leaveDssOrganization}>{dssOrganizationLeaveSubmitting ? 'Vykdoma…' : 'Nebesu šios įmonės DSS specialistas'}</button></div>}</div>
               {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? dssOrganizationIsOpen ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Įmonės darbuotojai" value={orgEmployees.length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div> : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /></div>
                   : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
@@ -5616,7 +5757,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         const BadgeIcon = badge.Icon;
                         return <span title={badge.label} className={`inline-flex w-full items-center justify-center gap-1 rounded-md px-1 py-1 text-[11px] font-semibold ${badge.cls}`}><span className="truncate">{badge.label}</span><BadgeIcon size={12} className="shrink-0" /></span>;
                       })()}</td>
-                      <td className="px-1 py-2 align-middle"><div inert={employee.invitePending} className={`flex justify-center gap-0.5 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={14} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={14} /></button>{needsReminder && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={14} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={14} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={14} /></button>}</div></td>
+                      <td className="px-1 py-2 align-middle"><div inert={employee.invitePending} className={`flex justify-center gap-0.5 ${employee.invitePending ? 'opacity-40' : ''}`}><button type="button" title={`Peržiūrėti ${employee.name}`} aria-label={`Peržiūrėti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeDetails(employee.id)}><Eye size={14} /></button><button type="button" title={`Redaguoti ${employee.name}`} aria-label={`Redaguoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:bg-slate-50" onClick={() => openEmployeeEditor(employee)}><Pencil size={14} /></button>{needsReminder && !sandboxMode && <button type="button" title={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} aria-label={employee.status === 'Pakviestas' ? `Persiųsti kvietimą ${employee.name}` : `Siųsti priminimą ${employee.name}`} className="rounded-md border border-amber-300 p-1 text-amber-700 hover:bg-amber-50" onClick={() => remindEmployee(employee)}><BellRing size={14} /></button>}{hasEmployeeSignatures(employee.id) ? <button type="button" title={`Archyvuoti ${employee.name}`} aria-label={`Archyvuoti ${employee.name}`} className="rounded-md border border-slate-300 p-1 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => archiveEmployee(employee)}><Archive size={14} /></button> : <button type="button" title={`Ištrinti ${employee.name}`} aria-label={`Ištrinti ${employee.name}`} className="rounded-md border border-rose-300 p-1 text-rose-700 hover:bg-rose-50" onClick={() => deleteEmployee(employee)}><Trash2 size={14} /></button>}</div></td>
                     </tr>;
                   })}</tbody></table></div>
                 {filteredOrgEmployees.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Darbuotojų pagal pasirinktus filtrus nerasta.</p>}
@@ -5631,7 +5772,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   </div>
                 </div>
               </Panel>}
-              {canManageSelectedWorkspace && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+              {canManageSelectedWorkspace && !sandboxMode && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
                 <form onSubmit={inviteEmployee} className="space-y-5">
                   <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{matchingArchivedEmployee ? 'Grąžinti darbuotoją į darbą' : 'Pakviesti darbuotoją'}</h2><p className="mt-1 text-sm text-slate-500">{matchingArchivedEmployee ? 'Bus sukurtas naujas darbo įrašas. Ankstesnis archyvas liks nepakeistas, o paskyra ir PIN išliks tie patys.' : 'Įveskite darbuotojo duomenis ir parinkite dokumentus.'}</p></div><button type="button" aria-label="Uždaryti darbuotojo formą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
                   {matchingArchivedEmployee && <p role="status" className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Pagal el. paštą rastas ankstesnis darbuotojas: <strong>{matchingArchivedEmployee.employee.name}</strong>. Prisijungimui naudos esamą slaptažodį ir PIN.</p>}
@@ -5782,8 +5923,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'komanda' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Darbuotojai" subtitle="Priskirti darbai, jų atlikimas ir parašai vienoje vietoje." />
-            <div className="flex justify-end"><button type="button" className={buttonClass} onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pakviesti darbuotoją</button></div>
-            <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
+            {!sandboxMode && <div className="flex justify-end"><button type="button" className={buttonClass} onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pakviesti darbuotoją</button></div>}
+            {!sandboxMode && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               <form onSubmit={inviteEmployee} className="space-y-5">
                 <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -5823,7 +5964,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   /></fieldset>
                 <div className="flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => document.getElementById('invite-employee-dialog')?.close()}>Atšaukti</button><button className={buttonClass} disabled={inviteSubmitting}><Plus size={16} />{inviteSubmitting ? 'Siunčiamas kvietimas…' : 'Pakviesti'}</button></div>
               </form>
-            </dialog>
+            </dialog>}
             <dialog id="employee-details-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               {employeeDetails && <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">{employeeDetails.name}</h2><p className="mt-1 text-sm text-slate-500">Darbuotojo informacija ir dokumentų būklė</p></div><button type="button" aria-label="Uždaryti darbuotojo informaciją" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => { document.getElementById('employee-details-dialog')?.close(); setEmployeeDetailsId(null); }}><X size={20} /></button></div>
                 <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><div><dt className="text-slate-500">El. paštas</dt><dd className="font-semibold">{employeeDetails.email}</dd></div><div><dt className="text-slate-500">Darbo sutarties Nr.</dt><dd className="font-semibold">{employeeDetails.contractNumber || 'Nenurodytas'}</dd></div><div><dt className="text-slate-500">Pareigos</dt><dd className="font-semibold">{employeeDetails.position || 'Darbuotojas'}</dd></div><div><dt className="text-slate-500">Paskyros būsena</dt><dd className="font-semibold">{employeeDetails.status}</dd></div></dl>
@@ -6117,7 +6258,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {archiveDetailsId && <div className="archive-print-controls fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><section className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-xl bg-white p-5"><div className="archive-print-controls mb-4 flex items-start justify-between gap-4"><div>{archiveDetailRecord && <><p className="text-xs font-semibold uppercase text-emerald-800">Archyvas · {recordSignaturesLabel(archiveDetailRecord.signatures.length)}</p><h2 className="text-xl font-bold">{archiveDetailRecord.employee.name}</h2></>}</div><div className="flex flex-wrap justify-end gap-2">{archiveDetailRecord && canManageSelectedWorkspace && archiveDetailIsLatestForEmail && !creatorReadOnlyPreview && <button type="button" className={buttonClass} onClick={() => { const [firstName, ...lastName] = archiveDetailRecord.employee.name.trim().split(/\s+/); setEmployeeForm({ firstName: firstName ?? '', lastName: lastName.join(' '), email: archiveDetailRecord.employee.email ?? '', contractNumber: '', position: archiveDetailRecord.employee.position ?? '', medicalCertificateValidUntil: '' }); setInviteResourceIds([]); setArchiveDetailsId(null); setArchiveDetailRecord(null); if (activeTab === 'komanda') { document.getElementById('invite-employee-dialog')?.showModal(); } else { openInviteForRehire.current = true; setActiveTab('komanda'); } }}><UserPlus size={16} />Grąžinti į darbą</button>}{archiveDetailRecord && <button type="button" className={buttonClass} disabled={archivePdfLoading || archiveDetailsLoading} onClick={() => downloadArchivedEmployeeDocuments(archiveDetailRecord)}><Download size={16} />{archivePdfLoading ? 'Ruošiamas PDF…' : 'Atsisiųsti pasirašytus dokumentus PDF'}</button>}{creatorReadOnlyPreview && archiveDetailRecord && <button type="button" className="rounded-md border border-rose-300 bg-rose-50 p-2 text-rose-800 hover:bg-rose-100" title="Ištrinti archyvo įrašą" onClick={() => deleteCreatorArchivedEmployees(currentOrg, [archiveDetailRecord.id])}><Trash2 size={18} /></button>}<button type="button" aria-label="Uždaryti archyvo įrašą" className="rounded-md border border-slate-300 p-2" onClick={() => { setArchiveDetailsId(null); setArchiveDetailRecord(null); setArchiveDetailsError(''); }}><X size={18} /></button></div></div>{archiveDetailsLoading && <p role="status" className="py-8 text-center text-sm text-slate-600">Įkeliamas darbuotojo archyvas…</p>}{archiveDetailsError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Darbuotojo archyvo įkelti nepavyko: {archiveDetailsError}</p>}{!archiveDetailsLoading && !archiveDetailsError && !archiveDetailRecord && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Šio darbuotojo archyvo įrašo rasti nepavyko.</p>}{archiveDetailRecord && <ArchiveEmployeeDetails record={archiveDetailRecord} organizationName={currentOrg?.name} onPreviewSignature={(signature) => previewArchivedSignature(archiveDetailRecord, signature)} />}</section></div>}
 
-          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
+          {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={sandboxMode ? 'Demo PIN lieka tik dabartinio skirtuko atmintyje ir išnyksta atnaujinus puslapį.' : cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
           {activeTab === 'imones' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Įmonės" subtitle="Pasirinkite įmonę, kad įkeltumėte tik jos darbo srities duomenis." />
