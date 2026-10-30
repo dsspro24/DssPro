@@ -7865,6 +7865,12 @@ function applyFamiliarizationTopics(html, topics) {
   return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
 }
 
+function removeAapSignatureLines(html) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  parsed.querySelectorAll('.signature-entry .sig-line').forEach((line) => line.remove());
+  return `<!doctype html>\n${parsed.documentElement.outerHTML}`;
+}
+
 function buildResourcePreviewHtml(resource, employee, org, signatures, resources = []) {
   resources = resource.previewResources ?? resources;
   if (resource.id === 'res-aap' && resource.aapCatalogPreview) {
@@ -7996,7 +8002,7 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
   const aapTemplateHtml = (resource.html || '')
     .replace(/\{\{ACCOUNTING_ROWS\}\}\s*(<table\b[\s\S]*?<tbody>)\s*<\/tbody>/, '$1{{ACCOUNTING_ROWS}}</tbody>')
     .replace(/\{\{ISSUE_ROWS\}\}\s*(<table\b[\s\S]*?<tbody>)\s*<\/tbody>/, '$1{{ISSUE_ROWS}}</tbody>');
-  const html = Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), aapTemplateHtml);
+  const html = removeAapSignatureLines(Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), aapTemplateHtml));
   if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
