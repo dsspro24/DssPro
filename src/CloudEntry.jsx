@@ -292,7 +292,7 @@ async function loadManagerWorkspace(user) {
     if (aapIssuancesError) throw aapIssuancesError;
     if (commissionInvitationsError) throw commissionInvitationsError;
     if (commissionTasksError) throw commissionTasksError;
-    if (commissionStatusError) throw commissionStatusError;
+    if (commissionStatusError && commissionStatusError.code !== 'PGRST202') throw commissionStatusError;
     if (employeeSequenceNumberError) throw employeeSequenceNumberError;
     const normalizedCommissionTasks = normalizeProtocolCommissionTasks(
       commissionTasks ?? [],

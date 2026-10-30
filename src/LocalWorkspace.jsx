@@ -1770,11 +1770,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!cloudMode || userRole !== 'darbuotojas' || !selectedOrgId) return undefined;
     let active = true;
     let requestInFlight = false;
+    let statusFunctionUnavailable = false;
     const refreshCommissionStatus = async () => {
-      if (requestInFlight) return;
+      if (requestInFlight || statusFunctionUnavailable) return;
       requestInFlight = true;
       try {
         const { data: status, error } = await supabase.rpc('get_employee_protocol_commission_status');
+        if (error?.code === 'PGRST202') {
+          statusFunctionUnavailable = true;
+          if (active) setNotice('Komisijos parašų būsenai atnaujinti pritaikykite naujausią Supabase migraciją.');
+          return;
+        }
         if (error) throw error;
         if (!active) return;
         setData((current) => {
