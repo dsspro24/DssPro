@@ -1835,8 +1835,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       .filter((assignment) => assignment.organizationId === currentEmployee?.orgId && assignment.employeeId === currentEmployee?.id && assignment.status === 'accepted')
       .flatMap((assignment) => (data.protocolBatches ?? [])
         .filter((batch) => batch.orgId === assignment.organizationId && batch.protocolDate && batch.employeeIds?.length
-          && assignment.respondedAt
-          && new Date(assignment.respondedAt).toISOString().slice(0, 10) <= batch.protocolDate)
+          && assignment.respondedAt)
         .map((batch) => {
           const resource = data.resources.find((item) => item.id === batch.resourceId && item.templateKind === 'knowledge-assessment-protocol');
           if (!resource) return null;
@@ -1866,6 +1865,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .filter(Boolean));
   const pendingCommissionTasks = commissionProtocolTasks.filter((task) => !task.hasSigned);
   const completedCommissionTasks = commissionProtocolTasks.filter((task) => task.hasSigned);
+  const dssCommissionProtocolSignatures = [...new Map([
+    ...(data.protocolCommissionSignatures ?? []),
+    ...(data.commissionTasks ?? []).flatMap((task) => task.protocolCommissionSignatures ?? []),
+  ]
+    .filter((signature) => signature.orgId === currentOrg?.id
+      && signature.role === 'Komisijos narys'
+      && (cloudMode
+        ? (signature.userId ?? signature.signerUserId) === cloudUserId
+        : signature.signer === currentSpecialist?.name))
+    .map((signature) => [signature.id, signature])).values()]
+    .sort((left, right) => new Date(right.signedAt).getTime() - new Date(left.signedAt).getTime());
   const commissionProtocolTaskId = (task) => `${task.assignmentId}-${task.batchId}`;
   const commissionTaskPageCount = Math.max(1, Math.ceil(pendingCommissionTasks.length / dssTaskPageSize));
   const currentCommissionTaskPage = Math.min(commissionTaskPage, commissionTaskPageCount);
@@ -6457,6 +6467,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 }}
               />
             </Panel>
+            {dssHistoryView === 'specialist' && <Panel title={`${currentOrg?.name} · komisijos nario parašai`}>
+              <CommissionProtocolSignatureHistory
+                key={currentOrg?.id}
+                signatures={dssCommissionProtocolSignatures}
+                tasks={data.commissionTasks ?? []}
+                batches={data.protocolBatches ?? []}
+                resources={data.resources}
+                onPreviewSignature={(signature, task) => {
+                  const batch = data.protocolBatches.find((item) => item.id === signature.batchId);
+                  const resource = data.resources.find((item) => item.id === (task?.resourceId ?? batch?.resourceId));
+                  if (!resource) {
+                    setNotice('Pasirašyto protokolo peržiūrėti nepavyko: dokumento šablonas nerastas.');
+                    return;
+                  }
+                  openResourcePreview(resource, {
+                    protocolBatchId: signature.batchId,
+                    commissionAssignments: task?.commissionAssignments ?? data.commissionAssignments.filter((assignment) => assignment.organizationId === currentOrg?.id && assignment.status === 'accepted'),
+                    protocolCommissionSignatures: task?.protocolCommissionSignatures ?? data.protocolCommissionSignatures.filter((item) => item.batchId === signature.batchId),
+                  });
+                }}
+              />
+            </Panel>}
           </section>}
 
           {activeTab === 'parasai' && userRole === 'darbuotojas' && <section className="space-y-5"><PageTitle title="Mano parašai" subtitle="Pasirašytų dokumentų data, veiksmo rolė ir demo aplinkos IP žyma." /><Panel title={currentEmployee?.name}><PaginatedSignatureHistory
@@ -6947,6 +6979,45 @@ function PaginatedSignatureHistory({ organizationId, employeeId, signerUserId, s
         <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Ankstesnis</button>
         <span className="self-center text-xs text-slate-500">{page} / {pageCount}</span>
         <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={page >= pageCount || loading} onClick={() => setPage((current) => current + 1)}>Kitas</button>
+      </div>
+    </div>
+  </div>;
+}
+function CommissionProtocolSignatureHistory({ signatures, tasks, batches, resources, onPreviewSignature, pageSize = 10 }) {
+  const [page, setPage] = useState(1);
+  const taskByBatchId = useMemo(() => new Map(tasks.map((task) => [task.batchId, task])), [tasks]);
+  const batchById = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
+  const sortedSignatures = useMemo(() => [...signatures].sort((left, right) => {
+    const timeDifference = new Date(right.signedAt).getTime() - new Date(left.signedAt).getTime();
+    return timeDifference || String(right.id).localeCompare(String(left.id));
+  }), [signatures]);
+  const pageCount = Math.max(1, Math.ceil(sortedSignatures.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleSignatures = sortedSignatures.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  return <div className="space-y-3">
+    <DataTable
+      headers={['Protokolas', 'Dokumentas', 'Parašas', 'Data', 'Veiksmai']}
+      rows={visibleSignatures.map((signature) => {
+        const task = taskByBatchId.get(signature.batchId);
+        const batch = batchById.get(signature.batchId);
+        const resource = resources.find((item) => item.id === (task?.resourceId ?? batch?.resourceId));
+        return [
+          `Nr. ${task?.batchNumber ?? batch?.number ?? '—'} · ${task?.protocolDate ?? batch?.protocolDate ?? 'data nenurodyta'}`,
+          resource?.title ?? task?.resourceTitle ?? 'Protokolas',
+          <div key={`signature-${signature.id}`}><p>{signature.signer} · {signature.role}</p><SignatureImagePreview signature={signature} emptyLabel="Nėra" /></div>,
+          new Date(signature.signedAt).toLocaleString('lt-LT'),
+          <button key={`preview-${signature.id}`} type="button" className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50" disabled={!resource} onClick={() => onPreviewSignature(signature, task)}><Eye size={14} />{resource ? 'Peržiūrėti protokolą' : 'Dokumentas nerastas'}</button>,
+        ];
+      })}
+      empty="Komisijos nario parašų dar nėra."
+    />
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-xs text-slate-500">{sortedSignatures.length ? `Rodoma ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, sortedSignatures.length)} iš ${sortedSignatures.length} parašų` : 'Komisijos nario parašų dar nėra.'}</p>
+      <div className="flex gap-2">
+        <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Ankstesnis</button>
+        <span className="self-center text-xs text-slate-500">{currentPage} / {pageCount}</span>
+        <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold disabled:opacity-50" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Kitas</button>
       </div>
     </div>
   </div>;
@@ -7481,13 +7552,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
 
   if (resource.templateKind === 'knowledge-assessment-protocol') {
     const assignments = (resource.previewCommissionAssignments ?? [])
-      .filter((assignment) => {
-        if (assignment.status !== 'accepted') return false;
-        if (!resource.protocolBatchDate) return true;
-        const respondedAt = assignment.respondedAt ? new Date(assignment.respondedAt) : null;
-        return respondedAt && !Number.isNaN(respondedAt.getTime())
-          && respondedAt.toISOString().slice(0, 10) <= resource.protocolBatchDate;
-      })
+      .filter((assignment) => assignment.status === 'accepted')
       .sort((left, right) => (left.role === 'Komisijos pirmininkas' ? -1 : 1) - (right.role === 'Komisijos pirmininkas' ? -1 : 1));
     const batchSignatures = (resource.previewProtocolCommissionSignatures ?? [])
       .filter((signature) => signature.batchId === resource.protocolBatchId);
@@ -7500,7 +7565,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     const memberSigners = [...members, ...historicalSigners.filter((signer) => signer.role === 'Komisijos narys')];
     const commissionLines = parsed.querySelectorAll('.commission-row .line');
     if (commissionLines[0]) commissionLines[0].textContent = chair?.employeeName ?? '';
-    if (commissionLines[1]) commissionLines[1].textContent = members.map((assignment) => assignment.employeeName).join(', ');
+    if (commissionLines[1]) commissionLines[1].textContent = members.map((assignment) => assignment.employeeName || 'Komisijos narys').join(', ');
     if (commissionLines[2]) commissionLines[2].closest('.commission-row')?.remove();
 
     const signatureRows = parsed.querySelectorAll('.signatures-section .sig-row');
@@ -7523,12 +7588,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const pair = parsed.createElement('div');
         pair.className = 'commission-signature-proof';
         const name = parsed.createElement('strong');
-        name.textContent = assignment.employeeName;
+        name.textContent = assignment.employeeName || 'Komisijos narys';
         pair.append(name);
         if (signature?.signatureImage) {
           const image = parsed.createElement('img');
           image.src = signature.signatureImage;
-          image.alt = `${assignment.employeeName} parašas`;
+          image.alt = `${assignment.employeeName || 'Komisijos narys'} parašas`;
           image.className = 'signature-image';
           pair.append(image);
         } else {
