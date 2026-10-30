@@ -5763,7 +5763,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </div>
         <div id="workspace-mobile-menu" className={`${mobileMenuOpen ? 'block' : 'hidden'} mt-3 lg:contents`}>
         {sandboxMode
-          ? <label className="mb-5 rounded-lg border border-emerald-300/40 bg-emerald-400/10 p-3 text-xs text-emerald-50">
+          ? <label className="mb-5 text-xs text-emerald-50">
             Demo paskyra · 10 fiktyvių naudotojų
             <select aria-label="Pasirinkti demo paskyrą" value={selectedSandboxAccountId} onChange={(event) => {
               const account = sandboxAccounts.find((item) => item.id === event.target.value);
