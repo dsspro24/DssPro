@@ -799,9 +799,26 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
     const id = bundledResourceIds.get(resource.id);
     const relatedTestId = bundledResourceIds.get(resource.relatedTestId);
     const relatedJournalId = bundledResourceIds.get(resource.relatedJournalId);
+    const originalRelatedResourceIds = resource.defaultSettings?.relatedResourceIds;
+    const defaultSettings = resource.defaultSettings
+      ? {
+        ...resource.defaultSettings,
+        ...(Array.isArray(originalRelatedResourceIds)
+          ? {
+            relatedResourceIds: originalRelatedResourceIds
+              .map((relatedId) => bundledResourceIds.get(relatedId))
+              .filter(Boolean),
+          }
+          : {}),
+        ...(resource.defaultSettings.relatedProtocolId
+          ? { relatedProtocolId: bundledResourceIds.get(resource.defaultSettings.relatedProtocolId) ?? null }
+          : {}),
+      }
+      : resource.defaultSettings;
     return {
       ...resource,
       id,
+      defaultSettings,
       imageUrl: resource.image || undefined,
       organizationId,
       ...(resource.relatedTestId ? { relatedTestId: relatedTestId ?? null } : {}),
@@ -1132,6 +1149,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const workspaceData = {
       ...loadedData,
       resources: (loadedData.resources ?? []).map((resource) => {
+        if (sandboxMode) return resource;
         if (resource.id === 'res-fire-safety-journal') {
           const defaults = initialData.resources.find((item) => item.id === resource.id);
           return {
