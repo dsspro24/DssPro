@@ -7756,7 +7756,10 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
     '{{ACCOUNTING_ROWS}}': makeRows(),
     '{{ISSUE_ROWS}}': makeRows(true),
   };
-  const html = Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), resource.html || '');
+  const aapTemplateHtml = (resource.html || '')
+    .replace(/\{\{ACCOUNTING_ROWS\}\}\s*(<table\b[\s\S]*?<tbody>)\s*<\/tbody>/, '$1{{ACCOUNTING_ROWS}}</tbody>')
+    .replace(/\{\{ISSUE_ROWS\}\}\s*(<table\b[\s\S]*?<tbody>)\s*<\/tbody>/, '$1{{ISSUE_ROWS}}</tbody>');
+  const html = Object.entries(values).reduce((content, [token, value]) => content.replaceAll(token, value), aapTemplateHtml);
   if (!workerSignature?.signatureImage && !employerSignature?.signatureImage) return html;
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
