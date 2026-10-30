@@ -1369,6 +1369,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [commissionSigningTarget, setCommissionSigningTarget] = useState(null);
   const [commissionSignPin, setCommissionSignPin] = useState('');
   const [commissionSignError, setCommissionSignError] = useState('');
+  const [legacyCommissionSigningTasks, setLegacyCommissionSigningTasks] = useState([]);
+  const [legacyCommissionSignError, setLegacyCommissionSignError] = useState('');
+  const [selectedLegacyCommissionTaskIds, setSelectedLegacyCommissionTaskIds] = useState([]);
+  const [legacyCommissionTaskPage, setLegacyCommissionTaskPage] = useState(1);
   const [commissionPinStatus, setCommissionPinStatus] = useState({ organizationId: null, members: {} });
   const [commissionInvitationTarget, setCommissionInvitationTarget] = useState(null);
   const [protocolCommissionTaskTarget, setProtocolCommissionTaskTarget] = useState(null);
@@ -2197,6 +2201,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .map((signer) => ({ id: `${employee.id}-${resource.id}-${signer.name}`, employee, resource, commissionMember: signer.name }));
     }))
     : [];
+  const legacyCommissionTaskPageCount = Math.max(1, Math.ceil(pendingLegacyCommissionTasks.length / dssTaskPageSize));
+  const currentLegacyCommissionTaskPage = Math.min(legacyCommissionTaskPage, legacyCommissionTaskPageCount);
+  const paginatedLegacyCommissionTasks = pendingLegacyCommissionTasks.slice(
+    (currentLegacyCommissionTaskPage - 1) * dssTaskPageSize,
+    currentLegacyCommissionTaskPage * dssTaskPageSize,
+  );
+  const selectedCurrentLegacyCommissionTasks = pendingLegacyCommissionTasks.filter((task) => selectedLegacyCommissionTaskIds.includes(task.id));
   const getEmployeeProtocolAccessError = (employee, resource) => {
     const org = data.organizations.find((organization) => organization.id === employee?.orgId);
     const isLinkedResource = ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource));
@@ -5117,7 +5128,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const pinConfigured = cloudMode
       ? commissionPinStatus.organizationId === org?.id && commissionPinStatus.members[member]
       : org?.commissionPins?.[member];
-    if (!pinConfigured) {
+    if (!sandboxMode && !pinConfigured) {
       setActiveTab('imone');
       setNotice(`Komisijos nariui „${member}“ įmonės nustatymuose pirmiausia reikia nustatyti asmeninį PIN.`);
       return;
@@ -5127,6 +5138,46 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setActiveTab('zurnalai');
     setCommissionSignPin('');
     setCommissionSignError('');
+  };
+
+  const requestLegacyCommissionBatchSign = (tasks) => {
+    setLegacyCommissionSigningTasks(tasks.slice(0, dssSignatureBatchSize));
+    setLegacyCommissionSignError('');
+    setSignatureInk('');
+  };
+
+  const confirmLegacyCommissionBatchSign = (event) => {
+    event.preventDefault();
+    if (!signatureInk) {
+      setLegacyCommissionSignError('Nupieškite parašą prieš patvirtindami.');
+      return;
+    }
+    const tasksToSign = legacyCommissionSigningTasks.filter((task) => pendingLegacyCommissionTasks.some((pendingTask) => pendingTask.id === task.id));
+    if (!tasksToSign.length) {
+      setLegacyCommissionSignError('Pasirašytinų dokumentų nebėra.');
+      return;
+    }
+    const signedAt = new Date().toISOString();
+    setData((current) => ({ ...current, signatures: [...current.signatures, ...tasksToSign.map((task, index) => ({
+      id: `sig-${Date.now()}-${index}`,
+      orgId: task.employee.orgId,
+      employeeId: task.employee.id,
+      contractNumber: task.employee.contractNumber ?? '',
+      resourceId: task.resource.id,
+      signer: task.commissionMember,
+      role: 'Komisijos narys',
+      signatureMethod: 'Sandbox',
+      signedAt,
+      validUntil: getValidityUntil(task.resource.validityMonths),
+      signatureImage: signatureInk,
+      ip: '127.0.0.1 (demo)',
+    }))] }));
+    const signedIds = new Set(tasksToSign.map((task) => task.id));
+    setSelectedLegacyCommissionTaskIds((current) => current.filter((id) => !signedIds.has(id)));
+    setLegacyCommissionSigningTasks([]);
+    setLegacyCommissionSignError('');
+    setSignatureInk('');
+    setNotice(`Demo komisijos dokumentai pasirašyti: ${tasksToSign.length}.`);
   };
 
   const saveCommissionPin = async (orgId, member, pin) => {
@@ -5163,7 +5214,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return;
     }
     if (!signatureInk) {
-      setCommissionSignError('Nupieškite parašą prieš patvirtindami PIN.');
+      setCommissionSignError(sandboxMode ? 'Nupieškite parašą prieš patvirtindami.' : 'Nupieškite parašą prieš patvirtindami PIN.');
       return;
     }
     if (cloudMode) {
@@ -5194,7 +5245,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       setData((current) => ({ ...current, signatures: [...current.signatures, { ...signature, signaturePath: uploadedSignature.path }] }));
     } else {
-      if (commissionSignPin !== org.commissionPins?.[target.member]) {
+      if (!sandboxMode && commissionSignPin !== org.commissionPins?.[target.member]) {
         setCommissionSignError('Komisijos nario PIN kodas neteisingas.');
         return;
       }
@@ -5206,7 +5257,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         resourceId: resource.id,
         signer: target.member,
         role: 'Komisijos narys',
-        signatureMethod: 'PIN',
+        signatureMethod: sandboxMode ? 'Sandbox' : 'PIN',
         signedAt: new Date().toISOString(),
         validUntil: getValidityUntil(resource.validityMonths),
         signatureImage: signatureInk,
@@ -5216,7 +5267,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setCommissionSigningTarget(null);
     setCommissionSignPin('');
     setSignatureInk('');
-    setNotice(`Komisijos nario „${target.member}“ parašas patvirtintas PIN kodu.`);
+    setNotice(sandboxMode
+      ? `Demo komisijos nario „${target.member}“ parašas patvirtintas.`
+      : `Komisijos nario „${target.member}“ parašas patvirtintas PIN kodu.`);
   };
 
   const updateSubscription = (subscriptionId, action) => {
@@ -6276,18 +6329,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </div>
             </Panel>}
             {pendingLegacyCommissionTasks.length > 0 && <Panel title="Kiti komisijai pasirašomi dokumentai">
+              {sandboxMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={paginatedLegacyCommissionTasks.length > 0 && paginatedLegacyCommissionTasks.every((task) => selectedLegacyCommissionTaskIds.includes(task.id))} disabled={!paginatedLegacyCommissionTasks.length} onChange={(event) => setSelectedLegacyCommissionTaskIds((current) => event.target.checked
+                  ? [...new Set([...current, ...paginatedLegacyCommissionTasks.map((task) => task.id)])]
+                  : current.filter((id) => !paginatedLegacyCommissionTasks.some((task) => task.id === id)))} />Pasirinkti visus šiame puslapyje ({paginatedLegacyCommissionTasks.length})</label>
+                <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-600">Pasirinkta {selectedCurrentLegacyCommissionTasks.length} / {pendingLegacyCommissionTasks.length}{selectedCurrentLegacyCommissionTasks.length > dssSignatureBatchSize ? ` · vienu kartu iki ${dssSignatureBatchSize}` : ''}</span><button type="button" className={buttonClass} disabled={!selectedCurrentLegacyCommissionTasks.length} onClick={() => requestLegacyCommissionBatchSign(selectedCurrentLegacyCommissionTasks)}><FileSignature size={16} />Pasirašyti {Math.min(selectedCurrentLegacyCommissionTasks.length, dssSignatureBatchSize)}{selectedCurrentLegacyCommissionTasks.length > dssSignatureBatchSize ? ` iš ${selectedCurrentLegacyCommissionTasks.length}` : ''}</button></div>
+              </div>}
               <div className="space-y-3">
-                {pendingLegacyCommissionTasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
-                  <div><p className="font-semibold">{task.resource.title}</p><p className="mt-1 text-sm text-slate-600">{task.employee.name} · {task.commissionMember}</p></div>
+                {(sandboxMode ? paginatedLegacyCommissionTasks : pendingLegacyCommissionTasks).map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-start gap-2">{sandboxMode && <input className="mt-1" type="checkbox" aria-label={`Pasirinkti ${task.employee.name} dokumentą`} checked={selectedLegacyCommissionTaskIds.includes(task.id)} onChange={(event) => setSelectedLegacyCommissionTaskIds((current) => event.target.checked ? [...new Set([...current, task.id])] : current.filter((id) => id !== task.id))} />}<div><p className="font-semibold">{task.resource.title}</p><p className="mt-1 text-sm text-slate-600">{task.employee.name} · {task.commissionMember}</p></div></div>
                   <div className="flex gap-2"><button type="button" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => openResourcePreview(task.resource, { employeeId: task.employee.id })}><Eye size={14} className="shrink-0" />Peržiūrėti</button><button type="button" className={buttonClass} onClick={() => requestCommissionSign(task.employee, task.resource, task.commissionMember)}><FileSignature size={15} />Pasirašyti</button></div>
                 </div>)}
               </div>
+              {sandboxMode && pendingLegacyCommissionTasks.length > dssTaskPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentLegacyCommissionTaskPage - 1) * dssTaskPageSize + 1}–{Math.min(currentLegacyCommissionTaskPage * dssTaskPageSize, pendingLegacyCommissionTasks.length)} iš {pendingLegacyCommissionTasks.length} · pasirinkta {selectedCurrentLegacyCommissionTasks.length}</p><nav className="flex items-center gap-2" aria-label="Komisijos dokumentų puslapiavimas"><button type="button" aria-label="Ankstesnis komisijos dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentLegacyCommissionTaskPage <= 1} onClick={() => setLegacyCommissionTaskPage(Math.max(1, currentLegacyCommissionTaskPage - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentLegacyCommissionTaskPage} / {legacyCommissionTaskPageCount}</span><button type="button" aria-label="Kitas komisijos dokumentų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentLegacyCommissionTaskPage >= legacyCommissionTaskPageCount} onClick={() => setLegacyCommissionTaskPage(Math.min(legacyCommissionTaskPageCount, currentLegacyCommissionTaskPage + 1))}><ChevronRight size={17} /></button></nav></div>}
             </Panel>}
+            {legacyCommissionSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmLegacyCommissionBatchSign} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Komisijos dokumentų parašas</h2><p className="text-sm text-slate-600">Pasirašomi {legacyCommissionSigningTasks.length} demo dokumentai. Parašas liks tik šiame skirtuke.</p><div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{legacyCommissionSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{task.employee.name} · {task.commissionMember}</p><p className="text-slate-600">{task.resource.title}</p></div>)}</div><SignaturePad value={signatureInk} onChange={setSignatureInk} />{legacyCommissionSignError && <p role="alert" className="text-sm text-rose-700">{legacyCommissionSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setLegacyCommissionSigningTasks([]); setLegacyCommissionSignError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
             {commissionSigningTarget?.orgId === currentOrg?.id && <Panel title="Komisijos parašas">
               <p className="mb-3 text-sm text-slate-600">{commissionSigningTarget.member} · {data.resources.find((item) => item.id === commissionSigningTarget.resourceId)?.title}</p>
               <SignaturePad value={signatureInk} onChange={setSignatureInk} />
               <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={confirmCommissionSign}>
-                <label className="text-sm font-medium">Seno dokumento komisijos PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={commissionSignPin} onChange={(event) => setCommissionSignPin(event.target.value)} required /></label>
+                {!sandboxMode && <label className="text-sm font-medium">Seno dokumento komisijos PIN<input className={`${inputClass} mt-1 max-w-xs`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={commissionSignPin} onChange={(event) => setCommissionSignPin(event.target.value)} required /></label>}
                 <button className={buttonClass}><FileSignature size={15} />Pasirašyti</button>
                 <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setCommissionSigningTarget(null); setCommissionSignPin(''); setSignatureInk(''); }}>Atšaukti</button>
               </form>
