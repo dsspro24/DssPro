@@ -201,6 +201,22 @@ const getLatestPassedProtocolTestResult = (employee, resource) => {
     .filter((result) => result.resourceId === resource.relatedTestId && result.passed === true)
     .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0];
 };
+const getUnsignedPassedTestResult = (employee, resourceId, signatures) => {
+  const employeeSignatures = signatures.filter((signature) => (
+    signature.employeeId === employee?.id
+    && signature.resourceId === resourceId
+    && signature.role === 'Darbuotojas'
+  ));
+  return (employee?.testResults ?? [])
+    .filter((result) => result.resourceId === resourceId && result.passed === true)
+    .filter((result) => {
+      const completedAt = new Date(result.completedAt).getTime() || 0;
+      return !employeeSignatures.some((signature) => (
+        (new Date(signature.signedAt).getTime() || 0) >= completedAt
+      ));
+    })
+    .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0] ?? null;
+};
 const hasPassedProtocolTest = (employee, resource) => {
   if (!resource.relatedTestId) return true;
   return Boolean(getLatestPassedProtocolTestResult(employee, resource));
@@ -3652,6 +3668,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka') } = {}) => {
+    if (!templateOnly && userRole === 'darbuotojas' && normalizeResourceType(resource) === 'Testas') {
+      const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
+      const unsignedPassedResult = getUnsignedPassedTestResult(employee, resource.id, data.signatures);
+      if (unsignedPassedResult) {
+        setPreviewResource(null);
+        requestWorkerSign(employee, resource);
+        return;
+      }
+    }
     if (userRole === 'darbuotojas' && ['Protokolas', 'Kortelė'].includes(normalizeResourceType(resource))) {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const accessError = getEmployeeProtocolAccessError(employee, resource);
