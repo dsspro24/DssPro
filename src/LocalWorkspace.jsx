@@ -1647,7 +1647,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   useLayoutEffect(() => {
     const frame = previewFrameRef.current;
     if (frame) {
-      frame.hidden = userRole === 'darbuotojas' && previewResource?.type === 'Testas';
+      frame.hidden = userRole === 'darbuotojas'
+        && previewResource?.type === 'Testas'
+        && !previewResource.workerSignedPreview;
       frame.closest('section')?.classList.toggle('worker-signed-preview', Boolean(previewResource?.workerSignedPreview));
     }
   }, [previewResource, userRole]);
