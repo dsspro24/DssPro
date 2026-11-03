@@ -100,6 +100,7 @@ function printPdfHtml(html, title) {
         const printWindow = frame.contentWindow;
         const printDocument = frame.contentDocument;
         if (!printWindow || !printDocument) throw new Error('Nepavyko atidaryti dokumento.');
+        printDocument.title = title;
         await printDocument.fonts?.ready;
         await Promise.all([...printDocument.images].map((image) => image.decode().catch(() => {})));
         printWindow.addEventListener('afterprint', cleanup, { once: true });
@@ -133,6 +134,7 @@ function formatInvoiceDate(value) {
 function renderSubscriptionInvoiceHtml(invoice) {
   const issuer = invoice.issuer ?? {};
   const recipient = invoice.recipient ?? {};
+  const isPaid = Boolean(invoice.paidAt);
   const amount = (cents) => new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((cents ?? 0) / 100);
   const issuerFields = [
     ['Teisinė forma', issuer.legalForm],
@@ -177,9 +179,9 @@ function renderSubscriptionInvoiceHtml(invoice) {
     </tbody></table>
     <div class="totals"><div><span>Suma be PVM</span><strong>${amount(invoice.netAmountCents)}</strong></div>
       ${invoice.vatRegistered ? `<div><span>${vatLabel}</span><strong>${amount(invoice.vatAmountCents)}</strong></div>` : '<div><span>PVM (netaikomas)</span><strong>0,00 €</strong></div>'}
-      <div class="total"><span>Mokėti</span><span>${amount(invoice.totalAmountCents)}</span></div></div>
+      <div class="total"><span>${isPaid ? 'Apmokėta' : 'Mokėti'}</span><span>${amount(invoice.totalAmountCents)}</span></div></div>
     ${invoice.note ? `<p class="note"><strong>Pastabos:</strong><br>${escapeInvoiceHtml(invoice.note)}</p>` : ''}
-    <p class="footer">Dokumentas sugeneruotas DSS Pro sistemoje. Išankstinė sąskaita nėra apmokėjimo patvirtinimas.</p>
+    <p class="footer">Dokumentas sugeneruotas DSS Pro sistemoje.${isPaid ? ' Apmokėjimas patvirtintas.' : ' Išankstinė sąskaita nėra apmokėjimo patvirtinimas.'}</p>
   </body></html>`;
 }
 
