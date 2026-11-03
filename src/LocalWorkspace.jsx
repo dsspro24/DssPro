@@ -5732,6 +5732,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return persistedSettings;
   };
 
+  const loadCreatorInvoiceSettings = async () => {
+    const { data: savedSettings, error } = await supabase
+      .from('creator_billing_settings')
+      .select('issuer_details, vat_registered, vat_rate, vat_included, invoice_note')
+      .eq('id', true)
+      .maybeSingle();
+    if (error) throw error;
+    const loadedSettings = savedSettings ?? defaultCreatorInvoiceSettings;
+    setCreatorInvoiceSettings(loadedSettings);
+    return loadedSettings;
+  };
+
   const downloadSubscriptionInvoice = async (invoiceData) => {
     try {
       await printPdfHtml(renderSubscriptionInvoiceHtml(invoiceData), invoiceData.invoiceNumber ?? invoiceData.orderCode);
@@ -7181,7 +7193,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
             <Panel title="Sąskaitų rekvizitai">
-              <CreatorInvoiceSettingsEditor settings={creatorInvoiceSettings} onSave={saveCreatorInvoiceSettings} />
+              <CreatorInvoiceSettingsEditor settings={creatorInvoiceSettings} onLoad={loadCreatorInvoiceSettings} onSave={saveCreatorInvoiceSettings} />
             </Panel>
             <div className="grid items-start gap-4 md:grid-cols-2">
               <Panel title="Pagrindiniai planai">
@@ -9261,7 +9273,7 @@ function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, onSave })
   </form>;
 }
 
-function CreatorInvoiceSettingsEditor({ settings, onSave }) {
+function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave }) {
   const [draft, setDraft] = useState(() => ({
     ...defaultCreatorInvoiceSettings,
     ...settings,
@@ -9271,6 +9283,7 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
     },
   }));
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
   const issuerFields = [
@@ -9308,6 +9321,32 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
     }
   };
 
+  const toggleEditing = async () => {
+    if (editing) {
+      setEditing(false);
+      setError('');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const saved = await onLoad();
+      setDraft({
+        ...defaultCreatorInvoiceSettings,
+        ...saved,
+        issuer_details: {
+          ...defaultCreatorInvoiceSettings.issuer_details,
+          ...(saved?.issuer_details ?? {}),
+        },
+      });
+      setEditing(true);
+    } catch (loadError) {
+      setError(loadError.message || 'Išsaugytų sąskaitų rekvizitų užkrauti nepavyko.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const savedIssuerDetails = issuerFields
     .map(([key, label]) => ({ label: label.replace(/\s*\([^)]*\)\s*/g, '').trim(), value: draft.issuer_details[key]?.trim() }))
     .filter(({ value }) => value);
@@ -9320,7 +9359,7 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
           <img src={dssProLogo} alt="DSS Pro" className="size-14 rounded-full object-contain" />
           <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Pardavėjas</p><h3 className="text-lg font-bold">{draft.issuer_details.name || 'Pavadinimas / vardas, pavardė'}</h3></div>
         </div>
-        <button type="button" className={buttonClass} onClick={() => { setEditing((current) => !current); setError(''); }}>{editing ? 'Slėpti redagavimą' : 'Redaguoti rekvizitus'}</button>
+        <button type="button" className={buttonClass} onClick={toggleEditing} disabled={loading}>{loading ? 'Užkraunama…' : editing ? 'Slėpti redagavimą' : 'Redaguoti rekvizitus'}</button>
       </div>
       <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         {draft.issuer_details.legalForm && <p><span className="text-slate-500">Teisinė forma: </span><strong>{draft.issuer_details.legalForm}</strong></p>}
