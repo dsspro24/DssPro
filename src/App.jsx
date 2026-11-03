@@ -459,20 +459,20 @@ function DemoApp({ cloudMode = false }) {
             </div>
 
             {subscriptionPlansError && <p role="alert" className="text-xs text-rose-700">{subscriptionPlansError}</p>}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-3">
               {subscriptionPlans.map((plan) => (
-                <button key={plan.code} type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === plan.code} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan(plan.code); }} className={`w-full rounded-2xl border bg-white p-5 text-left shadow-sm ${registerRole === 'vadovas' && registerPlan === plan.code ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
-                  <span className="text-xs font-semibold text-slate-500">{plan.name}</span>
-                  <div className="mt-1 flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-slate-800">{new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount_cents / 100)} €</span>
-                    <span className="text-xs text-slate-400">/ mėn.</span>
-                  </div>
-                  <ul className="mt-4 space-y-2 text-xs text-slate-600">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Iki {plan.employee_limit} darbuotojų</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> VDI žurnalai</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> PDF dokumentai</li>
-                  </ul>
-                  <span className="mt-4 block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === plan.code ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
+                <button key={plan.code} type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === plan.code} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan(plan.code); }} className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3.5 text-left transition-colors sm:px-5 ${registerRole === 'vadovas' && registerPlan === plan.code ? 'border-emerald-700 bg-emerald-50/70 ring-1 ring-emerald-700' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className={`grid size-5 shrink-0 place-items-center rounded-full border ${registerRole === 'vadovas' && registerPlan === plan.code ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-transparent'}`}><Check size={13} strokeWidth={3} /></span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-slate-900">{plan.name}</span>
+                      <span className="mt-1 block text-xs text-slate-500">VDI žurnalai <span className="px-1 text-slate-300">·</span> PDF dokumentai</span>
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block whitespace-nowrap text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount_cents / 100)} €</span>
+                    <span className="block text-xs text-slate-500">per mėnesį</span>
+                  </span>
                 </button>
               ))}
             </div>
