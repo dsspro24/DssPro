@@ -6988,11 +6988,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Peržiūrėkite galiojimo laiką, koreguokite įmonių prenumeratas ir kainoraštį. Sąskaitos išrašomos rankiniu būdu." />
-            <Panel title="Mėnesinių planų kainos">
-              <div className="grid gap-3 md:grid-cols-2">
-                {subscriptionPlans.filter((plan) => ['up_to_20', 'up_to_50', 'up_to_75', 'up_to_200', 'additional_workspace_20', 'additional_workspace_50', 'additional_workspace_75', 'additional_workspace_200'].includes(plan.code)).map((plan) => <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />)}
-              </div>
-            </Panel>
+            <div className="grid items-start gap-4 md:grid-cols-2">
+              <Panel title="Pagrindiniai planai">
+                <div className="space-y-3">
+                  {subscriptionPlans.filter((plan) => ['up_to_20', 'up_to_50', 'up_to_75', 'up_to_200'].includes(plan.code)).map((plan) => <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />)}
+                </div>
+              </Panel>
+              <Panel title="Papildomos įmonės">
+                <div className="space-y-3">
+                  {subscriptionPlans.filter((plan) => ['additional_workspace_20', 'additional_workspace_50', 'additional_workspace_75', 'additional_workspace_200'].includes(plan.code)).map((plan) => <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />)}
+                </div>
+              </Panel>
+            </div>
             <Panel title="Prenumeratos ir užsakymai">
               <div className="space-y-4">
                 {creatorSubscriptionGroups.map(({ root, workspaces }) => <section key={root?.id ?? 'unassigned'} className="space-y-3 rounded-lg border border-slate-200 p-4">
