@@ -1377,6 +1377,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [employeePositionFilter, setEmployeePositionFilter] = useState({ organizationId: '', position: '' });
   const [creatorOrganizationSearch, setCreatorOrganizationSearch] = useState('');
   const [creatorAccountSearch, setCreatorAccountSearch] = useState('');
+  const [creatorSubscriptionSearch, setCreatorSubscriptionSearch] = useState('');
+  const [creatorSubscriptionFilter, setCreatorSubscriptionFilter] = useState('all');
+  const [creatorSubscriptionPage, setCreatorSubscriptionPage] = useState(1);
+  const [expandedCreatorSubscriptionGroups, setExpandedCreatorSubscriptionGroups] = useState({});
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState('');
   const [deletingCreatorAccountId, setDeletingCreatorAccountId] = useState('');
   const [creatorOrganizationPage, setCreatorOrganizationPage] = useState(1);
   const [creatorAccountPage, setCreatorAccountPage] = useState(1);
@@ -2596,6 +2601,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }), [data.organizations, creatorOrganizationSearch, creatorMembershipsByOrg]);
   const creatorSubscriptionGroups = useMemo(() => {
     const organizationIds = new Set(data.organizations.map((organization) => organization.id));
+    const subscriptionsByOrganization = new Map();
+    for (const subscription of creatorSubscriptions) {
+      const current = subscriptionsByOrganization.get(subscription.orgId) ?? [];
+      current.push(subscription);
+      subscriptionsByOrganization.set(subscription.orgId, current);
+    }
     const groups = data.organizations
       .filter((organization) => !organization.parentOrganizationId || !organizationIds.has(organization.parentOrganizationId))
       .map((root) => {
@@ -2607,7 +2618,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           root,
           workspaces: workspaces.map((organization) => ({
             organization,
-            subscriptions: creatorSubscriptions.filter((subscription) => subscription.orgId === organization.id),
+            subscriptions: subscriptionsByOrganization.get(organization.id) ?? [],
           })),
         };
       });
@@ -2624,6 +2635,74 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     return groups.filter((group) => group.workspaces.some((workspace) => workspace.subscriptions.length));
   }, [data.organizations, creatorSubscriptions]);
+  const creatorSubscriptionSummary = useMemo(() => {
+    const now = validityCheckTime;
+    const summary = { active: 0, expiring: 0, expired: 0, pending: 0, canceled: 0 };
+    for (const group of creatorSubscriptionGroups) {
+      for (const workspace of group.workspaces) {
+        const latest = workspace.subscriptions[0];
+        if (!latest) continue;
+        if (latest.paymentStatus === 'Laukiama apmokėjimo') {
+          summary.pending += 1;
+        } else if (latest.status === 'Aktyvi' && latest.endsAt && new Date(latest.endsAt).getTime() <= now) {
+          summary.expired += 1;
+        } else if (latest.status === 'Aktyvi' && latest.endsAt && new Date(latest.endsAt).getTime() - now <= 5 * 24 * 60 * 60 * 1000) {
+          summary.expiring += 1;
+        } else if (latest.status === 'Aktyvi') {
+          summary.active += 1;
+        } else if (latest.status === 'Pasibaigusi') {
+          summary.expired += 1;
+        } else if (latest.status === 'Atšaukta') {
+          summary.canceled += 1;
+        }
+      }
+    }
+    return summary;
+  }, [creatorSubscriptionGroups, validityCheckTime]);
+  const filteredCreatorSubscriptionGroups = useMemo(() => {
+    const now = validityCheckTime;
+    const query = creatorSubscriptionSearch.trim().toLocaleLowerCase('lt');
+    const matchesStatus = (subscription) => {
+      const daysRemaining = subscription.endsAt ? (new Date(subscription.endsAt).getTime() - now) / (24 * 60 * 60 * 1000) : Infinity;
+      const expiring = subscription.status === 'Aktyvi' && daysRemaining > 0 && daysRemaining <= 5;
+      const expired = subscription.status === 'Pasibaigusi' || subscription.status === 'Aktyvi' && daysRemaining <= 0;
+      if (creatorSubscriptionFilter === 'action') return subscription.paymentStatus === 'Laukiama apmokėjimo' || expiring;
+      if (creatorSubscriptionFilter === 'active') return subscription.status === 'Aktyvi' && daysRemaining > 5;
+      if (creatorSubscriptionFilter === 'expiring') return expiring;
+      if (creatorSubscriptionFilter === 'expired') return expired;
+      if (creatorSubscriptionFilter === 'pending') return subscription.paymentStatus === 'Laukiama apmokėjimo';
+      if (creatorSubscriptionFilter === 'canceled') return subscription.status === 'Atšaukta';
+      return true;
+    };
+    return creatorSubscriptionGroups.map((group) => {
+      const rootMatches = !query || `${group.root?.name ?? ''} ${group.workspaces.flatMap(({ organization, subscriptions }) => `${organization.name} ${subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+      const workspaces = group.workspaces
+        .map((workspace) => {
+          const workspaceMatches = !query || `${workspace.organization.name} ${workspace.subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+          if (!rootMatches && !workspaceMatches) return null;
+          const subscriptions = workspace.subscriptions.filter(matchesStatus);
+          return subscriptions.length ? { ...workspace, subscriptions } : null;
+        })
+        .filter(Boolean);
+      return workspaces.length ? { ...group, workspaces } : null;
+    }).filter(Boolean).sort((left, right) => {
+      const urgency = (group) => {
+        const statuses = group.workspaces.flatMap(({ subscriptions }) => subscriptions).map((subscription) => {
+          if (subscription.paymentStatus === 'Laukiama apmokėjimo') return 0;
+          if (subscription.status === 'Aktyvi' && subscription.endsAt) {
+            const days = (new Date(subscription.endsAt).getTime() - now) / (24 * 60 * 60 * 1000);
+            if (days > 0 && days <= 5) return 1;
+            if (days <= 0) return 2;
+          }
+          if (subscription.status === 'Pasibaigusi') return 2;
+          if (subscription.status === 'Aktyvi') return 3;
+          return 4;
+        });
+        return Math.min(...statuses);
+      };
+      return urgency(left) - urgency(right) || (left.root?.name ?? '').localeCompare(right.root?.name ?? '', 'lt');
+    });
+  }, [creatorSubscriptionGroups, creatorSubscriptionSearch, creatorSubscriptionFilter, validityCheckTime]);
   const creatorAccountsFiltered = useMemo(() => creatorAccounts
     .filter((account) => `${account.fullName ?? ''} ${account.email ?? ''} ${account.accountType ?? ''} ${(account.organizations ?? []).map((organization) => organization.name).join(' ')}`.toLocaleLowerCase('lt').includes(creatorAccountSearch.trim().toLocaleLowerCase('lt'))), [creatorAccounts, creatorAccountSearch]);
   const creatorOrganizationPageSize = 20;
@@ -2632,6 +2711,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const creatorAccountPageSize = 20;
   const creatorAccountPageCount = Math.max(1, Math.ceil(creatorAccountsFiltered.length / creatorAccountPageSize));
   const paginatedCreatorAccounts = creatorAccountsFiltered.slice((creatorAccountPage - 1) * creatorAccountPageSize, creatorAccountPage * creatorAccountPageSize);
+  const creatorSubscriptionPageSize = 20;
+  const creatorSubscriptionPageCount = Math.max(1, Math.ceil(filteredCreatorSubscriptionGroups.length / creatorSubscriptionPageSize));
+  const paginatedCreatorSubscriptionGroups = filteredCreatorSubscriptionGroups.slice(
+    (creatorSubscriptionPage - 1) * creatorSubscriptionPageSize,
+    creatorSubscriptionPage * creatorSubscriptionPageSize,
+  );
   const getDashboardSortValue = (employee, key) => {
     if (key === 'medical') return employee.medicalCertificateValidUntil ? new Date(employee.medicalCertificateValidUntil).getTime() : null;
     if (key === 'status') return ({ atlikta: 0, vyksta: 1, truksta: 2, nepriskirta: 3 })[getEmployeeStatusFilter(employee)];
@@ -5832,6 +5917,36 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return refreshedSubscription;
   };
 
+  const deleteCreatorSubscriptionInvoice = async (subscriptionId, invoiceType) => {
+    if (deletingInvoiceId) return;
+    setDeletingInvoiceId(subscriptionId);
+    try {
+      const { data: updatedSubscription, error } = await supabase.rpc('creator_delete_subscription_invoice', {
+        input_subscription_id: subscriptionId,
+        input_invoice_type: invoiceType,
+      });
+      if (error) throw error;
+      const current = creatorSubscriptions.find((item) => item.id === subscriptionId);
+      if (!current) throw new Error('Prenumeratos įrašas neberastas.');
+      const refreshed = {
+        ...current,
+        preinvoiceData: updatedSubscription.preinvoice_data ?? null,
+        finalInvoiceNumber: updatedSubscription.final_invoice_number ?? '',
+        finalInvoiceData: updatedSubscription.final_invoice_data ?? null,
+      };
+      setCreatorSubscriptions((items) => items.map((item) => item.id === subscriptionId ? refreshed : item));
+      setData((value) => ({
+        ...value,
+        subscriptions: value.subscriptions.map((item) => item.id === subscriptionId ? refreshed : item),
+      }));
+      setNotice(invoiceType === 'preinvoice' ? 'Išankstinė sąskaita ištrinta.' : 'Galutinė sąskaita ištrinta.');
+    } catch (error) {
+      setNotice(`Sąskaitos ištrinti nepavyko: ${error.message}`);
+    } finally {
+      setDeletingInvoiceId('');
+    }
+  };
+
   const savePin = async (event) => {
     event.preventDefault();
     if (!/^\d{4}$/.test(pinDraft) || pinDraft !== pinConfirm) {
@@ -7209,29 +7324,69 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </div>
             <Panel title="Prenumeratos ir užsakymai">
               <div className="space-y-4">
-                {creatorSubscriptionGroups.map(({ root, workspaces }) => <section key={root?.id ?? 'unassigned'} className="space-y-3 rounded-lg border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <h3 className="font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</h3>
-                    {workspaces.length > 1 && <span className="text-xs text-slate-500">Papildomų įmonių: {workspaces.length - 1}</span>}
-                  </div>
-                  {workspaces.map(({ organization, subscriptions }) => <div key={organization.id} className={organization.parentOrganizationId ? 'ml-3 space-y-3 border-l-2 border-emerald-200 pl-3 sm:ml-5 sm:pl-4' : 'space-y-3'}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {organization.parentOrganizationId && <span aria-hidden="true" className="text-emerald-700">↳</span>}
-                      <p className="text-sm font-semibold">{organization.name}</p>
-                      {organization.parentOrganizationId && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">Papildoma įmonė</span>}
-                    </div>
-                    {subscriptions.map((subscription) => <CreatorSubscriptionEditor
-                      key={`${subscription.id}-${subscription.status}-${subscription.paymentStatus}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`}
-                      subscription={subscription}
-                      organizationName={organization.name}
-                      plans={subscriptionPlans}
-                      onSave={saveCreatorSubscription}
-                      onConfirmPayment={confirmSubscriptionPayment}
-                      onDownloadInvoice={downloadSubscriptionInvoice}
-                    />)}
-                  </div>)}
-                </section>)}
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {[
+                    ['action', 'Reikia dėmesio', creatorSubscriptionSummary.pending + creatorSubscriptionSummary.expiring, 'border-amber-300 bg-amber-50 text-amber-950'],
+                    ['active', 'Aktyvios', creatorSubscriptionSummary.active, 'border-emerald-300 bg-emerald-50 text-emerald-950'],
+                    ['expiring', 'Baigiasi per 5 d.', creatorSubscriptionSummary.expiring, 'border-yellow-300 bg-yellow-50 text-yellow-950'],
+                    ['expired', 'Pasibaigusios', creatorSubscriptionSummary.expired, 'border-rose-300 bg-rose-50 text-rose-950'],
+                    ['pending', 'Laukia apmokėjimo', creatorSubscriptionSummary.pending, 'border-orange-300 bg-orange-50 text-orange-950'],
+                  ].map(([filter, label, count, color]) => <button key={filter} type="button" className={`rounded-lg border p-3 text-left ${color} ${creatorSubscriptionFilter === filter ? 'ring-2 ring-slate-700 ring-offset-1' : ''}`} onClick={() => { setCreatorSubscriptionFilter(creatorSubscriptionFilter === filter ? 'all' : filter); setCreatorSubscriptionPage(1); }}>
+                    <span className="block text-xs font-medium">{label}</span><strong className="mt-1 block text-xl tabular-nums">{count}</strong>
+                  </button>)}
+                </div>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <label className="relative block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti prenumeratos ar įmonės</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={creatorSubscriptionSearch} onChange={(event) => { setCreatorSubscriptionSearch(event.target.value); setCreatorSubscriptionPage(1); }} placeholder="Įmonė, užsakymo kodas arba planas" /></label>
+                  <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1 min-w-48`} value={creatorSubscriptionFilter} onChange={(event) => { setCreatorSubscriptionFilter(event.target.value); setCreatorSubscriptionPage(1); }}>
+                    <option value="all">Visos būsenos</option><option value="action">Reikia dėmesio</option><option value="active">Aktyvios</option><option value="expiring">Baigiasi per 5 d.</option><option value="expired">Pasibaigusios</option><option value="pending">Laukia apmokėjimo</option><option value="canceled">Atšauktos</option>
+                  </select></label>
+                </div>
+                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
+                {paginatedCreatorSubscriptionGroups.map(({ root, workspaces }) => {
+                  const groupId = root?.id ?? 'unassigned';
+                  const expanded = expandedCreatorSubscriptionGroups[groupId] === true;
+                  const groupSubscriptions = workspaces.flatMap(({ subscriptions }) => subscriptions);
+                  const latestGroupSubscriptions = workspaces.map(({ subscriptions }) => subscriptions[0]).filter(Boolean);
+                  const now = validityCheckTime;
+                  const groupBadge = latestGroupSubscriptions.some((subscription) => subscription.paymentStatus === 'Laukiama apmokėjimo')
+                    ? ['Laukia apmokėjimo', 'bg-orange-100 text-orange-900']
+                    : latestGroupSubscriptions.some((subscription) => subscription.status === 'Aktyvi' && subscription.endsAt && (new Date(subscription.endsAt).getTime() - now) > 0 && (new Date(subscription.endsAt).getTime() - now) <= 5 * 24 * 60 * 60 * 1000)
+                      ? ['Baigiasi greitai', 'bg-yellow-100 text-yellow-900']
+                      : latestGroupSubscriptions.some((subscription) => subscription.status === 'Aktyvi' && (!subscription.endsAt || new Date(subscription.endsAt).getTime() > now))
+                        ? ['Aktyvi', 'bg-emerald-100 text-emerald-900']
+                        : latestGroupSubscriptions.some((subscription) => subscription.status === 'Pasibaigusi' || subscription.status === 'Aktyvi' && subscription.endsAt && new Date(subscription.endsAt).getTime() <= now)
+                          ? ['Pasibaigusi', 'bg-rose-100 text-rose-900']
+                          : ['Atšaukta', 'bg-slate-100 text-slate-700'];
+                  return <section key={groupId} className="overflow-hidden rounded-lg border border-slate-200">
+                    <button type="button" className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left hover:bg-slate-50" aria-expanded={expanded} onClick={() => setExpandedCreatorSubscriptionGroups((current) => ({ ...current, [groupId]: !current[groupId] }))}>
+                      <span className="flex min-w-0 items-center gap-2"><ChevronDown size={17} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} /><span className="truncate font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${groupBadge[1]}`}>{groupBadge[0]}</span></span>
+                      <span className="text-xs text-slate-500">{workspaces.length} {workspaces.length === 1 ? 'įmonė' : 'įmonių'} · {groupSubscriptions.length} {groupSubscriptions.length === 1 ? 'įrašas' : 'įrašų'}{workspaces.length > 1 ? ` · ${workspaces.length - 1} papild.` : ''}</span>
+                    </button>
+                    {expanded && <div className="space-y-4 border-t border-slate-200 bg-slate-50/60 p-4">
+                      {workspaces.map(({ organization, subscriptions }) => <div key={organization.id} className={organization.parentOrganizationId ? 'ml-3 space-y-3 border-l-2 border-emerald-200 pl-3 sm:ml-5 sm:pl-4' : 'space-y-3'}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {organization.parentOrganizationId && <span aria-hidden="true" className="text-emerald-700">↳</span>}
+                          <p className="text-sm font-semibold">{organization.name}</p>
+                          {organization.parentOrganizationId && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">Papildoma įmonė</span>}
+                        </div>
+                        {subscriptions.map((subscription) => <CreatorSubscriptionEditor
+                          key={`${subscription.id}-${subscription.status}-${subscription.paymentStatus}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`}
+                          subscription={subscription}
+                          organizationName={organization.name}
+                          plans={subscriptionPlans}
+                          onSave={saveCreatorSubscription}
+                          onConfirmPayment={confirmSubscriptionPayment}
+                          onDownloadInvoice={downloadSubscriptionInvoice}
+                          onDeleteInvoice={deleteCreatorSubscriptionInvoice}
+                          now={validityCheckTime}
+                        />)}
+                      </div>)}
+                    </div>}
+                  </section>;
+                })}
+                {filteredCreatorSubscriptionGroups.length > creatorSubscriptionPageSize && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Puslapis {Math.min(creatorSubscriptionPage, creatorSubscriptionPageCount)} iš {creatorSubscriptionPageCount}</span><nav className="flex items-center gap-2" aria-label="Prenumeratų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage <= 1} onClick={() => setCreatorSubscriptionPage((page) => Math.max(1, page - 1))}>Atgal</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage >= creatorSubscriptionPageCount} onClick={() => setCreatorSubscriptionPage((page) => Math.min(creatorSubscriptionPageCount, page + 1))}>Toliau</button></nav></div>}
                 {!creatorSubscriptions.length && <p className="text-sm text-slate-500">Prenumeratų užsakymų kol kas nėra.</p>}
+                {creatorSubscriptions.length > 0 && filteredCreatorSubscriptionGroups.length === 0 && <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Pagal paiešką ar būseną įmonių nerasta.</p>}
               </div>
             </Panel>
           </section>}
@@ -9420,7 +9575,7 @@ function SubscriptionPlanPriceEditor({ plan, onSave }) {
   </form>;
 }
 
-function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, onDownloadInvoice }) {
+function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, onDownloadInvoice, onDeleteInvoice, now }) {
   const [status, setStatus] = useState(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
   const [planCode, setPlanCode] = useState(subscription.planCode ?? 'up_to_20');
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
@@ -9431,11 +9586,26 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [paymentEndDate, setPaymentEndDate] = useState('');
   const [error, setError] = useState('');
   const availablePlans = plans.filter((plan) => plan.active !== false
     && (subscription.isAddon ? plan.code.startsWith('additional_workspace_') : !plan.code.startsWith('additional_workspace')));
   const price = Number(amount.replace(',', '.'));
+  const remainingDays = subscription.endsAt ? Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000) : null;
+  const lifecycle = subscription.paymentStatus === 'Laukiama apmokėjimo'
+    ? ['Laukia apmokėjimo', 'bg-orange-100 text-orange-900']
+    : subscription.status === 'Aktyvi' && remainingDays !== null && remainingDays <= 0
+      ? ['Pasibaigusi', 'bg-rose-100 text-rose-900']
+      : subscription.status === 'Aktyvi' && remainingDays !== null && remainingDays <= 5
+        ? [`Baigiasi po ${Math.max(1, remainingDays)} d.`, 'bg-yellow-100 text-yellow-900']
+        : subscription.status === 'Aktyvi'
+          ? ['Aktyvi', 'bg-emerald-100 text-emerald-900']
+          : subscription.status === 'Pasibaigusi'
+            ? ['Pasibaigusi', 'bg-rose-100 text-rose-900']
+            : subscription.status === 'Atšaukta'
+              ? ['Atšaukta', 'bg-slate-100 text-slate-700']
+              : [subscription.status, 'bg-slate-100 text-slate-700'];
   const confirmPayment = async () => {
     setConfirmingPayment(true);
     setError('');
@@ -9446,6 +9616,22 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
       setError(confirmError.message || 'Mokėjimo patvirtinti nepavyko.');
     } finally {
       setConfirmingPayment(false);
+    }
+  };
+
+  const deleteInvoice = async (invoiceType, invoiceNumber) => {
+    if (invoiceType === 'preinvoice' && subscription.paymentStatus === 'Laukiama apmokėjimo') {
+      setError('Išankstinės sąskaitos negalima ištrinti, kol užsakymas laukia apmokėjimo.');
+      return;
+    }
+    const invoiceLabel = invoiceType === 'preinvoice' ? 'išankstinę sąskaitą' : 'galutinę sąskaitą';
+    if (!window.confirm(`Ar tikrai ištrinti ${invoiceLabel} ${invoiceNumber ? `„${invoiceNumber}“` : ''} įmonei „${organizationName}“?\n\nBus ištrintas tik sąskaitos dokumentas. Prenumerata ir apmokėjimo istorija liks nepakeistos. Šio veiksmo atšaukti negalima.`)) return;
+    setDeletingInvoice(true);
+    setError('');
+    try {
+      await onDeleteInvoice(subscription.id, invoiceType);
+    } finally {
+      setDeletingInvoice(false);
     }
   };
 
@@ -9485,7 +9671,7 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold">{subscription.plan} · {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(subscription.price)} / mėn.</p>
-        <p className="mt-1 text-xs text-slate-600">{subscription.status}{subscription.endsAt ? ` · iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}{subscription.cancelAtPeriodEnd ? ' · atšaukiama laikotarpio pabaigoje' : ''}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-xs"><span className={`rounded-full px-2 py-1 font-semibold ${lifecycle[1]}`}>{lifecycle[0]}</span><span className="text-slate-600">{subscription.endsAt ? `iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}{subscription.cancelAtPeriodEnd ? ' · atšaukiama laikotarpio pabaigoje' : ''}</span></p>
         {subscription.status === 'Laukiama sąskaitos' && <p className="mt-1 text-xs font-semibold text-amber-800">Laukia sąskaitos išrašymo</p>}
         {subscription.orderCode && <p className="mt-1 text-xs font-semibold text-slate-700">Užsakymas {subscription.orderCode} · {subscription.paymentStatus} · {subscription.orderMonths} mėn.</p>}
       </div>
@@ -9502,9 +9688,10 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
       {subscription.orderCode && <><div><dt className="text-slate-500">Užsakymo kodas</dt><dd className="font-mono">{subscription.orderCode}</dd></div><div><dt className="text-slate-500">Apmokėta</dt><dd>{subscription.paidAt ? new Date(subscription.paidAt).toLocaleString('lt-LT') : 'Ne'}</dd></div></>}
     </dl>}
     {(subscription.preinvoiceData || subscription.finalInvoiceData) && <div className="flex flex-wrap gap-2">
-      {subscription.preinvoiceData && <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onDownloadInvoice(subscription.preinvoiceData)}><Download size={15} className="mr-1 inline" />Išankstinė sąskaita PDF</button>}
-      {subscription.finalInvoiceData && <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onDownloadInvoice(subscription.finalInvoiceData)}><Download size={15} className="mr-1 inline" />Galutinė sąskaita · {subscription.finalInvoiceNumber}</button>}
+      {subscription.preinvoiceData && <><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onDownloadInvoice(subscription.preinvoiceData)}><Download size={15} className="mr-1 inline" />Išankstinė sąskaita PDF</button><button type="button" aria-label={`Ištrinti išankstinę sąskaitą ${subscription.orderCode}`} className="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={deletingInvoice || subscription.paymentStatus === 'Laukiama apmokėjimo'} title={subscription.paymentStatus === 'Laukiama apmokėjimo' ? 'Negalima ištrinti, kol laukiama apmokėjimo.' : undefined} onClick={() => deleteInvoice('preinvoice', subscription.orderCode)}><Trash2 size={15} className="mr-1 inline" />Ištrinti</button></>}
+      {subscription.finalInvoiceData && <><button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onDownloadInvoice(subscription.finalInvoiceData)}><Download size={15} className="mr-1 inline" />Galutinė sąskaita · {subscription.finalInvoiceNumber}</button><button type="button" aria-label={`Ištrinti galutinę sąskaitą ${subscription.finalInvoiceNumber}`} className="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={deletingInvoice} onClick={() => deleteInvoice('final', subscription.finalInvoiceNumber)}><Trash2 size={15} className="mr-1 inline" />Ištrinti</button></>}
     </div>}
+    {subscription.preinvoiceData && subscription.paymentStatus === 'Laukiama apmokėjimo' && <p className="text-xs text-slate-500">Išankstinės sąskaitos negalima ištrinti, kol užsakymas laukia apmokėjimo.</p>}
     {subscription.orderCode && subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
       <p className="text-sm text-amber-950">Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</p>
       <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={subscription.orderedAt?.slice(0, 10)} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>
