@@ -1381,6 +1381,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [creatorSubscriptionFilter, setCreatorSubscriptionFilter] = useState('all');
   const [creatorSubscriptionPage, setCreatorSubscriptionPage] = useState(1);
   const [expandedCreatorSubscriptionGroups, setExpandedCreatorSubscriptionGroups] = useState({});
+  const [creatorInvoiceSettingsOpen, setCreatorInvoiceSettingsOpen] = useState(false);
+  const [creatorPlanPricingOpen, setCreatorPlanPricingOpen] = useState({ primary: false, additional: false });
   const [deletingInvoiceId, setDeletingInvoiceId] = useState('');
   const [deletingCreatorAccountId, setDeletingCreatorAccountId] = useState('');
   const [creatorOrganizationPage, setCreatorOrganizationPage] = useState(1);
@@ -7307,18 +7309,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
-            <Panel title="Sąskaitų rekvizitai">
-              <CreatorInvoiceSettingsEditor settings={creatorInvoiceSettings} onLoad={loadCreatorInvoiceSettings} onSave={saveCreatorInvoiceSettings} />
-            </Panel>
-            <div className="grid items-start gap-4 md:grid-cols-2">
-              <Panel title="Pagrindiniai planai">
-                <div className="space-y-3">
-                  {subscriptionPlans.filter((plan) => ['up_to_20', 'up_to_50', 'up_to_75', 'up_to_200'].includes(plan.code)).map((plan) => <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />)}
+            <div className="grid items-start gap-3 lg:grid-cols-3">
+              <Panel title={<button type="button" className="flex w-full items-center justify-between gap-2 text-left" aria-expanded={creatorInvoiceSettingsOpen} onClick={() => setCreatorInvoiceSettingsOpen((open) => !open)}><span>Sąskaitų rekvizitai</span><ChevronDown size={17} className={`shrink-0 transition-transform ${creatorInvoiceSettingsOpen ? 'rotate-180' : ''}`} /></button>}>
+                {creatorInvoiceSettingsOpen && <CreatorInvoiceSettingsEditor settings={creatorInvoiceSettings} onLoad={loadCreatorInvoiceSettings} onSave={saveCreatorInvoiceSettings} />}
+              </Panel>
+              <Panel title={<button type="button" className="flex w-full items-center justify-between gap-2 text-left" aria-expanded={creatorPlanPricingOpen.primary} onClick={() => setCreatorPlanPricingOpen((current) => ({ ...current, primary: !current.primary }))}><span>Pagrindiniai planai</span><ChevronDown size={17} className={`shrink-0 transition-transform ${creatorPlanPricingOpen.primary ? 'rotate-180' : ''}`} /></button>}>
+                <div className="space-y-2">
+                  {subscriptionPlans.filter((plan) => ['up_to_20', 'up_to_50', 'up_to_75', 'up_to_200'].includes(plan.code)).map((plan) => creatorPlanPricingOpen.primary
+                    ? <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />
+                    : <div key={plan.code} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm"><span className="min-w-0 truncate">{plan.name}</span><strong className="shrink-0 tabular-nums">{new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount_cents / 100)} €/mėn.</strong></div>)}
                 </div>
               </Panel>
-              <Panel title="Papildomos įmonės">
-                <div className="space-y-3">
-                  {subscriptionPlans.filter((plan) => ['additional_workspace_20', 'additional_workspace_50', 'additional_workspace_75', 'additional_workspace_200'].includes(plan.code)).map((plan) => <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />)}
+              <Panel title={<button type="button" className="flex w-full items-center justify-between gap-2 text-left" aria-expanded={creatorPlanPricingOpen.additional} onClick={() => setCreatorPlanPricingOpen((current) => ({ ...current, additional: !current.additional }))}><span>Papildomos įmonės</span><ChevronDown size={17} className={`shrink-0 transition-transform ${creatorPlanPricingOpen.additional ? 'rotate-180' : ''}`} /></button>}>
+                <div className="space-y-2">
+                  {subscriptionPlans.filter((plan) => ['additional_workspace_20', 'additional_workspace_50', 'additional_workspace_75', 'additional_workspace_200'].includes(plan.code)).map((plan) => creatorPlanPricingOpen.additional
+                    ? <SubscriptionPlanPriceEditor key={`${plan.code}-${plan.amount_cents}`} plan={plan} onSave={saveCreatorPlanPrice} />
+                    : <div key={plan.code} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm"><span className="min-w-0 truncate">{plan.name}</span><strong className="shrink-0 tabular-nums">{new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount_cents / 100)} €/mėn.</strong></div>)}
                 </div>
               </Panel>
             </div>
