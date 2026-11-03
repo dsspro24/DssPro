@@ -19,14 +19,14 @@ function getWorkspaceStatus(workspace) {
 
 async function loadCreatorOrganizations() {
   const withParent = await supabase.from('organizations')
-    .select('id, name, company_code, parent_organization_id')
+    .select('id, name, company_code, billing_address, vat_code, parent_organization_id')
     .order('name');
   if (!withParent.error) return withParent;
   const missingParentColumn = ['42703', 'PGRST204'].includes(withParent.error.code)
     && withParent.error.message?.includes('parent_organization_id');
   if (!missingParentColumn) return withParent;
   const fallback = await supabase.from('organizations')
-    .select('id, name, company_code')
+    .select('id, name, company_code, billing_address, vat_code')
     .order('name');
   if (fallback.error) return fallback;
   return {
@@ -281,6 +281,8 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       id: organization.id,
       name: organization.name,
       companyCode: organization.company_code ?? '',
+      billingAddress: organization.billing_address ?? '',
+      vatCode: organization.vat_code ?? '',
       parentOrganizationId: organization.parent_organization_id ?? null,
     }));
     const subscriptions = (subscriptionsResult.data ?? []).map(formatSubscription);
@@ -458,7 +460,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
 
   const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
     supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
-    supabase.from('organizations').select('id, name, company_code').in('id', managerMemberships.map((membership) => membership.organization_id)).order('name'),
+    supabase.from('organizations').select('id, name, company_code, billing_address, vat_code').in('id', managerMemberships.map((membership) => membership.organization_id)).order('name'),
     supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').eq('active', true).order('employee_limit'),
   ]);
   const { data: catalogData, error: catalogError } = catalogResult;
@@ -494,6 +496,8 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
     id: organizationId,
     name: savedOrganization?.name ?? listedOrganization?.name ?? companyDetails.companyName,
     company_code: savedOrganization?.companyCode ?? listedOrganization?.company_code ?? companyDetails.companyCode,
+    billing_address: listedOrganization?.billing_address ?? '',
+    vat_code: listedOrganization?.vat_code ?? '',
   };
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
   const currentSubscription = (hydratedWorkspace?.subscriptions ?? [])[0];
@@ -510,6 +514,8 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       id: item.id,
       name: item.name,
       company_code: item.company_code ?? '',
+      billing_address: item.billing_address ?? '',
+      vat_code: item.vat_code ?? '',
     })),
     subscriptionPlans: subscriptionPlansResult.data ?? [],
     subscriptionAccess: getSubscriptionAccess(currentSubscription),

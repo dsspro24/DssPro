@@ -169,7 +169,9 @@ function renderSubscriptionInvoiceHtml(invoice) {
     </div>
     <div class="parties"><section><h2>Pardavėjas</h2>${issuerHtml || '<p class="muted">Rekvizitai nenurodyti</p>'}</section>
       <section><h2>Pirkėjas</h2><p><strong>${escapeInvoiceHtml(recipient.name || 'Nenurodyta')}</strong></p>
-        ${recipient.companyCode ? `<p>Įmonės kodas: ${escapeInvoiceHtml(recipient.companyCode)}</p>` : ''}</section></div>
+        ${recipient.companyCode ? `<p>Įmonės kodas: ${escapeInvoiceHtml(recipient.companyCode)}</p>` : ''}
+        ${recipient.vatCode ? `<p>PVM mokėtojo kodas: ${escapeInvoiceHtml(recipient.vatCode)}</p>` : ''}
+        ${recipient.address ? `<p>Adresas: ${escapeInvoiceHtml(recipient.address)}</p>` : ''}</section></div>
     <table><thead><tr><th>Paslauga</th><th>Kiekis</th><th>Vieneto kaina</th><th>Suma</th></tr></thead><tbody>
       <tr><td>${escapeInvoiceHtml(invoice.planName)} · ${escapeInvoiceHtml(invoice.months)} mėn.</td><td>${escapeInvoiceHtml(invoice.months)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
     </tbody></table>
@@ -1269,6 +1271,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       organizations: (loadedData.organizations ?? []).map((organization) => ({
         ...initialData.organizations[0],
         ...organization,
+        ...(organization.id === cloudOrganization?.id ? {
+          billingAddress: cloudOrganization.billing_address ?? organization.billingAddress ?? '',
+          vatCode: cloudOrganization.vat_code ?? organization.vatCode ?? '',
+        } : {}),
         commission: organization.commission ?? [],
         commissionPins: organization.commissionPins ?? {},
         dss: organization.dss ?? [],
@@ -5689,6 +5695,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice('Plano kaina atnaujinta.');
   };
 
+  const saveCompanyBillingDetails = async (values) => {
+    if (!currentOrg?.id) throw new Error('Nepasirinkta įmonė.');
+    const { error } = await supabase.rpc('manager_save_organization_billing_details', {
+      input_organization_id: currentOrg.id,
+      input_billing_address: values.billingAddress,
+      input_vat_code: values.vatCode,
+    });
+    if (error) throw error;
+    updateOrg(currentOrg.id, (organization) => ({
+      ...organization,
+      billingAddress: values.billingAddress,
+      vatCode: values.vatCode,
+    }));
+    setNotice('Įmonės sąskaitų rekvizitai išsaugoti. Nauji užsakymai įtrauks šią informaciją į sąskaitą.');
+  };
+
   const saveCreatorInvoiceSettings = async (values) => {
     const issuerFields = ['legalForm', 'name', 'companyCode', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
     const issuerDetails = Object.fromEntries(issuerFields
@@ -6702,7 +6724,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'imone' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Įmonės nustatymai" subtitle="Vadovas, DSS specialistai ir darbuotojų saugos komisija." />
             <div className="grid gap-4 md:grid-cols-2">
-              <Panel title="Įmonės informacija"><p className="font-semibold">{currentOrg?.name}</p><p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode}</p><p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager}</p>{sandboxMode && <p className="mt-1 text-sm text-slate-500">{currentOrg?.managerEmail}</p>}</Panel>
+              <Panel title="Įmonės informacija">
+                <p className="font-semibold">{currentOrg?.name}</p>
+                <p className="mt-1 text-sm text-slate-500">Įmonės kodas: {currentOrg?.companyCode || 'Nenurodytas'}</p>
+                <p className="mt-1 text-sm text-slate-500">Vadovas: {currentOrg?.manager || 'Nenurodytas'}</p>
+                {sandboxMode && <p className="mt-1 text-sm text-slate-500">{currentOrg?.managerEmail}</p>}
+                {userRole === 'vadovas' && cloudMode && !creatorReadOnlyPreview && <CompanyBillingDetailsEditor
+                  key={currentOrg?.id}
+                  initialAddress={currentOrg?.billingAddress ?? ''}
+                  initialVatCode={currentOrg?.vatCode ?? ''}
+                  onSave={saveCompanyBillingDetails}
+                />}
+              </Panel>
               <Panel title="DSS specialistai">
                 {cloudMode && <div className="mb-3 flex justify-end"><button type="button" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={dssRefreshSubmitting} onClick={refreshDssAssignments}>{dssRefreshSubmitting ? 'Atnaujinama…' : 'Atnaujinti sąrašą'}</button></div>}
                 {userRole === 'vadovas' && cloudMode && !creatorReadOnlyPreview && <label className="mb-3 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={currentOrg?.dssRequestsEnabled !== false} disabled={dssRequestVisibilitySaving} onChange={(event) => setDssRequestVisibility(event.target.checked)} /><span>Leisti DSS specialistams rasti šią įmonę ir siųsti priežiūros prašymus<small className="mt-0.5 block font-normal text-slate-500">Išjungus nauji specialistų prašymai nebus priimami. Esami prašymai ir paskirti DSS specialistai nebus pakeisti.</small></span></label>}
@@ -9191,6 +9224,37 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         </form>}
     </div>}
   </div>;
+}
+
+function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, onSave }) {
+  const [address, setAddress] = useState(initialAddress);
+  const [vatCode, setVatCode] = useState(initialVatCode);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({ billingAddress: address.trim(), vatCode: vatCode.trim() });
+    } catch (saveError) {
+      setError(saveError.message || 'Įmonės rekvizitų išsaugoti nepavyko.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <form onSubmit={save} className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+    <h3 className="text-sm font-semibold">Duomenys sąskaitoms</h3>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="text-sm font-medium">PVM mokėtojo kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className={`${inputClass} mt-1`} maxLength={40} value={vatCode} onChange={(event) => setVatCode(event.target.value)} placeholder="LT123456789" /></label>
+      <label className="text-sm font-medium sm:col-span-2">Sąskaitos adresas <span className="font-normal text-slate-500">(neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
+    </div>
+    <p className="text-xs text-slate-500">Šie duomenys bus įrašyti į naujų prenumeratų išankstines ir galutines sąskaitas. Jau išrašytos sąskaitos nekeičiamos.</p>
+    <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
+    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+  </form>;
 }
 
 function CreatorInvoiceSettingsEditor({ settings, onSave }) {
