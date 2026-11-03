@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
+import dssProLogo from './assets/dss-pro-logo.webp';
 import aapTemplate from './assets/aap-template.html?raw';
 import { supabase } from './lib/supabase.js';
 import employeeFamiliarizationTemplate from './assets/employee-familiarization-card.html?raw';
@@ -114,6 +115,79 @@ function printPdfHtml(html, title) {
     document.body.append(frame);
   });
 }
+
+function escapeInvoiceHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+function formatInvoiceDate(value) {
+  return value ? new Date(value).toLocaleDateString('lt-LT') : '—';
+}
+
+function renderSubscriptionInvoiceHtml(invoice) {
+  const issuer = invoice.issuer ?? {};
+  const recipient = invoice.recipient ?? {};
+  const amount = (cents) => new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((cents ?? 0) / 100);
+  const issuerFields = [
+    ['Teisinė forma', issuer.legalForm],
+    ['Pavadinimas / vardas, pavardė', issuer.name],
+    ['Įmonės kodas', issuer.companyCode],
+    ['PVM mokėtojo kodas', issuer.vatCode],
+    ['Adresas', issuer.address],
+    ['El. paštas', issuer.email],
+    ['Telefonas', issuer.phone],
+    ['Bankas', issuer.bankName],
+    ['Banko sąskaita', issuer.bankAccount],
+  ].filter(([, value]) => value);
+  const issuerHtml = issuerFields.map(([label, value]) => `<p><strong>${escapeInvoiceHtml(label)}:</strong> ${escapeInvoiceHtml(value)}</p>`).join('');
+  const vatLabel = invoice.vatRegistered
+    ? `PVM (${escapeInvoiceHtml(invoice.vatRate)} %)`
+    : 'PVM';
+  return `<!doctype html><html lang="lt"><head><meta charset="utf-8"><title>${escapeInvoiceHtml(invoice.invoiceNumber ?? invoice.orderCode)}</title><style>
+    @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:13px Arial,sans-serif;color:#14251f;margin:0}
+    header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #009b70;padding-bottom:18px}
+    header img{width:84px;height:84px;object-fit:contain}h1{font-size:24px;margin:0 0 6px}h2{font-size:14px;margin:24px 0 8px}
+    .muted{color:#52635d}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:18px 0}
+    .parties{display:grid;grid-template-columns:1fr 1fr;gap:32px}.parties p{margin:4px 0}
+    table{width:100%;border-collapse:collapse;margin-top:24px}th,td{padding:10px 8px;border-bottom:1px solid #dce5e1;text-align:left}
+    th{background:#f0f7f4}td:last-child,th:last-child{text-align:right}.totals{width:280px;margin:14px 0 0 auto}
+    .totals div{display:flex;justify-content:space-between;padding:5px 0}.total{font-size:17px;font-weight:700;border-top:2px solid #14251f;margin-top:5px;padding-top:10px!important}
+    .note{margin-top:24px;white-space:pre-wrap}.footer{margin-top:32px;padding-top:10px;border-top:1px solid #dce5e1;font-size:11px;color:#52635d}
+  </style></head><body>
+    <header><div><h1>${escapeInvoiceHtml(invoice.documentType)}</h1><p class="muted">Nr. ${escapeInvoiceHtml(invoice.invoiceNumber ?? invoice.orderCode)}</p></div><img src="${escapeInvoiceHtml(dssProLogo)}" alt="DSS Pro"></header>
+    <div class="meta"><div><strong>Išrašymo data:</strong> ${escapeInvoiceHtml(formatInvoiceDate(invoice.issueDate))}</div>
+      <div><strong>Užsakymo kodas:</strong> ${escapeInvoiceHtml(invoice.orderCode)}</div>
+      ${invoice.dueDate ? `<div><strong>Apmokėti iki:</strong> ${escapeInvoiceHtml(formatInvoiceDate(invoice.dueDate))}</div>` : ''}
+      ${invoice.paidAt ? `<div><strong>Apmokėta:</strong> ${escapeInvoiceHtml(formatInvoiceDate(invoice.paidAt))}</div>` : ''}
+      <div><strong>Paslaugos laikotarpis:</strong> ${escapeInvoiceHtml(formatInvoiceDate(invoice.serviceStart))} – ${escapeInvoiceHtml(formatInvoiceDate(invoice.serviceEnd))}</div>
+    </div>
+    <div class="parties"><section><h2>Pardavėjas</h2>${issuerHtml || '<p class="muted">Rekvizitai nenurodyti</p>'}</section>
+      <section><h2>Pirkėjas</h2><p><strong>${escapeInvoiceHtml(recipient.name || 'Nenurodyta')}</strong></p>
+        ${recipient.companyCode ? `<p>Įmonės kodas: ${escapeInvoiceHtml(recipient.companyCode)}</p>` : ''}</section></div>
+    <table><thead><tr><th>Paslauga</th><th>Kiekis</th><th>Vieneto kaina</th><th>Suma</th></tr></thead><tbody>
+      <tr><td>${escapeInvoiceHtml(invoice.planName)} · ${escapeInvoiceHtml(invoice.months)} mėn.</td><td>${escapeInvoiceHtml(invoice.months)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
+    </tbody></table>
+    <div class="totals"><div><span>Suma be PVM</span><strong>${amount(invoice.netAmountCents)}</strong></div>
+      ${invoice.vatRegistered ? `<div><span>${vatLabel}</span><strong>${amount(invoice.vatAmountCents)}</strong></div>` : '<div><span>PVM (netaikomas)</span><strong>0,00 €</strong></div>'}
+      <div class="total"><span>Mokėti</span><span>${amount(invoice.totalAmountCents)}</span></div></div>
+    ${invoice.note ? `<p class="note"><strong>Pastabos:</strong><br>${escapeInvoiceHtml(invoice.note)}</p>` : ''}
+    <p class="footer">Dokumentas sugeneruotas DSS Pro sistemoje. Išankstinė sąskaita nėra apmokėjimo patvirtinimas.</p>
+  </body></html>`;
+}
+
+const defaultCreatorInvoiceSettings = {
+  issuer_details: { legalForm: 'Individuali veikla' },
+  vat_registered: false,
+  vat_rate: 21,
+  vat_included: false,
+  invoice_note: '',
+};
 
 function resourceForDatabase(resource) {
   const databaseResource = { ...resource };
@@ -1234,6 +1308,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   });
   const [creatorSubscriptions, setCreatorSubscriptions] = useState(() => initialCloudData?.subscriptions ?? []);
+  const [creatorInvoiceSettings, setCreatorInvoiceSettings] = useState(() => initialCloudData?.creatorInvoiceSettings ?? defaultCreatorInvoiceSettings);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [subscriptionActionBusy, setSubscriptionActionBusy] = useState(false);
   const [activeTab, setActiveTabState] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
@@ -1458,7 +1533,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_data, final_invoice_number, final_invoice_data, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1482,6 +1557,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             createdAt: subscription.created_at,
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
             isAddon: subscription.is_addon,
+            orderCode: subscription.order_code ?? '',
+            orderedAt: subscription.ordered_at ?? null,
+            orderMonths: subscription.order_months ?? 1,
+            paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+            preinvoiceData: subscription.preinvoice_data ?? null,
+            finalInvoiceNumber: subscription.final_invoice_number ?? '',
+            finalInvoiceData: subscription.final_invoice_data ?? null,
+            paidAt: subscription.paid_at ?? null,
           };
         }));
         setData((current) => {
@@ -5538,17 +5621,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return refreshedWorkspace;
   };
 
-  const orderSubscription = async (planCode) => {
+  const orderSubscription = async (planCode, months = 1) => {
     if (!cloudMode || !currentOrg?.id) return;
     setSubscriptionActionBusy(true);
     try {
       const { error } = await supabase.rpc('request_workspace_subscription', {
         input_organization_id: currentOrg.id,
         input_plan_code: planCode,
+        input_months: months,
       });
       if (error) throw error;
       await refreshCurrentSubscription(currentOrg.id);
-      setNotice('Užsakymas pateiktas. Sąskaitą paruošime rankiniu būdu, prenumeratą aktyvuos kūrėjas.');
+      setNotice('Užsakymas pateiktas. Prieiga suteikta 5 dienoms, išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
     } finally {
@@ -5568,7 +5652,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       });
       if (error) throw error;
       await refreshCurrentSubscription(currentOrg?.id);
-      setNotice('Atšaukimas užregistruotas. Prieiga liks aktyvi iki apmokėto laikotarpio pabaigos.');
+      setNotice('Atšaukimas užregistruotas. Prieiga liks aktyvi iki dabartinio laikotarpio pabaigos.');
     } catch (error) {
       setNotice(`Prenumeratos atšaukti nepavyko: ${error.message}`);
     } finally {
@@ -5587,7 +5671,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       });
       if (error) throw error;
       await onRefreshWorkspace(organizationId);
-      setNotice('Papildomos įmonės darbo sritis sukurta. Užsakymas laukia sąskaitos ir kūrėjo aktyvavimo.');
+      setNotice('Papildomos įmonės darbo sritis sukurta. Jos vadovas gali pateikti užsakymą ir iškart gauti 5 dienų prieigą.');
     } catch (error) {
       setNotice(`Papildomos įmonės sukurti nepavyko: ${error.message}`);
     } finally {
@@ -5603,6 +5687,69 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (error) throw error;
     await onCreatorWorkspaceChanged();
     setNotice('Plano kaina atnaujinta.');
+  };
+
+  const saveCreatorInvoiceSettings = async (values) => {
+    const issuerFields = ['legalForm', 'name', 'companyCode', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
+    const issuerDetails = Object.fromEntries(issuerFields
+      .map((field) => [field, values.issuer_details?.[field]?.trim() ?? ''])
+      .filter(([, value]) => value));
+    const { data: savedSettings, error } = await supabase.rpc('creator_save_billing_settings', {
+      input_issuer_details: issuerDetails,
+      input_vat_registered: values.vat_registered,
+      input_vat_rate: Number(values.vat_rate),
+      input_vat_included: values.vat_included,
+      input_invoice_note: values.invoice_note?.trim() ?? '',
+    });
+    if (error) throw error;
+    setCreatorInvoiceSettings(savedSettings);
+    setNotice('Sąskaitų rekvizitai išsaugoti. Nauji užsakymai naudos šiuos duomenis.');
+  };
+
+  const downloadSubscriptionInvoice = async (invoiceData) => {
+    try {
+      await printPdfHtml(renderSubscriptionInvoiceHtml(invoiceData), invoiceData.invoiceNumber ?? invoiceData.orderCode);
+    } catch (error) {
+      setNotice(`Sąskaitos PDF paruošti nepavyko: ${error.message}`);
+    }
+  };
+
+  const confirmSubscriptionPayment = async (subscriptionId, endDate = '') => {
+    const { data: updatedSubscription, error } = await supabase.rpc('creator_confirm_workspace_subscription_payment', {
+      input_subscription_id: subscriptionId,
+      input_end_at: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : null,
+    });
+    if (error) throw error;
+    const currentSubscription = creatorSubscriptions.find((item) => item.id === subscriptionId);
+    const refreshedSubscription = {
+      ...currentSubscription,
+      id: updatedSubscription.id,
+      orgId: updatedSubscription.organization_id,
+      plan: updatedSubscription.plan_name,
+      planCode: updatedSubscription.plan_code,
+      status: 'Aktyvi',
+      price: updatedSubscription.amount_cents / 100,
+      startsAt: updatedSubscription.starts_at,
+      endsAt: updatedSubscription.ends_at,
+      cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
+      isAddon: updatedSubscription.is_addon,
+      orderCode: updatedSubscription.order_code,
+      orderedAt: updatedSubscription.ordered_at,
+      orderMonths: updatedSubscription.order_months,
+      paymentStatus: 'Apmokėta',
+      preinvoiceData: updatedSubscription.preinvoice_data,
+      finalInvoiceNumber: updatedSubscription.final_invoice_number,
+      finalInvoiceData: updatedSubscription.final_invoice_data,
+      paidAt: updatedSubscription.paid_at,
+    };
+    setCreatorSubscriptions((current) => current.map((item) => item.id === subscriptionId ? refreshedSubscription : item));
+    setData((current) => ({
+      ...current,
+      subscriptions: current.subscriptions.map((item) => item.id === subscriptionId ? refreshedSubscription : item),
+    }));
+    await onCreatorWorkspaceChanged();
+    setNotice(`Apmokėjimas patvirtintas. Galutinė sąskaita ${updatedSubscription.final_invoice_number} paruošta.`);
+    return refreshedSubscription;
   };
 
   const saveCreatorSubscription = async (subscriptionId, values) => {
@@ -5629,6 +5776,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       endsAt: updatedSubscription.ends_at,
       cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
       isAddon: updatedSubscription.is_addon,
+      orderCode: updatedSubscription.order_code ?? '',
+      orderedAt: updatedSubscription.ordered_at ?? null,
+      orderMonths: updatedSubscription.order_months ?? 1,
+      paymentStatus: updatedSubscription.payment_status === 'paid' ? 'Apmokėta' : updatedSubscription.order_code ? 'Laukiama apmokėjimo' : '',
+      preinvoiceData: updatedSubscription.preinvoice_data ?? null,
+      finalInvoiceNumber: updatedSubscription.final_invoice_number ?? '',
+      finalInvoiceData: updatedSubscription.final_invoice_data ?? null,
+      paidAt: updatedSubscription.paid_at ?? null,
     };
     setData((current) => ({
       ...current,
@@ -5733,15 +5888,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const notifications = userRole === 'kurejas'
     ? [
       ...creatorSubscriptions
-        .filter((subscription) => subscription.status === 'Laukiama sąskaitos')
+        .filter((subscription) => subscription.paymentStatus === 'Laukiama apmokėjimo' || subscription.status === 'Laukiama sąskaitos')
         .map((subscription) => ({
           id: `subscription-invoice-${subscription.id}`,
-          title: 'Naujas prenumeratos užsakymas – reikia išrašyti sąskaitą',
-          description: `${data.organizations.find((organization) => organization.id === subscription.orgId)?.name ?? 'Įmonė'} · ${subscription.plan} · ${new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(subscription.price)} / mėn.${subscription.createdAt ? ` · ${new Date(subscription.createdAt).toLocaleDateString('lt-LT')}` : ''}`,
+          title: 'Naujas prenumeratos užsakymas – laukia apmokėjimo',
+          description: `${data.organizations.find((organization) => organization.id === subscription.orgId)?.name ?? 'Įmonė'} · ${subscription.plan} · ${subscription.orderCode} · ${new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((subscription.preinvoiceData?.totalAmountCents ?? subscription.price * 100) / 100)}${subscription.createdAt ? ` · ${new Date(subscription.createdAt).toLocaleDateString('lt-LT')}` : ''}`,
           creatorSubscription: true,
         })),
       ...creatorSubscriptions
-        .filter((subscription) => subscription.status === 'Aktyvi' && subscription.endsAt)
+        .filter((subscription) => subscription.status === 'Aktyvi' && subscription.paymentStatus === 'Apmokėta' && subscription.endsAt)
         .map((subscription) => ({
           subscription,
           remainingDays: Math.ceil((new Date(subscription.endsAt).getTime() - validityCheckTime) / 86_400_000),
@@ -6984,10 +7139,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </Panel>
           </section>}
 
-          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Prenumeratą užsakysite čia; sąskaitą išrašysime rankiniu būdu. Stripe dar neprijungtas." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} /></Panel></section>}
+          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-2xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinkite planą ir laikotarpį. Užsakymo metu išrašoma išankstinė sąskaita, o prieiga suteikiama iškart 5 dienoms." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onDownloadInvoice={downloadSubscriptionInvoice} /></Panel></section>}
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
-            <PageTitle title="Prenumeratų valdymas" subtitle="Peržiūrėkite galiojimo laiką, koreguokite įmonių prenumeratas ir kainoraštį. Sąskaitos išrašomos rankiniu būdu." />
+            <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
+            <Panel title="Sąskaitų rekvizitai">
+              <CreatorInvoiceSettingsEditor settings={creatorInvoiceSettings} onSave={saveCreatorInvoiceSettings} />
+            </Panel>
             <div className="grid items-start gap-4 md:grid-cols-2">
               <Panel title="Pagrindiniai planai">
                 <div className="space-y-3">
@@ -7014,11 +7172,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       {organization.parentOrganizationId && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">Papildoma įmonė</span>}
                     </div>
                     {subscriptions.map((subscription) => <CreatorSubscriptionEditor
-                      key={`${subscription.id}-${subscription.status}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`}
+                      key={`${subscription.id}-${subscription.status}-${subscription.paymentStatus}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`}
                       subscription={subscription}
                       organizationName={organization.name}
                       plans={subscriptionPlans}
                       onSave={saveCreatorSubscription}
+                      onConfirmPayment={confirmSubscriptionPayment}
+                      onDownloadInvoice={downloadSubscriptionInvoice}
                     />)}
                   </div>)}
                 </section>)}
@@ -8935,7 +9095,7 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
     return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas baigėsi'}</span>{signature && <SignatureImagePreview signature={signature} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
-function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onCancel, onAddCompany, onDemoAction }) {
+function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onCancel, onAddCompany, onDemoAction, onDownloadInvoice }) {
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
   const availablePlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false && plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
@@ -8947,6 +9107,8 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyCode, setCompanyCode] = useState('');
+  const [orderMonths, setOrderMonths] = useState('1');
+  const canOrder = !subscription || subscription.status !== 'Aktyvi';
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
     : availablePlans[0]?.code ?? '';
@@ -8959,7 +9121,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const handleOrder = (event) => {
     event.preventDefault();
     if (cloudMode) {
-      onOrder(effectivePlanCode);
+      onOrder(effectivePlanCode, Number(orderMonths));
       return;
     }
     if (subscription) onDemoAction(subscription.id, subscription.status === 'Aktyvi' ? 'renew' : 'restore');
@@ -8981,31 +9143,40 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
           Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}
         </p>
-        {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Užsakymas gautas. Sąskaitą išrašysime rankiniu būdu; aktyvavus bus nustatytas prenumeratos galiojimo laikas.</p>}
+        {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Šis senesnis užsakymas dar neaktyvintas. Naują užsakymą pateikę iškart gausite 5 dienų prieigą ir išankstinę sąskaitą.</p>}
+        {subscription.paymentStatus === 'Laukiama apmokėjimo' && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Užsakymas <strong>{subscription.orderCode}</strong> laukia apmokėjimo. Pilna prieiga suteikta 5 dienoms; jei per šį laiką negausime mokėjimo, darbo sritis pereis į peržiūros režimą.</p>}
+        {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
+        {(subscription.preinvoiceData || subscription.finalInvoiceData) && <div className="flex flex-wrap gap-2">
+          {subscription.preinvoiceData && <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onDownloadInvoice(subscription.preinvoiceData)}><Download size={15} className="mr-1 inline" />Išankstinė sąskaita PDF</button>}
+          {subscription.finalInvoiceData && <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onDownloadInvoice(subscription.finalInvoiceData)}><Download size={15} className="mr-1 inline" />Galutinė sąskaita PDF</button>}
+        </div>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
-        {locked && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">Prieiga užblokuota. Pateikite naują užsakymą, kad kūrėjas galėtų atkurti prieigą.</p>}
+        {locked && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">Prieiga užblokuota. Pateikite naują užsakymą – prieiga bus suteikta iškart 5 dienoms.</p>}
       </>
       : <p className="text-sm text-slate-600">Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.</p>}
 
     {subscription?.isAddon
       ? <div className="space-y-3">
         <p className="text-sm text-slate-600">Papildomos įmonės planas pagal aktyvių darbuotojų skaičių. Šios darbo srities duomenys atskirti nuo kitų įmonių.</p>
-        {subscription.status !== 'Laukiama sąskaitos' && subscription.status !== 'Aktyvi' && <div className="flex flex-wrap items-end gap-2">
+        {canOrder && <div className="flex flex-wrap items-end gap-2">
           <label className="text-sm font-medium">Darbuotojų skaičiaus planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)}>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>
-          <button type="button" className={buttonClass} disabled={busy || !effectiveAddonPlanCode} onClick={() => onOrder(effectiveAddonPlanCode)}><RotateCcw size={16} />Užsakyti papildomos įmonės prenumeratą</button>
+          <label className="text-sm font-medium">Laikotarpis (mėn.)<input className={`${inputClass} mt-1 w-28`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
+          <button type="button" className={buttonClass} disabled={busy || !effectiveAddonPlanCode || !Number.isInteger(Number(orderMonths)) || Number(orderMonths) < 1 || Number(orderMonths) > 36} onClick={() => onOrder(effectiveAddonPlanCode, Number(orderMonths))}><RotateCcw size={16} />Užsakyti papildomos įmonės prenumeratą</button>
         </div>}
+        {!canOrder && <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
       </div>
-      : <form onSubmit={handleOrder} className="space-y-3">
+      : canOrder ? <form onSubmit={handleOrder} className="space-y-3">
         <label className="block text-sm font-medium">Darbuotojų skaičiaus planas
           <select className={`${inputClass} mt-1`} value={effectivePlanCode} onChange={(event) => setSelectedPlanCode(event.target.value)} disabled={!availablePlans.length}>
             {availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}
           </select>
         </label>
+        <label className="block text-sm font-medium">Užsakymo laikotarpis (mėn.)<input className={`${inputClass} mt-1 max-w-36`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
         <p className="text-xs text-slate-500">Aktyvių darbuotojų šiame workspace: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
-          <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti / pateikti sąskaitos prašymą'}
+          <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti ir gauti 5 d. prieigą'}
         </button>
-      </form>}
+      </form> : <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
 
     {subscription && subscription.status === 'Aktyvi' && !subscription.cancelAtPeriodEnd && <button type="button" className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50" disabled={busy} onClick={() => onCancel(subscription.id)}><X size={15} className="mr-1 inline" />Atšaukti prenumeratą</button>}
     {subscription?.status === 'Laukiama sąskaitos' && <button type="button" className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50" disabled={busy} onClick={() => onCancel(subscription.id)}><X size={15} className="mr-1 inline" />Atšaukti užsakymą</button>}
@@ -9020,6 +9191,68 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         </form>}
     </div>}
   </div>;
+}
+
+function CreatorInvoiceSettingsEditor({ settings, onSave }) {
+  const [draft, setDraft] = useState(() => ({
+    ...defaultCreatorInvoiceSettings,
+    ...settings,
+    issuer_details: {
+      ...defaultCreatorInvoiceSettings.issuer_details,
+      ...(settings?.issuer_details ?? {}),
+    },
+  }));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const issuerFields = [
+    ['legalForm', 'Teisinė forma (IV, MB, UAB ir kt.)'],
+    ['name', 'Pavadinimas / vardas, pavardė'],
+    ['companyCode', 'Įmonės / veiklos kodas'],
+    ['vatCode', 'PVM mokėtojo kodas'],
+    ['address', 'Adresas'],
+    ['email', 'El. paštas'],
+    ['phone', 'Telefonas'],
+    ['bankName', 'Bankas'],
+    ['bankAccount', 'Banko sąskaita (IBAN)'],
+  ];
+
+  const save = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const saved = await onSave(draft);
+      setDraft({
+        ...defaultCreatorInvoiceSettings,
+        ...saved,
+        issuer_details: {
+          ...defaultCreatorInvoiceSettings.issuer_details,
+          ...(saved?.issuer_details ?? {}),
+        },
+      });
+    } catch (saveError) {
+      setError(saveError.message || 'Sąskaitų rekvizitų išsaugoti nepavyko.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <form onSubmit={save} className="space-y-4">
+    <p className="text-sm text-slate-600">Visi pardavėjo rekvizitai neprivalomi. Nauji užsakymai naudos čia išsaugotą informaciją; jau išrašyti dokumentai išsaugos tuometinius duomenis.</p>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {issuerFields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={draft.issuer_details[key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, issuer_details: { ...current.issuer_details, [key]: event.target.value } }))} /></label>)}
+    </div>
+    <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+      <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={draft.vat_registered === true} onChange={(event) => setDraft((current) => ({ ...current, vat_registered: event.target.checked }))} />Esu PVM mokėtojas</label>
+      {draft.vat_registered && <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-medium">PVM tarifas (%)<input className={`${inputClass} mt-1`} type="number" min="0" max="100" step="0.01" value={draft.vat_rate ?? 21} onChange={(event) => setDraft((current) => ({ ...current, vat_rate: event.target.value }))} required /></label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={draft.vat_included === true} onChange={(event) => setDraft((current) => ({ ...current, vat_included: event.target.checked }))} />Nurodytos kainos jau apima PVM</label>
+      </div>}
+      <label className="block text-sm font-medium">Pastaba sąskaitoje <span className="font-normal text-slate-500">(pvz., PVMĮ 22 str.; neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} value={draft.invoice_note ?? ''} onChange={(event) => setDraft((current) => ({ ...current, invoice_note: event.target.value }))} /></label>
+    </div>
+    <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
+    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+  </form>;
 }
 
 function SubscriptionPlanPriceEditor({ plan, onSave }) {
@@ -9053,7 +9286,7 @@ function SubscriptionPlanPriceEditor({ plan, onSave }) {
   </form>;
 }
 
-function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave }) {
+function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, onDownloadInvoice }) {
   const [status, setStatus] = useState(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
   const [planCode, setPlanCode] = useState(subscription.planCode ?? 'up_to_20');
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
@@ -9063,10 +9296,24 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [paymentEndDate, setPaymentEndDate] = useState('');
   const [error, setError] = useState('');
   const availablePlans = plans.filter((plan) => plan.active !== false
     && (subscription.isAddon ? plan.code.startsWith('additional_workspace_') : !plan.code.startsWith('additional_workspace')));
   const price = Number(amount.replace(',', '.'));
+  const confirmPayment = async () => {
+    setConfirmingPayment(true);
+    setError('');
+    try {
+      await onConfirmPayment(subscription.id, paymentEndDate);
+      setPaymentEndDate('');
+    } catch (confirmError) {
+      setError(confirmError.message || 'Mokėjimo patvirtinti nepavyko.');
+    } finally {
+      setConfirmingPayment(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -9106,6 +9353,7 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
         <p className="truncate font-semibold">{subscription.plan} · {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(subscription.price)} / mėn.</p>
         <p className="mt-1 text-xs text-slate-600">{subscription.status}{subscription.endsAt ? ` · iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}{subscription.cancelAtPeriodEnd ? ' · atšaukiama laikotarpio pabaigoje' : ''}</p>
         {subscription.status === 'Laukiama sąskaitos' && <p className="mt-1 text-xs font-semibold text-amber-800">Laukia sąskaitos išrašymo</p>}
+        {subscription.orderCode && <p className="mt-1 text-xs font-semibold text-slate-700">Užsakymas {subscription.orderCode} · {subscription.paymentStatus} · {subscription.orderMonths} mėn.</p>}
       </div>
       <div className="flex shrink-0 gap-2">
         <button type="button" aria-label={`${detailsOpen ? 'Slėpti' : 'Peržiūrėti'} prenumeratos informaciją: ${organizationName}`} aria-expanded={detailsOpen} className="grid size-9 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" onClick={() => setDetailsOpen((open) => !open)}><Eye size={16} /></button>
@@ -9117,7 +9365,17 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
       <div><dt className="text-slate-500">Užsakymo ID</dt><dd className="break-all font-mono">{subscription.id}</dd></div>
       <div><dt className="text-slate-500">Galioja nuo</dt><dd>{subscription.startsAt ? new Date(subscription.startsAt).toLocaleString('lt-LT') : 'Dar nenustatyta'}</dd></div>
       <div><dt className="text-slate-500">Galioja iki</dt><dd>{subscription.endsAt ? new Date(subscription.endsAt).toLocaleString('lt-LT') : 'Dar nenustatyta'}</dd></div>
+      {subscription.orderCode && <><div><dt className="text-slate-500">Užsakymo kodas</dt><dd className="font-mono">{subscription.orderCode}</dd></div><div><dt className="text-slate-500">Apmokėta</dt><dd>{subscription.paidAt ? new Date(subscription.paidAt).toLocaleString('lt-LT') : 'Ne'}</dd></div></>}
     </dl>}
+    {(subscription.preinvoiceData || subscription.finalInvoiceData) && <div className="flex flex-wrap gap-2">
+      {subscription.preinvoiceData && <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onDownloadInvoice(subscription.preinvoiceData)}><Download size={15} className="mr-1 inline" />Išankstinė sąskaita PDF</button>}
+      {subscription.finalInvoiceData && <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onDownloadInvoice(subscription.finalInvoiceData)}><Download size={15} className="mr-1 inline" />Galutinė sąskaita · {subscription.finalInvoiceNumber}</button>}
+    </div>}
+    {subscription.orderCode && subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+      <p className="text-sm text-amber-950">Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</p>
+      <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={subscription.orderedAt?.slice(0, 10)} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>
+      <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
+    </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="pending">Laukia sąskaitos</option><option value="active">Aktyvi</option><option value="canceled">Atšaukta</option><option value="expired">Pasibaigusi</option></select></label>
@@ -9134,6 +9392,7 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
       <div className="flex flex-wrap gap-2"><button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti prenumeratą'}</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setEditing(false)}>Atšaukti</button></div>
       {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
     </form>}
+    {error && !editing && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </div>;
 }
 function CommissionEditor({ org, employees = [], specialists = [], managerName = '', cloudUserId = '', canAssignEmployeeChair = false, assignments = [], onInvite, onInviteSpecialist, onAppointManager, onRevoke, cloudMode = false, sandboxMode = false, commissionPinStatus = {}, onSetPin }) {

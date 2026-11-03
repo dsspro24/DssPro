@@ -133,6 +133,14 @@ function formatSubscription(subscription) {
     endsAt: subscription.ends_at,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     isAddon: subscription.is_addon,
+    orderCode: subscription.order_code ?? '',
+    orderedAt: subscription.ordered_at ?? null,
+    orderMonths: subscription.order_months ?? 1,
+    paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+    preinvoiceData: subscription.preinvoice_data ?? null,
+    finalInvoiceNumber: subscription.final_invoice_number ?? '',
+    finalInvoiceData: subscription.final_invoice_data ?? null,
+    paidAt: subscription.paid_at ?? null,
   };
 }
 
@@ -148,7 +156,7 @@ function addCalendarMonths(date, months) {
 
 function getSubscriptionAccess(subscription) {
   if (!subscription || subscription.status === 'Laukiama sąskaitos') {
-    return { readOnly: false, locked: false, periodEnd: null, readOnlyUntil: null };
+    return { readOnly: false, locked: true, periodEnd: null, readOnlyUntil: null };
   }
   const endDate = subscription.endsAt ? new Date(subscription.endsAt) : null;
   if (!endDate && ['Atšaukta', 'Pasibaigusi'].includes(subscription.status)) {
@@ -180,7 +188,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
       .eq('organization_id', organizationId)
       .eq('active', true),
     supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at, updated_at')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_data, final_invoice_number, final_invoice_data, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
   ]);
@@ -252,20 +260,22 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   }
 
   if (isCreator) {
-    const [organizationsResult, catalogResult, accountsResult, subscriptionsResult, plansResult] = await Promise.all([
+    const [organizationsResult, catalogResult, accountsResult, subscriptionsResult, plansResult, billingSettingsResult] = await Promise.all([
       loadCreatorOrganizations(),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
       supabase.from('workspace_subscriptions')
-        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at, updated_at')
+        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_data, final_invoice_number, final_invoice_data, paid_at, created_at, updated_at')
         .order('created_at', { ascending: false }),
       supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').order('employee_limit'),
+      supabase.from('creator_billing_settings').select('issuer_details, vat_registered, vat_rate, vat_included, invoice_note').eq('id', true).maybeSingle(),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
     if (catalogResult.error) throw catalogResult.error;
     if (accountsResult.error) throw accountsResult.error;
     if (subscriptionsResult.error) throw subscriptionsResult.error;
     if (plansResult.error) throw plansResult.error;
+    if (billingSettingsResult.error) throw billingSettingsResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const organizations = organizationsResult.data.map((organization) => ({
       id: organization.id,
@@ -281,6 +291,13 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       catalog: hydratedCatalog,
       creatorAccounts: accountsResult.data ?? [],
       subscriptionPlans: plansResult.data ?? [],
+      creatorInvoiceSettings: billingSettingsResult.data ?? {
+        issuer_details: { legalForm: 'Individuali veikla' },
+        vat_registered: false,
+        vat_rate: 21,
+        vat_included: false,
+        invoice_note: '',
+      },
       data: {
         organizations,
         employees: [],
