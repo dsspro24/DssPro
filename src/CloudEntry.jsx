@@ -17,22 +17,38 @@ function getWorkspaceStatus(workspace) {
   return workspace ? 'ready' : 'organization-needed';
 }
 
+async function loadOrganizationRecords(organizationIds = null) {
+  const optionalColumns = ['parent_organization_id', 'billing_address', 'vat_code'];
+  let selectedOptionalColumns = [...optionalColumns];
+  while (true) {
+    let query = supabase.from('organizations')
+      .select(['id', 'name', 'company_code', ...selectedOptionalColumns].join(', '))
+      .order('name');
+    if (organizationIds) query = query.in('id', organizationIds);
+    const result = await query;
+    if (!result.error) {
+      return {
+        ...result,
+        data: result.data.map((organization) => ({
+          ...organization,
+          parent_organization_id: organization.parent_organization_id ?? null,
+          billing_address: organization.billing_address ?? '',
+          vat_code: organization.vat_code ?? '',
+        })),
+      };
+    }
+
+    const missingOptionalColumn = optionalColumns.find((column) =>
+      selectedOptionalColumns.includes(column)
+      && ['42703', 'PGRST204'].includes(result.error.code)
+      && result.error.message?.includes(column));
+    if (!missingOptionalColumn) return result;
+    selectedOptionalColumns = selectedOptionalColumns.filter((column) => column !== missingOptionalColumn);
+  }
+}
+
 async function loadCreatorOrganizations() {
-  const withParent = await supabase.from('organizations')
-    .select('id, name, company_code, billing_address, vat_code, parent_organization_id')
-    .order('name');
-  if (!withParent.error) return withParent;
-  const missingParentColumn = ['42703', 'PGRST204'].includes(withParent.error.code)
-    && withParent.error.message?.includes('parent_organization_id');
-  if (!missingParentColumn) return withParent;
-  const fallback = await supabase.from('organizations')
-    .select('id, name, company_code, billing_address, vat_code')
-    .order('name');
-  if (fallback.error) return fallback;
-  return {
-    ...fallback,
-    data: fallback.data.map((organization) => ({ ...organization, parent_organization_id: null })),
-  };
+  return loadOrganizationRecords();
 }
 
 function isUuid(value) {
@@ -460,7 +476,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
 
   const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
     supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
-    supabase.from('organizations').select('id, name, company_code, billing_address, vat_code').in('id', managerMemberships.map((membership) => membership.organization_id)).order('name'),
+    loadOrganizationRecords(managerMemberships.map((membership) => membership.organization_id)),
     supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').eq('active', true).order('employee_limit'),
   ]);
   const { data: catalogData, error: catalogError } = catalogResult;

@@ -9249,7 +9249,7 @@ function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, onSave })
     <h3 className="text-sm font-semibold">Duomenys sąskaitoms</h3>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-medium">PVM mokėtojo kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className={`${inputClass} mt-1`} maxLength={40} value={vatCode} onChange={(event) => setVatCode(event.target.value)} placeholder="LT123456789" /></label>
-      <label className="text-sm font-medium sm:col-span-2">Sąskaitos adresas <span className="font-normal text-slate-500">(neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
+      <label className="text-sm font-medium sm:col-span-2">Adresas <span className="font-normal text-slate-500">(neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
     </div>
     <p className="text-xs text-slate-500">Šie duomenys bus įrašyti į naujų prenumeratų išankstines ir galutines sąskaitas. Jau išrašytos sąskaitos nekeičiamos.</p>
     <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
@@ -9268,6 +9268,7 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
   const issuerFields = [
     ['legalForm', 'Teisinė forma (IV, MB, UAB ir kt.)'],
     ['name', 'Pavadinimas / vardas, pavardė'],
@@ -9294,6 +9295,7 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
           ...(saved?.issuer_details ?? {}),
         },
       });
+      setEditing(false);
     } catch (saveError) {
       setError(saveError.message || 'Sąskaitų rekvizitų išsaugoti nepavyko.');
     } finally {
@@ -9301,22 +9303,46 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
     }
   };
 
-  return <form onSubmit={save} className="space-y-4">
-    <p className="text-sm text-slate-600">Visi pardavėjo rekvizitai neprivalomi. Nauji užsakymai naudos čia išsaugotą informaciją; jau išrašyti dokumentai išsaugos tuometinius duomenis.</p>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {issuerFields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={draft.issuer_details[key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, issuer_details: { ...current.issuer_details, [key]: event.target.value } }))} /></label>)}
-    </div>
-    <div className="space-y-3 rounded-lg border border-slate-200 p-3">
-      <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={draft.vat_registered === true} onChange={(event) => setDraft((current) => ({ ...current, vat_registered: event.target.checked }))} />Esu PVM mokėtojas</label>
-      {draft.vat_registered && <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-medium">PVM tarifas (%)<input className={`${inputClass} mt-1`} type="number" min="0" max="100" step="0.01" value={draft.vat_rate ?? 21} onChange={(event) => setDraft((current) => ({ ...current, vat_rate: event.target.value }))} required /></label>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={draft.vat_included === true} onChange={(event) => setDraft((current) => ({ ...current, vat_included: event.target.checked }))} />Nurodytos kainos jau apima PVM</label>
-      </div>}
-      <label className="block text-sm font-medium">Pastaba sąskaitoje <span className="font-normal text-slate-500">(pvz., PVMĮ 22 str.; neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} value={draft.invoice_note ?? ''} onChange={(event) => setDraft((current) => ({ ...current, invoice_note: event.target.value }))} /></label>
-    </div>
-    <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
-    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
-  </form>;
+  const savedIssuerDetails = issuerFields
+    .map(([key, label]) => ({ label: label.replace(/\s*\([^)]*\)\s*/g, '').trim(), value: draft.issuer_details[key]?.trim() }))
+    .filter(({ value }) => value);
+
+  return <div className="space-y-4">
+    <p className="text-sm text-slate-600">Čia pardavėjo rekvizitai (IV, MB, UAB ir kt.). Peržiūrėkite, kaip jie bus rodomi sąskaitoje; paspauskite „Redaguoti“ norėdami pakeisti.</p>
+    <section className="max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm" aria-label="Sąskaitos pardavėjo rekvizitų peržiūra">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
+        <div className="flex items-center gap-3">
+          <img src={dssProLogo} alt="DSS Pro" className="size-14 rounded-full object-contain" />
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Pardavėjas</p><h3 className="text-lg font-bold">{draft.issuer_details.name || 'Pavadinimas / vardas, pavardė'}</h3></div>
+        </div>
+        <button type="button" className={buttonClass} onClick={() => { setEditing((current) => !current); setError(''); }}>{editing ? 'Slėpti redagavimą' : 'Redaguoti rekvizitus'}</button>
+      </div>
+      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        {draft.issuer_details.legalForm && <p><span className="text-slate-500">Teisinė forma: </span><strong>{draft.issuer_details.legalForm}</strong></p>}
+        {savedIssuerDetails.filter(({ label }) => label !== 'Pavadinimas / vardas, pavardė' && label !== 'Teisinė forma').map(({ label, value }) => <p key={label}><span className="text-slate-500">{label}: </span><strong className="break-words">{value}</strong></p>)}
+        <p><span className="text-slate-500">PVM: </span><strong>{draft.vat_registered ? `${draft.vat_rate ?? 21} %${draft.vat_included ? ' (įskaičiuotas į kainą)' : ' (pridedamas prie kainos)'}` : 'netaikomas'}</strong></p>
+        {draft.invoice_note?.trim() && <p className="whitespace-pre-wrap sm:col-span-2"><span className="text-slate-500">Pastaba: </span>{draft.invoice_note}</p>}
+        {!savedIssuerDetails.length && !draft.invoice_note?.trim() && <p className="text-slate-500 sm:col-span-2">Pardavėjo rekvizitai dar nesužymėti.</p>}
+      </div>
+    </section>
+    {editing && <form onSubmit={save} className="max-w-4xl space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/30 p-4">
+      <p className="text-sm text-slate-600">Visi laukai neprivalomi. Išsaugoti duomenys bus naudojami naujoms sąskaitoms; jau išrašytos sąskaitos nekeičiamos.</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {issuerFields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={draft.issuer_details[key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, issuer_details: { ...current.issuer_details, [key]: event.target.value } }))} /></label>)}
+      </div>
+      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+        <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={draft.vat_registered === true} onChange={(event) => setDraft((current) => ({ ...current, vat_registered: event.target.checked }))} />Esu PVM mokėtojas</label>
+        {draft.vat_registered && <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">PVM tarifas (%)<input className={`${inputClass} mt-1`} type="number" min="0" max="100" step="0.01" value={draft.vat_rate ?? 21} onChange={(event) => setDraft((current) => ({ ...current, vat_rate: event.target.value }))} required /></label>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={draft.vat_included === true} onChange={(event) => setDraft((current) => ({ ...current, vat_included: event.target.checked }))} />Nurodytos kainos jau apima PVM</label>
+        </div>}
+        <label className="block text-sm font-medium">Pastaba sąskaitoje <span className="font-normal text-slate-500">(neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} value={draft.invoice_note ?? ''} onChange={(event) => setDraft((current) => ({ ...current, invoice_note: event.target.value }))} /></label>
+      </div>
+      <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+    </form>}
+    {error && !editing && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+  </div>;
 }
 
 function SubscriptionPlanPriceEditor({ plan, onSave }) {
