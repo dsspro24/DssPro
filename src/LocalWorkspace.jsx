@@ -5724,8 +5724,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       input_invoice_note: values.invoice_note?.trim() ?? '',
     });
     if (error) throw error;
-    setCreatorInvoiceSettings(savedSettings);
+    const persistedSettings = savedSettings ?? values;
+    setCreatorInvoiceSettings(persistedSettings);
     setNotice('Sąskaitų rekvizitai išsaugoti. Nauji užsakymai naudos šiuos duomenis.');
+    return persistedSettings;
   };
 
   const downloadSubscriptionInvoice = async (invoiceData) => {
@@ -9249,7 +9251,7 @@ function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, onSave })
     <h3 className="text-sm font-semibold">Duomenys sąskaitoms</h3>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-medium">PVM mokėtojo kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className={`${inputClass} mt-1`} maxLength={40} value={vatCode} onChange={(event) => setVatCode(event.target.value)} placeholder="LT123456789" /></label>
-      <label className="text-sm font-medium sm:col-span-2">Adresas <span className="font-normal text-slate-500">(neprivaloma)</span><textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
+      <label className="text-sm font-medium sm:col-span-2">Adresas<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
     </div>
     <p className="text-xs text-slate-500">Šie duomenys bus įrašyti į naujų prenumeratų išankstines ir galutines sąskaitas. Jau išrašytos sąskaitos nekeičiamos.</p>
     <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti rekvizitus'}</button>
@@ -9287,12 +9289,13 @@ function CreatorInvoiceSettingsEditor({ settings, onSave }) {
     setError('');
     try {
       const saved = await onSave(draft);
+      const updatedSettings = saved ?? draft;
       setDraft({
         ...defaultCreatorInvoiceSettings,
-        ...saved,
+        ...updatedSettings,
         issuer_details: {
           ...defaultCreatorInvoiceSettings.issuer_details,
-          ...(saved?.issuer_details ?? {}),
+          ...(updatedSettings?.issuer_details ?? {}),
         },
       });
       setEditing(false);
