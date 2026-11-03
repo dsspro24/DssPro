@@ -125,6 +125,24 @@ function resourceForDatabase(resource) {
   return databaseResource;
 }
 
+async function loadCreatorOrganizations() {
+  const withParent = await supabase.from('organizations')
+    .select('id, name, company_code, parent_organization_id')
+    .order('name');
+  if (!withParent.error) return withParent;
+  const missingParentColumn = ['42703', 'PGRST204'].includes(withParent.error.code)
+    && withParent.error.message?.includes('parent_organization_id');
+  if (!missingParentColumn) return withParent;
+  const fallback = await supabase.from('organizations')
+    .select('id, name, company_code')
+    .order('name');
+  if (fallback.error) return fallback;
+  return {
+    ...fallback,
+    data: fallback.data.map((organization) => ({ ...organization, parent_organization_id: null })),
+  };
+}
+
 function workspaceForDatabase(workspace) {
   const databaseWorkspace = { ...workspace };
   delete databaseWorkspace.commissionAssignments;
@@ -1442,7 +1460,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           supabase.from('workspace_subscriptions')
             .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at')
             .order('created_at', { ascending: false }),
-          supabase.from('organizations').select('id, name, company_code, parent_organization_id').order('name'),
+          loadCreatorOrganizations(),
         ]);
         if (subscriptionsResult.error) throw subscriptionsResult.error;
         if (organizationsResult.error) throw organizationsResult.error;
@@ -1466,15 +1484,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             isAddon: subscription.is_addon,
           };
         }));
-        setData((current) => ({
-          ...current,
-          organizations: (organizationsResult.data ?? []).map((organization) => ({
-            id: organization.id,
-            name: organization.name,
-            companyCode: organization.company_code ?? '',
-            parentOrganizationId: organization.parent_organization_id ?? null,
-          })),
-        }));
+        setData((current) => {
+          const existingById = new Map(current.organizations.map((organization) => [organization.id, organization]));
+          return {
+            ...current,
+            organizations: (organizationsResult.data ?? []).map((organization) => ({
+              ...existingById.get(organization.id),
+              id: organization.id,
+              name: organization.name,
+              companyCode: organization.company_code ?? '',
+              parentOrganizationId: organization.parent_organization_id ?? null,
+            })),
+          };
+        });
       } catch (error) {
         if (active) setNotice(`Prenumeratų pranešimų atnaujinti nepavyko: ${error.message}`);
       } finally {

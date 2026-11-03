@@ -17,6 +17,24 @@ function getWorkspaceStatus(workspace) {
   return workspace ? 'ready' : 'organization-needed';
 }
 
+async function loadCreatorOrganizations() {
+  const withParent = await supabase.from('organizations')
+    .select('id, name, company_code, parent_organization_id')
+    .order('name');
+  if (!withParent.error) return withParent;
+  const missingParentColumn = ['42703', 'PGRST204'].includes(withParent.error.code)
+    && withParent.error.message?.includes('parent_organization_id');
+  if (!missingParentColumn) return withParent;
+  const fallback = await supabase.from('organizations')
+    .select('id, name, company_code')
+    .order('name');
+  if (fallback.error) return fallback;
+  return {
+    ...fallback,
+    data: fallback.data.map((organization) => ({ ...organization, parent_organization_id: null })),
+  };
+}
+
 function isUuid(value) {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -235,7 +253,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
 
   if (isCreator) {
     const [organizationsResult, catalogResult, accountsResult, subscriptionsResult, plansResult] = await Promise.all([
-      supabase.from('organizations').select('id, name, company_code, parent_organization_id').order('name'),
+      loadCreatorOrganizations(),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
       supabase.from('workspace_subscriptions')
