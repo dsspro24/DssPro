@@ -63,10 +63,42 @@ function DemoApp({ cloudMode = false }) {
   const [activeTab, setActiveTab] = useState('skydelis'); 
   const [courseFilter, setCourseFilter] = useState('visi'); // 'visi' | 'mano' | 'baigti'
   const [registerRole, setRegisterRole] = useState('vadovas');
-  const [registerPlan, setRegisterPlan] = useState('standard');
+  const [registerPlan, setRegisterPlan] = useState('up_to_20');
+  const [subscriptionPlans, setSubscriptionPlans] = useState([
+    { code: 'up_to_20', name: 'Iki 20 darbuotojų', amount_cents: 2999, employee_limit: 20 },
+    { code: 'up_to_50', name: 'Iki 50 darbuotojų', amount_cents: 4999, employee_limit: 50 },
+    { code: 'up_to_75', name: 'Iki 75 darbuotojų', amount_cents: 5999, employee_limit: 75 },
+    { code: 'up_to_200', name: 'Iki 200 darbuotojų', amount_cents: 12999, employee_limit: 200 },
+  ]);
+  const [subscriptionPlansError, setSubscriptionPlansError] = useState('');
   const [cloudSignupFeedback, setCloudSignupFeedback] = useState('');
   const [signupConfirmationEmail, setSignupConfirmationEmail] = useState('');
   const [signupSubmitting, setSignupSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!cloudMode) return undefined;
+    let active = true;
+    supabase.from('subscription_plans')
+      .select('code, name, amount_cents, employee_limit')
+      .eq('active', true)
+      .in('code', ['up_to_20', 'up_to_50', 'up_to_75', 'up_to_200'])
+      .order('employee_limit')
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setSubscriptionPlansError(`Kainoraščio įkelti nepavyko: ${error.message}`);
+          return;
+        }
+        if (data?.length === 4) {
+          setSubscriptionPlans(data);
+          setSubscriptionPlansError('');
+        }
+      })
+      .catch((error) => {
+        if (active) setSubscriptionPlansError(`Kainoraščio įkelti nepavyko: ${error.message || 'ryšio klaida.'}`);
+      });
+    return () => { active = false; };
+  }, [cloudMode]);
 
   const scrollToSignup = () => {
     const signupSection = document.getElementById('pricing-signup');
@@ -426,41 +458,23 @@ function DemoApp({ cloudMode = false }) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === 'standard'} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan('standard'); }} className={`w-full bg-white p-5 rounded-2xl border text-left shadow-sm space-y-4 ${registerRole === 'vadovas' && registerPlan === 'standard' ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
-                <div>
-                  <span className="text-xs font-semibold text-slate-400">Standartinis</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-3xl font-black text-slate-800">29 €</span>
+            {subscriptionPlansError && <p role="alert" className="text-xs text-rose-700">{subscriptionPlansError}</p>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {subscriptionPlans.map((plan) => (
+                <button key={plan.code} type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === plan.code} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan(plan.code); }} className={`w-full rounded-2xl border bg-white p-5 text-left shadow-sm ${registerRole === 'vadovas' && registerPlan === plan.code ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
+                  <span className="text-xs font-semibold text-slate-500">{plan.name}</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-slate-800">{new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount_cents / 100)} €</span>
                     <span className="text-xs text-slate-400">/ mėn.</span>
                   </div>
-                </div>
-
-                <ul className="space-y-2 text-xs text-slate-600">
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Iki 25 darbuotojų</li>
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> VDI žurnalai</li>
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Visi ataskaitų PDF</li>
-                </ul>
-                <span className="block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === 'standard' ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
-              </button>
-
-              <button type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === 'pro'} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan('pro'); }} className={`w-full bg-white p-5 rounded-2xl border text-left shadow-sm space-y-4 ${registerRole === 'vadovas' && registerPlan === 'pro' ? 'border-2 border-emerald-600' : 'border-slate-200'}`}>
-                <div>
-                  <span className="text-xs font-bold text-[#1bc880]">Pro</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-3xl font-black text-slate-800">79 €</span>
-                    <span className="text-xs text-slate-400">/ mėn.</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2 text-xs text-slate-600">
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Neriboti darbuotojai</li>
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> DSS komisija</li>
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Komisijos ir DSS parašai</li>
-                  <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Prioritetinė pagalba</li>
-                </ul>
-                <span className="block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === 'pro' ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
-              </button>
+                  <ul className="mt-4 space-y-2 text-xs text-slate-600">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> Iki {plan.employee_limit} darbuotojų</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> VDI žurnalai</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-[#1bc880]" /> PDF dokumentai</li>
+                  </ul>
+                  <span className="mt-4 block text-xs font-semibold text-emerald-800">{registerRole === 'vadovas' && registerPlan === plan.code ? 'Pasirinktas planas' : 'Pasirinkti planą'}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -484,7 +498,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
             {cloudMode && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-950">
               {registerRole === 'vadovas'
-                ? `Pasirinktas ${registerPlan === 'standard' ? 'Standartinis' : 'Pro'} planas. Sukurkite paskyrą ir patvirtinkite el. paštą; prisijungę užbaigsite įmonės nustatymą.`
+                ? `Pasirinktas ${subscriptionPlans.find((plan) => plan.code === registerPlan)?.name ?? 'planas'}. Sukurkite paskyrą ir patvirtinkite el. paštą; prisijungę galėsite užsakyti prenumeratą.`
                 : 'Sukurkite atskirą DSS specialisto paskyrą ir patvirtinkite el. paštą. Įmonės duomenų įvesti nereikia; vadovo kvietimą priimsite prisijungę.'}
             </p>}
 
@@ -1031,7 +1045,7 @@ function DemoApp({ cloudMode = false }) {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 max-w-lg">
               <h1 className="text-lg font-bold text-slate-800">Įmonės Prenumerata</h1>
               <div className="p-4 bg-emerald-50 rounded-xl text-xs space-y-1">
-                <p className="font-bold text-[#0c4a3b]">Aktyvus planas: Pro (79 € / mėn.)</p>
+                <p className="font-bold text-[#0c4a3b]">Aktyvus planas: iki 20 darbuotojų (29,99 € / mėn.)</p>
                 <p className="text-slate-600">Būsena: Aktyvi iki 2026-11-12</p>
               </div>
             </div>

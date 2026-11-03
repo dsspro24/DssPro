@@ -94,19 +94,81 @@ function scopeWorkspaceToOrganization(workspace, organizationId) {
   };
 }
 
+function formatSubscription(subscription) {
+  const statusLabels = {
+    pending: 'Laukiama sąskaitos',
+    active: 'Aktyvi',
+    canceled: 'Atšaukta',
+    expired: 'Pasibaigusi',
+  };
+  const isExpired = subscription.status === 'active'
+    && subscription.ends_at
+    && new Date(subscription.ends_at).getTime() <= Date.now();
+  return {
+    id: subscription.id,
+    orgId: subscription.organization_id,
+    plan: subscription.plan_name,
+    planCode: subscription.plan_code,
+    status: isExpired ? 'Pasibaigusi' : statusLabels[subscription.status] ?? subscription.status,
+    price: subscription.amount_cents / 100,
+    startsAt: subscription.starts_at,
+    endsAt: subscription.ends_at,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    isAddon: subscription.is_addon,
+  };
+}
+
+function addCalendarMonths(date, months) {
+  const result = new Date(date);
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
+}
+
+function getSubscriptionAccess(subscription) {
+  if (!subscription || subscription.status === 'Laukiama sąskaitos') {
+    return { readOnly: false, locked: false, periodEnd: null, readOnlyUntil: null };
+  }
+  const endDate = subscription.endsAt ? new Date(subscription.endsAt) : null;
+  if (!endDate && ['Atšaukta', 'Pasibaigusi'].includes(subscription.status)) {
+    return { readOnly: false, locked: true, periodEnd: null, readOnlyUntil: null };
+  }
+  if (subscription.status === 'Aktyvi' && !endDate) {
+    return { readOnly: false, locked: false, periodEnd: null, readOnlyUntil: null };
+  }
+  const effectiveEndDate = endDate ?? new Date();
+  const readOnlyUntil = addCalendarMonths(effectiveEndDate, 2);
+  const now = Date.now();
+  return {
+    readOnly: now >= effectiveEndDate.getTime() && now < readOnlyUntil.getTime(),
+    locked: now >= readOnlyUntil.getTime(),
+    periodEnd: effectiveEndDate.toISOString(),
+    readOnlyUntil: readOnlyUntil.toISOString(),
+  };
+}
+
 async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
   const [
     { data: workspace, error: workspaceError },
     { data: organizationDocuments, error: documentsError },
+    { data: subscriptionRows, error: subscriptionError },
   ] = await Promise.all([
     supabase.rpc('get_organization_workspace_metadata', { input_organization_id: organizationId }),
     supabase.from('organization_documents')
       .select('document_id, payload')
       .eq('organization_id', organizationId)
       .eq('active', true),
+    supabase.from('workspace_subscriptions')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at, updated_at')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false }),
   ]);
   if (workspaceError) throw workspaceError;
   if (documentsError) throw documentsError;
+  if (subscriptionError) throw subscriptionError;
 
   const mapDocuments = (documents, resourceOrganizationId = '') => documents.map((document) => {
     if (!document.payload || typeof document.payload !== 'object' || Array.isArray(document.payload)) {
@@ -133,15 +195,27 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
   return scopedWorkspace
     ? {
       ...scopedWorkspace,
+      subscriptions: (subscriptionRows ?? []).map(formatSubscription),
       resources: [
         ...sharedCatalogResources,
         ...mapDocuments(organizationDocuments ?? [], organizationId),
       ],
     }
-    : null;
+    : {
+      organizations: [],
+      employees: [],
+      archivedEmployees: [],
+      protocolBatches: [],
+      signatures: [],
+      subscriptions: (subscriptionRows ?? []).map(formatSubscription),
+      resources: [
+        ...sharedCatalogResources,
+        ...mapDocuments(organizationDocuments ?? [], organizationId),
+      ],
+    };
 }
 
-async function loadManagerWorkspace(user) {
+async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   const [{ data: isCreator, error: creatorError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.rpc('is_creator'),
     supabase.from('profiles').select('full_name, account_type').eq('id', user.id).maybeSingle(),
@@ -152,7 +226,7 @@ async function loadManagerWorkspace(user) {
   const companyDetails = {
     companyName: user.user_metadata?.company_name ?? '',
     companyCode: user.user_metadata?.company_code ?? '',
-    companyPlanCode: user.user_metadata?.plan_code === 'pro' ? 'pro' : 'standard',
+    companyPlanCode: user.user_metadata?.plan_code ?? 'up_to_20',
   };
 
   if (['employee', 'dss_specialist'].includes(profile?.account_type) && user.user_metadata?.employee_needs_password) {
@@ -160,29 +234,34 @@ async function loadManagerWorkspace(user) {
   }
 
   if (isCreator) {
-    const [organizationsResult, catalogResult, accountsResult, subscriptionsResult] = await Promise.all([
+    const [organizationsResult, catalogResult, accountsResult, subscriptionsResult, plansResult] = await Promise.all([
       supabase.from('organizations').select('id, name, company_code').order('name'),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
-      supabase.from('organization_data').select('organization_id, subscriptions:data->subscriptions'),
+      supabase.from('workspace_subscriptions')
+        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, created_at, updated_at')
+        .order('created_at', { ascending: false }),
+      supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').order('employee_limit'),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
     if (catalogResult.error) throw catalogResult.error;
     if (accountsResult.error) throw accountsResult.error;
     if (subscriptionsResult.error) throw subscriptionsResult.error;
+    if (plansResult.error) throw plansResult.error;
     const hydratedCatalog = await hydrateWorkspaceAssets(catalogResult.data?.data ?? null);
     const organizations = organizationsResult.data.map((organization) => ({
       id: organization.id,
       name: organization.name,
       companyCode: organization.company_code ?? '',
     }));
-    const subscriptions = subscriptionsResult.data.flatMap((workspace) => workspace.subscriptions ?? []);
+    const subscriptions = (subscriptionsResult.data ?? []).map(formatSubscription);
 
     return {
       creator: true,
       managerName,
       catalog: hydratedCatalog,
       creatorAccounts: accountsResult.data ?? [],
+      subscriptionPlans: plansResult.data ?? [],
       data: {
         organizations,
         employees: [],
@@ -335,13 +414,21 @@ async function loadManagerWorkspace(user) {
     };
   }
 
-  const managerMembership = memberships.find((membership) => membership.role === 'manager');
+  const managerMemberships = memberships.filter((membership) => membership.role === 'manager');
+  const managerMembership = managerMemberships.find((membership) => membership.organization_id === selectedOrganizationId)
+    ?? managerMemberships[0];
   if (!managerMembership) return { requiresOrganization: true, managerName, ...companyDetails };
   const organizationId = managerMembership.organization_id;
 
-  const { data: catalogData, error: catalogError } = await supabase
-    .from('creator_workspace_data').select('data').eq('id', true).maybeSingle();
+  const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
+    supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
+    supabase.from('organizations').select('id, name, company_code').in('id', managerMemberships.map((membership) => membership.organization_id)).order('name'),
+    supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').eq('active', true).order('employee_limit'),
+  ]);
+  const { data: catalogData, error: catalogError } = catalogResult;
   if (catalogError) throw catalogError;
+  if (organizationsResult.error) throw organizationsResult.error;
+  if (subscriptionPlansResult.error) throw subscriptionPlansResult.error;
   const [savedWorkspace, invitationsResult, requestsResult, organizationSettingsResult] = await Promise.all([
     loadOrganizationWorkspace(organizationId, catalogData?.data?.resources ?? []),
     supabase.from('dss_specialist_invitations')
@@ -366,12 +453,14 @@ async function loadManagerWorkspace(user) {
   const { data: organizationSettings, error: organizationSettingsError } = organizationSettingsResult;
   if (organizationSettingsError) throw organizationSettingsError;
   const savedOrganization = savedWorkspace?.organizations?.find((item) => item.id === organizationId);
+  const listedOrganization = organizationsResult.data?.find((item) => item.id === organizationId);
   const organization = {
     id: organizationId,
-    name: savedOrganization?.name ?? companyDetails.companyName,
-    company_code: savedOrganization?.companyCode ?? companyDetails.companyCode,
+    name: savedOrganization?.name ?? listedOrganization?.name ?? companyDetails.companyName,
+    company_code: savedOrganization?.companyCode ?? listedOrganization?.company_code ?? companyDetails.companyCode,
   };
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
+  const currentSubscription = (hydratedWorkspace?.subscriptions ?? [])[0];
   const hydratedCatalog = await hydrateWorkspaceAssets(catalogData?.data ?? null);
   const hydratedManagerWorkspace = await hydrateWorkspaceAssets({
     ...hydratedWorkspace,
@@ -381,6 +470,13 @@ async function loadManagerWorkspace(user) {
 
   return {
     organization,
+    availableOrganizations: (organizationsResult.data ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      company_code: item.company_code ?? '',
+    })),
+    subscriptionPlans: subscriptionPlansResult.data ?? [],
+    subscriptionAccess: getSubscriptionAccess(currentSubscription),
     initializeCreatorDefaults: !savedWorkspace,
     managerName,
     catalog: hydratedCatalog,
@@ -515,7 +611,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
               ...(signupRole === 'manager' ? {
                 company_name: form.companyName.trim(),
                 company_code: form.companyCode.trim(),
-                plan_code: 'standard',
+                plan_code: 'up_to_20',
               } : { plan_code: 'free' }),
               signing_pin: form.signingPin,
             },
@@ -611,18 +707,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         organization_code: form.companyCode.trim() || null,
       });
       if (error) throw error;
-      const { data: organization, error: organizationError } = await supabase
-        .from('organizations')
-        .select('id, name, company_code')
-        .eq('id', organizationId)
-        .single();
-      if (organizationError) throw organizationError;
-      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).maybeSingle();
-      setWorkspace({
-        organization: { ...organization, plan_code: session.user.user_metadata?.plan_code === 'pro' ? 'pro' : 'standard' },
-        managerName: profile?.full_name ?? session.user.user_metadata?.full_name ?? '',
-        data: null,
-      });
+      const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+      setWorkspace(loadedWorkspace);
       setWorkspaceStatus('ready');
     } catch (error) {
       setErrorMessage(error.message || 'Nepavyko sukurti įmonės.');
@@ -649,14 +735,30 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     setWorkspace(loadedWorkspace);
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
     if (exitPreview) setCreatorPreview(null);
+    return loadedWorkspace;
   };
 
-  const refreshSignedInWorkspace = async () => {
+  const refreshSignedInWorkspace = async (organizationId = workspace?.organization?.id) => {
     if (!session?.user) return null;
-    const loadedWorkspace = await loadManagerWorkspace(session.user);
+    const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
     setWorkspace(loadedWorkspace);
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
     return loadedWorkspace;
+  };
+
+  const switchManagerOrganization = async (organizationId) => {
+    if (!session?.user) return;
+    setErrorMessage('');
+    setSubmitting(true);
+    try {
+      const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+      setWorkspace(loadedWorkspace);
+      setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
+    } catch (error) {
+      setErrorMessage(error.message || 'Nepavyko pakeisti įmonės darbo srities.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openCreatorPreview = async (organizationId, role) => {
@@ -812,7 +914,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       }
     }
     return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
-        key={workspace.creator ? 'creator-workspace' : 'signed-in-workspace'}
+        key={workspace.creator ? 'creator-workspace' : `signed-in-workspace-${workspace.organization?.id ?? workspace.data.organizations?.[0]?.id ?? ''}`}
       userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'}
       onRoleChange={() => {}}
       onExit={signOut}
@@ -825,9 +927,13 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
       onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
       cloudOrganization={workspace.organization}
+      availableOrganizations={workspace.availableOrganizations ?? []}
+      subscriptionPlans={workspace.subscriptionPlans ?? []}
+      subscriptionAccess={workspace.subscriptionAccess ?? { readOnly: false, locked: false }}
       cloudManagerName={workspace.managerName}
       onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
       onRefreshWorkspace={refreshSignedInWorkspace}
+      onSwitchOrganization={switchManagerOrganization}
       cloudMode
       cloudUserId={session.user.id}
     /></Suspense>;
@@ -847,7 +953,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         <h1 className="text-xl font-bold">Nustatykite pasirašymo PIN</h1><p className="mt-1 text-sm text-slate-600">PIN bus naudojamas dokumentams pasirašyti. Jis saugomas užšifruotu hash’u ir niekada nerodomas nustatymuose.</p>
         <form onSubmit={finishSigningPinSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">4 skaitmenų PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Nustatyti PIN'}</button></form>
       </> : session && workspaceStatus === 'organization-needed' ? <>
-        <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų.</p><p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Pasirinktas planas: {session.user.user_metadata?.plan_code === 'pro' ? 'Pro · 79 €/mėn.' : 'Standartinis · 29 €/mėn.'}. Mokėjimų integracija dar neprijungta, todėl prenumerata bus laukianti apmokėjimo.</p>
+        <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų.</p><p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Pasirinktas planas: {({ up_to_20: 'Iki 20 darbuotojų · 29,99 €/mėn.', up_to_50: 'Iki 50 darbuotojų · 49,99 €/mėn.', up_to_75: 'Iki 75 darbuotojų · 59,99 €/mėn.', up_to_200: 'Iki 200 darbuotojų · 129,99 €/mėn.' })[session.user.user_metadata?.plan_code] ?? 'Iki 20 darbuotojų · 29,99 €/mėn.'}. Užsakymas bus perduotas rankiniam sąskaitos išrašymui.</p>
         <form onSubmit={createOrganization} className="mt-5 space-y-4"><label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label><label className="block text-sm font-medium">Įmonės kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><Building2 size={16} />{submitting ? 'Kuriama…' : 'Sukurti įmonę'}</button></form>
       </> : session && workspaceStatus === 'error' ? <>
         <h1 className="text-xl font-bold">Nepavyko atidaryti darbo srities</h1>

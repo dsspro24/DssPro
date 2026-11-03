@@ -17,7 +17,7 @@ Atidarykite Vite parodytą vietinį adresą. Tailwind CSS įkompiliuojamas kartu
 - **AAP šablonas:** kūrėjo bibliotekoje jau paruošta dviejų dalių AAP apskaitos kortelė ir išdavimo žiniaraštis. Vadovas prieš kvietimą įveda darbo sutarties Nr.; jis rodomas prie darbuotojo ir dokumente. Įmonės bibliotekoje vadovas gali pakeisti AAP priemones, išdavimo pagrindus, kiekius, terminus ir kainas. Darbuotojas pasirašo PIN, tada vadovas patvirtina įmonės PIN. Parašo įraše fiksuojamas pasirašymo būdas, vietinis laikas iki sekundės ir demo IP. Po darbuotojo parašo visas dokumentas ir AAP pozicijų versija užrakinami; vėlesni pakeitimai galioja tik naujiems dokumentams. Viršelio nuotrauka yra vietinė: `public/courses/aap-equipment.jpg`.
 - **DSS specialistas:** pasirinkite demo specialisto paskyrą, priimkite įmonės kvietimą, peržiūrėkite žurnalus ir pasirašykite po darbuotojo PIN patvirtinimo.
 - **Įmonės vadovas:** tvarkykite įmonės DSS specialistus ir komisiją, darbuotojus, biblioteką, priskyrimus, ataskaitas ir prenumeratą.
-- **Turinio kūrėjas:** įkelkite HTML ir nuotrauką, kurkite testų klausimus, nustatykite galiojimą, tvarkykite biblioteką bei demo prenumeratas.
+- **Turinio kūrėjas:** įkelkite HTML ir nuotrauką, kurkite testų klausimus, nustatykite galiojimą, tvarkykite biblioteką, cloud prenumeratas ir jų kainas.
 
 Izoliuotame sandbox galima persijungti tarp vienos fiktyvios įmonės vadovo, DSS specialisto ir aštuonių darbuotojų. Darbuotojo ir DSS PIN, parašai bei rodomas IP yra tik demo įrašai, ne teisiškai patvirtinti elektroniniai parašai. Prenumeratos veiksmai nekeičia realių mokėjimų, o kvietimai neišsiunčia el. laiškų.
 
@@ -42,6 +42,8 @@ npx supabase functions deploy invite-dss-specialist --project-ref wickbchyltkpmu
 Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir `development` aplinkoms. GitHub `main` pushai automatiškai paleidžia Vercel deploy.
 
 Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Registruojantis DSS specialistui įmonės duomenų nereikia: patvirtinęs el. paštą jis patenka į savo darbo sritį, kur gali naudotis paskyros ir bendromis sistemos funkcijomis, kol neturi prižiūrimų įmonių. Vadovas gali pakviesti DSS specialistą el. paštu; kvietimas nesuteikia prieigos, kol specialistas neprisijungęs jo nepriima. Specialistas gali kvietimo atsisakyti. Vadovas gali patvirtinęs pašalinti specialistą iš įmonės; panaikinama tik jo prieiga prie tos įmonės, o jo paskyra ir ankstesni parašai išsaugomi.
+
+Cloud prenumeratos užsakomos rankiniu būdu: iki 20 aktyvių darbuotojų – 29,99 €/mėn., iki 50 – 49,99 €/mėn., iki 75 – 59,99 €/mėn., iki 200 – 129,99 €/mėn. Kiekviena papildoma įmonė turi atskirą workspace ir kainuoja 19,99 €/mėn. Vadovas gali pateikti užsakymą ir atšaukti prenumeratą; Stripe integracija neprijungta, sąskaitas išrašo kūrėjas. Kūrėjo skiltyje „Prenumeratos“ galima koreguoti kainas, užsakymo būseną ir galiojimo datas. Atšaukus aktyvią prenumeratą, prieiga lieka iki jos pabaigos, po kurios 2 mėn. galima tik peržiūrėti duomenis ir atsisiųsti PDF. Vėliau prieiga užblokuojama, o duomenys paliekami sistemoje.
 
 Vadovas įmonės nustatymuose gali atskirai suteikti DSS specialistui teisę tvarkyti įmonės darbo sritį arba bet kada ją atšaukti. Gavęs teisę specialistas gali tvarkyti darbuotojus, dokumentus, priskyrimus ir DSS komisiją; jis išlieka DSS specialistu ir gali pasirašyti tik kaip DSS specialistas. Vadovo parašo PIN keitimas ir vadovo vardu pasirašymas lieka tik vadovui.
 
