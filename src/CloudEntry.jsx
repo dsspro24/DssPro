@@ -235,7 +235,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
 
   if (isCreator) {
     const [organizationsResult, catalogResult, accountsResult, subscriptionsResult, plansResult] = await Promise.all([
-      supabase.from('organizations').select('id, name, company_code').order('name'),
+      supabase.from('organizations').select('id, name, company_code, parent_organization_id').order('name'),
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
       supabase.from('workspace_subscriptions')
@@ -253,6 +253,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       id: organization.id,
       name: organization.name,
       companyCode: organization.company_code ?? '',
+      parentOrganizationId: organization.parent_organization_id ?? null,
     }));
     const subscriptions = (subscriptionsResult.data ?? []).map(formatSubscription);
 
