@@ -153,9 +153,11 @@ function formatSubscription(subscription) {
     orderedAt: subscription.ordered_at ?? null,
     orderMonths: subscription.order_months ?? 1,
     paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
-    preinvoiceData: subscription.preinvoice_data ?? null,
+    preinvoiceNumber: subscription.preinvoice_number ?? '',
+    preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? null,
+    preinvoiceTotalAmountCents: Number(subscription.preinvoice_total_amount_cents) || null,
     finalInvoiceNumber: subscription.final_invoice_number ?? '',
-    finalInvoiceData: subscription.final_invoice_data ?? null,
+    finalInvoiceDate: subscription.final_invoice_issue_date ?? subscription.paid_at ?? null,
     paidAt: subscription.paid_at ?? null,
   };
 }
@@ -204,7 +206,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
       .eq('organization_id', organizationId)
       .eq('active', true),
     supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_data, final_invoice_number, final_invoice_data, paid_at, created_at, updated_at')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
   ]);
@@ -281,7 +283,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
       supabase.from('workspace_subscriptions')
-        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_data, final_invoice_number, final_invoice_data, paid_at, created_at, updated_at')
+        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
         .order('created_at', { ascending: false }),
       supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').order('employee_limit'),
       supabase.from('creator_billing_settings').select('issuer_details, vat_registered, vat_rate, vat_included, invoice_note').eq('id', true).maybeSingle(),
