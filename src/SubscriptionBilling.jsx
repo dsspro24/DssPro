@@ -121,7 +121,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         </button>
       </form> : <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
 
-    {cloudMode && <div className="border-t border-slate-200 pt-4">
+    {cloudMode && !readOnly && !locked && <div className="border-t border-slate-200 pt-4">
       {!showAddCompany
         ? <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => setShowAddCompany(true)}>+ Pridėti įmonę</button>
         : <form onSubmit={submitAdditionalCompany} className="grid gap-3 sm:grid-cols-2">

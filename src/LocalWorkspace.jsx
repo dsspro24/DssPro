@@ -6296,6 +6296,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ]
       : userRole === 'vadovas'
         ? [
+          ...(cloudMode && currentSubscription?.endsAt
+            && ['Aktyvi', 'Pasibaigusi', 'Atšaukta'].includes(currentSubscription.status)
+            ? (() => {
+              const remainingDays = Math.ceil((new Date(currentSubscription.endsAt).getTime() - validityCheckTime) / 86_400_000);
+              if (!Number.isFinite(remainingDays) || remainingDays > 5) return [];
+              const daysLabel = remainingDays === 1 ? 'dienos' : 'dienų';
+              const hasExpired = remainingDays <= 0;
+              return [{
+                id: `subscription-renewal-${currentSubscription.id}`,
+                title: hasExpired ? 'Prenumerata pasibaigė' : `Prenumerata baigsis po ${remainingDays} ${daysLabel}`,
+                description: `${currentOrg?.name ?? 'Įmonė'} · ${currentSubscription.plan}${hasExpired
+                  ? ` · pasibaigė ${new Date(currentSubscription.endsAt).toLocaleDateString('lt-LT')}. Duomenis dar galima peržiūrėti ir atsisiųsti per 2 mėn. laikotarpį.`
+                  : ` · galioja iki ${new Date(currentSubscription.endsAt).toLocaleDateString('lt-LT')}`}`,
+                actionLabel: hasExpired ? 'Atnaujinti prenumeratą' : 'Peržiūrėti prenumeratą',
+                subscriptionRenewal: true,
+              }];
+            })()
+            : []),
           ...(cloudMode ? data.subscriptions
             .filter((subscription) => subscription.orgId === currentOrg?.id)
             .flatMap((subscription) => {
@@ -6561,7 +6579,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!(target instanceof Element)) return false;
     if (target.closest('aside, [data-readonly-allowed], a[download]')) return true;
     const button = target.closest('button');
-    return Boolean(button && /pdf|atsisiųsti|eksportuoti|spausdinti|baigti darbą/i.test(`${button.innerText} ${button.getAttribute('aria-label') ?? ''}`));
+    return Boolean(button && /pdf|atsisiųsti|eksportuoti|spausdinti|peržiūrėti|atidaryti|uždaryti|baigti darbą/i.test(`${button.innerText} ${button.getAttribute('aria-label') ?? ''}`));
   };
   const guardReadOnlyClick = (event) => {
     if (!isWorkspaceReadOnly || isReadOnlyAllowedTarget(event.target)) return;
@@ -6668,6 +6686,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     if (userRole === 'vadovas' && item.subscriptionInvoice) {
                       setActiveTab('prenumerata');
                       await openSubscriptionInvoice(item.subscriptionInvoice.subscriptionId, item.subscriptionInvoice.invoiceType);
+                    } else if (userRole === 'vadovas' && item.subscriptionRenewal) {
+                      setActiveTab('prenumerata');
                     } else if (userRole === 'kurejas' && item.creatorSubscription) {
                       setActiveTab('prenumeratos');
                     } else if (userRole === 'darbuotojas') {
@@ -6762,7 +6782,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <button type="button" className="rounded-md border border-sky-300 bg-white px-2.5 py-1 font-semibold hover:bg-sky-100" onClick={onExit}>Baigti demo</button>
         </div>}
         <div className="w-full max-w-none space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:space-y-6 lg:px-6 lg:py-6">
-          {isSubscriptionReadOnly && <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">Prenumerata pasibaigė. Dar galima 2 mėn. peržiūrėti duomenis ir atsisiųsti PDF; keisti duomenų negalima.</div>}
+          {isSubscriptionReadOnly && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"><span>Prenumerata pasibaigė. 2 mėn. galite peržiūrėti ir atsisiųsti įmonės duomenis. Darbuotojų pridėti ar duomenų keisti negalima.</span><button type="button" className="shrink-0 rounded-md border border-amber-500 bg-white px-3 py-1.5 font-semibold hover:bg-amber-100" data-readonly-allowed onClick={() => setActiveTab('prenumerata')}>Atnaujinti prenumeratą</button></div>}
           {userRole === 'dss' && dssOrganizationIsOpen && onLoadDssOrganization && (dssWorkspaceLoadState.organizationId !== selectedOrgId || dssWorkspaceLoadState.status === 'loading') && <div role="status" className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">Įkeliami pasirinktos įmonės duomenys…</div>}
           {userRole === 'dss' && dssOrganizationIsOpen && onLoadDssOrganization && dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'error' && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950"><span>Įmonės darbo srities įkelti nepavyko: {dssWorkspaceLoadState.error}</span><button type="button" className="rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold hover:bg-rose-100" onClick={() => { setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'loading', error: '' }); setDssWorkspaceLoadAttempt((attempt) => attempt + 1); }}>Bandyti dar kartą</button></div>}
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
@@ -6889,7 +6909,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                     <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => { setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] }); document.getElementById('assignment-presets-dialog')?.showModal(); }}><Settings2 size={16} />Ruošiniai ({currentOrg?.employeeAssignmentPresets?.length ?? 0})</button>
-                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={openEmployeeInviteDialog}><Plus size={16} />Pridėti darbuotoją</button>
+                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={isWorkspaceReadOnly} title={isWorkspaceReadOnly ? 'Prenumerata pasibaigė: darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.' : undefined} onClick={openEmployeeInviteDialog}><Plus size={16} />Pridėti darbuotoją</button>
                   </div>
                 </div>
                 <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <span className="font-semibold text-slate-800">{filteredOrgEmployees.length}</span></span></div>
