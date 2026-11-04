@@ -530,7 +530,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
     supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
     loadOrganizationRecords(managerMemberships.map((membership) => membership.organization_id)),
-    supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').eq('active', true).order('employee_limit'),
+    supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').order('employee_limit'),
   ]);
   const { data: catalogData, error: catalogError } = catalogResult;
   if (catalogError) throw catalogError;

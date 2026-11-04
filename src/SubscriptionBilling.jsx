@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
 
 export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, managerName = '', now = 0, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
-  const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
-  const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false);
+  const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
+  const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
+  const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && isPlanSelectable(plan));
   const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
   const availablePlans = planOptions.filter((plan) => plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
@@ -23,7 +24,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
     : availablePlans[0]?.code ?? '';
-  const currentPlan = planOptions.find((plan) => plan.code === subscription?.planCode);
+  const currentPlan = plans.find((plan) => plan.code === subscription?.planCode);
   const selectedPlan = planOptions.find((plan) => plan.code === selectedPlanCode);
   const effectiveAddonPlanCode = addonPlans.some((plan) => plan.code === selectedAddonPlanCode)
     ? selectedAddonPlanCode
@@ -31,6 +32,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   const selectedAddonPlan = addonPlans.find((plan) => plan.code === effectiveAddonPlanCode);
   const pendingPlanChange = subscription?.isPlanChange && subscription.paymentStatus === 'Laukiama apmokėjimo';
   const canChangePlan = cloudMode && subscription?.status === 'Aktyvi' && !pendingPlanChange;
+  const activeEmployeeLimit = currentPlan?.employee_limit;
   const subscriptionRemainingTime = subscription?.endsAt
     ? new Date(subscription.endsAt).getTime() > now
       ? ` · liko ${Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000)} d.`
@@ -66,6 +68,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   };
 
   return <div className="space-y-4">
+    <p className="text-xs text-slate-500">
+      Aktyvūs darbuotojai: {employeeCount}{typeof activeEmployeeLimit === 'number' ? ` / ${activeEmployeeLimit}` : ''}. Archyvuoti darbuotojai į plano limitą neįskaičiuojami.
+    </p>
     {subscription
       ? <>
         <p className="text-lg font-bold">{subscription.plan} · {formatPrice(subscription.price)} €/mėn.</p>
@@ -88,7 +93,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           {planOptions.map((plan) => <option key={plan.code} value={plan.code} disabled={plan.employee_limit < employeeCount && plan.code !== subscription.planCode}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.{plan.employee_limit < employeeCount && plan.code !== subscription.planCode ? ' · nepakanka aktyvių darbuotojų limitui' : ''}</option>)}
         </select>
       </label>
-      <p className="text-xs text-slate-500">Aktyvių darbuotojų: {employeeCount}. Archyvuoti darbuotojai į plano limitą neįskaičiuojami. Pakeitimas įsigalioja iškart; kaina perskaičiuojama už likusį laikotarpį.</p>
+      <p className="text-xs text-slate-500">Pakeitimas įsigalioja iškart; kaina perskaičiuojama už likusį laikotarpį.</p>
       {selectedPlan?.code !== subscription.planCode && <button type="submit" className={buttonClass} disabled={busy || !selectedPlan || selectedPlan.employee_limit < employeeCount}><CreditCard size={16} />{busy ? 'Keičiama…' : `${selectedPlan && currentPlan && selectedPlan.amount_cents < currentPlan.amount_cents ? 'Sumažinti' : 'Atnaujinti'} planą`}</button>}
     </form>}
     {pendingPlanChange && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Palaukite, kol bus patvirtintas plano pakeitimo sąskaitos apmokėjimas, arba apmokėkite ją per 5 dienas.</p>}
@@ -110,7 +115,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           </select>
         </label>
         <label className="block text-sm font-medium">Užsakymo laikotarpis (mėn.)<input className={`${inputClass} mt-1 max-w-36`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
-        <p className="text-xs text-slate-500">Aktyvių darbuotojų šiame workspace: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
+        <p className="text-xs text-slate-500">Aktyvūs darbuotojai: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
           <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti prenumeratą'}
         </button>

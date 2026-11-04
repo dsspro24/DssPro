@@ -1989,8 +1989,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const currentSubscription = data.subscriptions.find((subscription) => subscription.orgId === currentOrg?.id);
+  const currentSubscriptionPlan = subscriptionPlans.find((plan) => plan.code === currentSubscription?.planCode);
   const currentActiveEmployeeCount = data.employees.filter((employee) =>
     employee.orgId === currentOrg?.id && employee.status === 'Aktyvus' && !employee.archivedAt).length;
+  const employeePlanLimitReached = currentSubscriptionPlan
+    && currentActiveEmployeeCount >= currentSubscriptionPlan.employee_limit;
   useEffect(() => {
     if (!cloudMode || userRole !== 'vadovas' || creatorReadOnlyPreview || isSubscriptionReadOnly || isSubscriptionLocked || !currentOrg?.id) return undefined;
     let active = true;
@@ -4626,6 +4629,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     });
   };
 
+  const openEmployeeInviteDialog = () => {
+    if (cloudMode && currentSubscription && !currentSubscriptionPlan) {
+      setActiveTab('prenumerata');
+      setNotice('Nepavyko nustatyti aktyvaus prenumeratos plano darbuotojų limito. Atnaujinkite prenumeratos duomenis ir bandykite dar kartą.');
+      return;
+    }
+    if (cloudMode && employeePlanLimitReached) {
+      setActiveTab('prenumerata');
+      setNotice(`Pasiektas plano limitas: ${currentActiveEmployeeCount} iš ${currentSubscriptionPlan.employee_limit} aktyvių darbuotojų. Pasirinkite didesnį planą, kad galėtumėte pridėti darbuotoją. Archyvuoti darbuotojai į limitą neįskaičiuojami.`);
+      return;
+    }
+    document.getElementById('invite-employee-dialog')?.showModal();
+  };
+
   const inviteEmployee = async (event) => {
     event.preventDefault();
     if (sandboxMode) {
@@ -4638,6 +4655,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const contractNumber = employeeForm.contractNumber.trim();
     if (!name || !email || !contractNumber || !employeeForm.position.trim() || employeeEmailError || employeeContractNumberError || rehireLookupPending) return;
     const rehireRecord = matchingArchivedEmployee;
+    if (cloudMode && currentSubscription && !currentSubscriptionPlan) {
+      inviteDialog?.close();
+      setActiveTab('prenumerata');
+      setNotice('Nepavyko nustatyti aktyvaus prenumeratos plano darbuotojų limito. Atnaujinkite prenumeratos duomenis ir bandykite dar kartą.');
+      return;
+    }
+    if (cloudMode && employeePlanLimitReached) {
+      inviteDialog?.close();
+      setActiveTab('prenumerata');
+      setNotice(`Pasiektas plano limitas: ${currentActiveEmployeeCount} iš ${currentSubscriptionPlan.employee_limit} aktyvių darbuotojų. Pasirinkite didesnį planą, kad galėtumėte pridėti darbuotoją. Archyvuoti darbuotojai į limitą neįskaičiuojami.`);
+      return;
+    }
     const invitedAt = new Date().toISOString();
     const assignedResourceIds = expandProtocolResourceAssignments(
       inviteResourceIds.filter((resourceId) => currentOrg.resources.includes(resourceId)),
@@ -5807,11 +5836,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (/active employee|employee limit.*plan|plan.*employee limit/i.test(error?.message ?? '')) {
       employeeLimitUpgradePendingRef.current = true;
       setActiveTab('prenumerata');
-      setNotice('Pasiektas aktyvių darbuotojų skaičiaus plano limitas. Archyvuoti darbuotojai neskaičiuojami. Atnaujinkite planą, kad galėtumėte pridėti aktyvų darbuotoją.');
+      setNotice(`Pasiektas aktyvių darbuotojų plano limitas${currentSubscriptionPlan ? ` (${currentActiveEmployeeCount} iš ${currentSubscriptionPlan.employee_limit})` : ''}. Pasirinkite didesnį planą, kad galėtumėte pridėti aktyvų darbuotoją. Archyvuoti darbuotojai į limitą neįskaičiuojami.`);
       return;
     }
     setNotice(`${context}: ${error?.message ?? 'įvyko klaida.'}`);
-  }, [setActiveTab]);
+  }, [currentActiveEmployeeCount, currentSubscriptionPlan, setActiveTab]);
   useEffect(() => {
     reportWorkspaceSaveFailureRef.current = reportWorkspaceSaveFailure;
   }, [reportWorkspaceSaveFailure]);
@@ -6779,7 +6808,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? dssOrganizationIsOpen ? currentOrg?.name ?? 'Įmonės darbo vieta' : 'Pasirinkite įmonę' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : userRole === 'dss' && !dssOrganizationIsOpen ? 'Pasirinkite įmonę, kurią norite peržiūrėti ir tvarkyti.' : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : sandboxMode ? 'izoliuotas demo, pakeitimai tik šiame skirtuke' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div>{userRole === 'dss' && dssOrganizationIsOpen && <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={returnToDssOrganizations}><ChevronLeft size={16} />Grįžti į įmonių sąrašą</button><button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssOrganizationLeaveSubmitting} onClick={leaveDssOrganization}>{dssOrganizationLeaveSubmitting ? 'Vykdoma…' : 'Nebesu šios įmonės DSS specialistas'}</button></div>}</div>
               {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? dssOrganizationIsOpen ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Įmonės darbuotojai" value={orgEmployees.length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div> : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /></div>
-                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={orgEmployees.filter((employee) => employee.status === 'Aktyvus').length} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
+                  : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={currentActiveEmployeeCount} hint={currentSubscriptionPlan ? `Plano limitas: ${currentSubscriptionPlan.employee_limit} aktyvių darbuotojų` : 'Plano darbuotojų limitas nenustatytas'} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
               {userRole === 'darbuotojas' && (pendingCommissionInvitations.length > 0 || pendingCommissionTasks.length > 0 || completedCommissionTasks.length > 0) && <Panel title="DSS komisijos veiksmai">
                 <div className="space-y-3">
@@ -6860,7 +6889,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                     <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => { setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] }); document.getElementById('assignment-presets-dialog')?.showModal(); }}><Settings2 size={16} />Ruošiniai ({currentOrg?.employeeAssignmentPresets?.length ?? 0})</button>
-                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pridėti darbuotoją</button>
+                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={openEmployeeInviteDialog}><Plus size={16} />Pridėti darbuotoją</button>
                   </div>
                 </div>
                 <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <span className="font-semibold text-slate-800">{filteredOrgEmployees.length}</span></span></div>
