@@ -1073,7 +1073,7 @@ const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2], ['prenumerata', 'Prenumerata', CreditCard]],
-  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
+  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard], ['kurejo-saskaitos', 'Sąskaitos', FileText]],
 };
 
 function loadData() {
@@ -7504,6 +7504,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </Panel>
           </section>}
 
+          {activeTab === 'kurejo-saskaitos' && userRole === 'kurejas' && <section className="space-y-5">
+            <PageTitle title="Sąskaitos" subtitle="Visų įmonių apmokėtos prenumeratos sąskaitos faktūros, suskirstytos pagal išrašymo metus." />
+            <Panel title="Visų įmonių sąskaitos faktūros"><CreatorFinalInvoiceArchive onOpenInvoice={openSubscriptionInvoice} /></Panel>
+          </section>}
+
           {activeTab === 'biblioteka' && userRole === 'kurejas' && <section className="space-y-5"><PageTitle title="Turinio biblioteka" subtitle="Kurti ir tvarkyti įmonėms prieinamus testų, žurnalų, kortelių ir protokolų šablonus." />
             {cloudMode && <Panel title="Standartinių šablonų atkūrimas"><p className="text-sm text-slate-600">Atnaujinkite standartinių testų, žurnalų, protokolų ir AAP kortelės turinį pagal programos versiją. Įkeltos nuotraukos ir įmonių nustatymai bus išsaugoti. Atkurti standartiniai šablonai bus pažymėti numatytaisiais ir priskirti esamoms įmonėms. Individualiai sukurti šablonai neatkuriami.</p><button type="button" className={`${buttonClass} mt-3`} disabled={restoringDefaultResources || resourceSaving || resourceFileUploading} onClick={restoreDefaultResources}><Upload size={16} />{restoringDefaultResources ? 'Atkuriami šablonai…' : 'Atkurti standartinius šablonus'}</button></Panel>}
             <Panel title="Turinio tipai"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.resourceTypes.map((type) => <div key={type} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"><span className="text-sm font-semibold">{resourceTypeDisplayNames[type] ?? type}</span><span className="text-xs text-slate-500">{data.resources.filter((resource) => resource.type === type).length} šablonų</span></div>)}</div></Panel>
@@ -9531,7 +9536,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         : <form onSubmit={submitAdditionalCompany} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium">Naujos įmonės pavadinimas<input className={`${inputClass} mt-1`} value={companyName} onChange={(event) => setCompanyName(event.target.value)} required /></label>
           <label className="text-sm font-medium">Įmonės kodas<input className={`${inputClass} mt-1`} value={companyCode} onChange={(event) => setCompanyCode(event.target.value)} required /></label>
-          <label className="text-sm font-medium sm:col-span-2">Adresas sąskaitoms<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={companyBillingAddress} onChange={(event) => setCompanyBillingAddress(event.target.value)} required /></label>
+          <label className="text-sm font-medium sm:col-span-2">Adresas<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={companyBillingAddress} onChange={(event) => setCompanyBillingAddress(event.target.value)} required /></label>
           <label className="text-sm font-medium sm:col-span-2">PVM mokėtojo kodas<input className={`${inputClass} mt-1`} maxLength={40} value={companyVatCode} onChange={(event) => setCompanyVatCode(event.target.value)} /></label>
           <label className="text-sm font-medium sm:col-span-2">Papildomos įmonės planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)} required>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>
           <div className="flex flex-wrap gap-2 sm:col-span-2"><button type="submit" className={buttonClass} disabled={busy || !selectedAddonPlan}>Sukurti darbo sritį · {formatPrice((selectedAddonPlan?.amount_cents ?? 0) / 100)} €/mėn.</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setShowAddCompany(false)}>Atšaukti</button></div>
@@ -9795,6 +9800,125 @@ function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInv
     {invoices.length > 0 && yearInvoices.length === 0 && <p className="rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Šiais metais sąskaitų nėra.</p>}
     {yearInvoices.length > pageSize && <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Rodoma {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, yearInvoices.length)} iš {yearInvoices.length}</span><nav className="flex items-center gap-2" aria-label="Sąskaitų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Atgal</button><span>{page} / {pageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Toliau</button></nav></div>}
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+  </div>;
+}
+
+function CreatorFinalInvoiceArchive({ onOpenInvoice }) {
+  const [yearSummaries, setYearSummaries] = useState([]);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [page, setPage] = useState(1);
+  const [invoices, setInvoices] = useState([]);
+  const [invoiceCount, setInvoiceCount] = useState(0);
+  const [loadingYears, setLoadingYears] = useState(true);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [error, setError] = useState('');
+  const pageSize = 25;
+
+  useEffect(() => {
+    let active = true;
+    supabase.rpc('creator_subscription_invoice_years')
+      .then(({ data, error: loadError }) => {
+        if (loadError) throw loadError;
+        if (!active) return;
+        const summaries = data ?? [];
+        setYearSummaries(summaries);
+        if (!summaries.length) setLoadingInvoices(false);
+        setSelectedYear((current) => current || String(
+          summaries.find((summary) => summary.invoice_year === new Date().getFullYear())?.invoice_year
+          ?? summaries[0]?.invoice_year
+          ?? new Date().getFullYear(),
+        ));
+      })
+      .catch((loadError) => {
+        if (active) {
+          setLoadingInvoices(false);
+          setError(loadError.message || 'Sąskaitų metų užkrauti nepavyko.');
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingYears(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedYear) return undefined;
+    let active = true;
+    const startDate = `${selectedYear}-01-01`;
+    const endDate = `${Number(selectedYear) + 1}-01-01`;
+    supabase.from('workspace_subscriptions')
+      .select('id, organization_id, final_invoice_number, final_invoice_data, plan_name, order_months, organizations(name)', { count: 'exact' })
+      .not('final_invoice_data', 'is', null)
+      .gte('final_invoice_data->>issueDate', startDate)
+      .lt('final_invoice_data->>issueDate', endDate)
+      .order('final_invoice_data->>issueDate', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1)
+      .then(({ data, count, error: loadError }) => {
+        if (loadError) throw loadError;
+        if (!active) return;
+        setInvoices(data ?? []);
+        setInvoiceCount(count ?? 0);
+      })
+      .catch((loadError) => {
+        if (active) {
+          setInvoices([]);
+          setInvoiceCount(0);
+          setError(loadError.message || 'Sąskaitų užkrauti nepavyko.');
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingInvoices(false);
+      });
+    return () => { active = false; };
+  }, [selectedYear, page]);
+
+  const selectedSummary = yearSummaries.find((summary) => String(summary.invoice_year) === selectedYear);
+  const pageCount = Math.max(1, Math.ceil(invoiceCount / pageSize));
+  const total = new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' })
+    .format((Number(selectedSummary?.total_amount_cents) || 0) / 100);
+
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-sm text-slate-600">Pasirinktų metų visų įmonių SF suma</p>
+        <p className="mt-1 text-2xl font-bold tabular-nums">{loadingYears ? 'Skaičiuojama…' : total}</p>
+      </div>
+      <label className="text-sm font-medium">Metai
+        <select className={`${inputClass} mt-1 min-w-36`} value={selectedYear} disabled={loadingYears} onChange={(event) => { setLoadingInvoices(true); setError(''); setSelectedYear(event.target.value); setPage(1); }}>
+          {!yearSummaries.length && <option value={selectedYear}>{selectedYear || new Date().getFullYear()}</option>}
+          {yearSummaries.map((summary) => <option key={summary.invoice_year} value={String(summary.invoice_year)}>{summary.invoice_year} · {summary.invoice_count} SF</option>)}
+        </select>
+      </label>
+    </div>
+    {error && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+    {loadingInvoices ? <p className="py-6 text-center text-sm text-slate-500">Kraunamos sąskaitos…</p>
+      : invoices.length > 0 ? <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
+        {invoices.map((invoice) => {
+          const invoiceData = invoice.final_invoice_data ?? {};
+          const organizationName = Array.isArray(invoice.organizations)
+            ? invoice.organizations[0]?.name
+            : invoice.organizations?.name;
+          const amount = Number(invoiceData.totalAmountCents);
+          return <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{invoice.final_invoice_number || invoiceData.invoiceNumber || 'SF'} <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">Sąskaita faktūra</span></p>
+              <p className="mt-1 text-xs text-slate-500">{organizationName || 'Įmonė'} · {invoice.plan_name}{invoice.order_months > 1 ? ` · ${invoice.order_months} mėn.` : ''} · {formatInvoiceDate(invoiceData.issueDate)}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              {Number.isFinite(amount) && <strong className="text-sm tabular-nums">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: invoiceData.currency ?? 'EUR' }).format(amount / 100)}</strong>}
+              <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onOpenInvoice(invoice.id, 'final')}><Download size={15} />Peržiūrėti / atsisiųsti</button>
+            </div>
+          </div>;
+        })}
+      </div> : <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Pasirinktais metais sąskaitų faktūrų nėra.</p>}
+    {invoiceCount > pageSize && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm">
+      <span className="text-slate-500">Rodoma {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, invoiceCount)} iš {invoiceCount}</span>
+      <nav className="flex items-center gap-2" aria-label="Sąskaitų puslapiavimas">
+        <button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page <= 1} onClick={() => { setLoadingInvoices(true); setPage((value) => Math.max(1, value - 1)); }}>Atgal</button>
+        <span>{page} / {pageCount}</span>
+        <button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page >= pageCount} onClick={() => { setLoadingInvoices(true); setPage((value) => Math.min(pageCount, value + 1)); }}>Toliau</button>
+      </nav>
+    </div>}
   </div>;
 }
 
