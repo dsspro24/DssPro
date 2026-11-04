@@ -1067,7 +1067,7 @@ const roleLabels = { darbuotojas: 'Darbuotojas', dss: 'DSS specialistas', vadova
 const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['aap', 'Mano AAP', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
-  vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2]],
+  vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2], ['prenumerata', 'Prenumerata', CreditCard]],
   kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard]],
 };
 
@@ -2426,7 +2426,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ? dssOrganizationIsOpen
       ? [
         ...roleNavigation.dss.filter(([id]) => id !== 'paskyra' && (id !== 'archyvas' || canViewCompanyArchive)),
-        ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis' && id !== 'archyvas' && id !== 'zurnalai') : []),
+        ...(canManageSelectedWorkspace ? roleNavigation.vadovas.filter(([id]) => id !== 'skydelis' && id !== 'archyvas' && id !== 'zurnalai' && id !== 'prenumerata') : []),
       ].sort((left, right) => ['skydelis', 'zurnalai', 'ataskaitos', 'parasai', 'archyvas', 'biblioteka', 'imone'].indexOf(left[0]) - ['skydelis', 'zurnalai', 'ataskaitos', 'parasai', 'archyvas', 'biblioteka', 'imone'].indexOf(right[0]))
         .map(([id, label, Icon]) => [id, id === 'skydelis' ? 'Būklės pasas' : label, Icon])
       : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
@@ -5822,18 +5822,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
-  const createAdditionalWorkspace = async (name, code, planCode) => {
+  const createAdditionalWorkspace = async (details) => {
     if (!cloudMode) return;
     setSubscriptionActionBusy(true);
     try {
-      const { data: organizationId, error } = await supabase.rpc('create_additional_organization', {
-        organization_name: name,
-        organization_code: code || null,
-        input_plan_code: planCode,
+      const { data: organizationId, error } = await supabase.rpc('create_additional_organization_with_billing_details', {
+        organization_name: details.companyName.trim(),
+        organization_code: details.companyCode.trim(),
+        input_billing_address: details.billingAddress.trim(),
+        input_vat_code: details.vatCode.trim(),
+        input_plan_code: details.planCode,
       });
       if (error) throw error;
       await onRefreshWorkspace(organizationId);
-      setNotice('Papildomos įmonės darbo sritis sukurta. Jos vadovas gali pateikti užsakymą ir iškart gauti 5 dienų prieigą.');
+      setNotice('Papildoma įmonė sukurta. Planas aktyvus 5 dienas; išankstinę sąskaitą rasite prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Papildomos įmonės sukurti nepavyko: ${error.message}`);
     } finally {
@@ -6993,7 +6995,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
               {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
-              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>}
             </div>
           </section>}
 
@@ -7394,7 +7395,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </Panel>
           </section>}
 
-          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-3xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinktas planas aktyvuojamas iškart 5 dienoms. Apmokėjus išankstinę sąskaitą, prenumerata pratęsiama pasirinktam laikotarpiui; neapmokėjus ji automatiškai baigiasi." /><Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel><Panel title="Sąskaitos"><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice /></Panel></section>}
+          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
+            <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
+            <Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} now={validityCheckTime} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>
+            <Panel title="Sąskaitų istorija">
+              <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
+              <SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice />
+            </Panel>
+          </section>}
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
@@ -9399,7 +9407,7 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
     return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas baigėsi'}</span>{signature && <SignatureImagePreview signature={signature} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
-function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice }) {
+function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, now = 0, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice }) {
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
   const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false);
   const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
@@ -9413,6 +9421,8 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyCode, setCompanyCode] = useState('');
+  const [companyBillingAddress, setCompanyBillingAddress] = useState('');
+  const [companyVatCode, setCompanyVatCode] = useState('');
   const [orderMonths, setOrderMonths] = useState('1');
   const canOrder = !subscription || subscription.status !== 'Aktyvi';
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
@@ -9426,6 +9436,11 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const selectedAddonPlan = addonPlans.find((plan) => plan.code === effectiveAddonPlanCode);
   const pendingPlanChange = subscription?.isPlanChange && subscription.paymentStatus === 'Laukiama apmokėjimo';
   const canChangePlan = cloudMode && subscription?.status === 'Aktyvi' && !pendingPlanChange;
+  const subscriptionRemainingTime = subscription?.endsAt
+    ? new Date(subscription.endsAt).getTime() > now
+      ? ` · liko ${Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000)} d.`
+      : ' · galiojimas pasibaigė'
+    : '';
   const formatPrice = (price) => new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price ?? 0);
 
   const handleOrder = (event) => {
@@ -9439,9 +9454,17 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
 
   const submitAdditionalCompany = (event) => {
     event.preventDefault();
-    onAddCompany(companyName.trim(), companyCode.trim(), effectiveAddonPlanCode);
+    onAddCompany({
+      companyName,
+      companyCode,
+      billingAddress: companyBillingAddress,
+      vatCode: companyVatCode,
+      planCode: effectiveAddonPlanCode,
+    });
     setCompanyName('');
     setCompanyCode('');
+    setCompanyBillingAddress('');
+    setCompanyVatCode('');
     setShowAddCompany(false);
   };
 
@@ -9451,7 +9474,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         <p className="text-lg font-bold">{subscription.plan} · {formatPrice(subscription.price)} €/mėn.</p>
         <p className={`text-sm font-semibold ${subscription.status === 'Laukiama sąskaitos' ? 'text-amber-800' : 'text-slate-700'}`}>
           Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status}
-          {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}
+          {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
         {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Šis senesnis užsakymas dar neaktyvintas. Naują užsakymą pateikę iškart gausite 5 dienų prieigą ir išankstinę sąskaitą.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
@@ -9502,7 +9525,9 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         ? <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => setShowAddCompany(true)}>+ Pridėti įmonę</button>
         : <form onSubmit={submitAdditionalCompany} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium">Naujos įmonės pavadinimas<input className={`${inputClass} mt-1`} value={companyName} onChange={(event) => setCompanyName(event.target.value)} required /></label>
-          <label className="text-sm font-medium">Įmonės kodas<input className={`${inputClass} mt-1`} value={companyCode} onChange={(event) => setCompanyCode(event.target.value)} /></label>
+          <label className="text-sm font-medium">Įmonės kodas<input className={`${inputClass} mt-1`} value={companyCode} onChange={(event) => setCompanyCode(event.target.value)} required /></label>
+          <label className="text-sm font-medium sm:col-span-2">Adresas sąskaitoms<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={companyBillingAddress} onChange={(event) => setCompanyBillingAddress(event.target.value)} required /></label>
+          <label className="text-sm font-medium sm:col-span-2">PVM mokėtojo kodas<input className={`${inputClass} mt-1`} maxLength={40} value={companyVatCode} onChange={(event) => setCompanyVatCode(event.target.value)} /></label>
           <label className="text-sm font-medium sm:col-span-2">Papildomos įmonės planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)} required>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>
           <div className="flex flex-wrap gap-2 sm:col-span-2"><button type="submit" className={buttonClass} disabled={busy || !selectedAddonPlan}>Sukurti darbo sritį · {formatPrice((selectedAddonPlan?.amount_cents ?? 0) / 100)} €/mėn.</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setShowAddCompany(false)}>Atšaukti</button></div>
         </form>}
