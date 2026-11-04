@@ -151,6 +151,11 @@ function renderSubscriptionInvoiceHtml(invoice) {
   const vatLabel = invoice.vatRegistered
     ? `PVM (${escapeInvoiceHtml(invoice.vatRate)} %)`
     : 'PVM';
+  const planLabel = String(invoice.planName ?? '')
+    .replace(/^Papildoma įmonė\s*[·-]\s*/i, '')
+    .trim()
+    .replace(/^./u, (character) => character.toLocaleLowerCase('lt-LT'));
+  const serviceDescription = `DSS Pro prenumerata (${planLabel}) – ${invoice.months} mėn.`;
   return `<!doctype html><html lang="lt"><head><meta charset="utf-8"><title>${escapeInvoiceHtml(invoice.invoiceNumber ?? invoice.orderCode)}</title><style>
     @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:13px Arial,sans-serif;color:#14251f;margin:0}
     header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #009b70;padding-bottom:18px}
@@ -175,7 +180,7 @@ function renderSubscriptionInvoiceHtml(invoice) {
         ${recipient.vatCode ? `<p>PVM mokėtojo kodas: ${escapeInvoiceHtml(recipient.vatCode)}</p>` : ''}
         ${recipient.address ? `<p>Adresas: ${escapeInvoiceHtml(recipient.address)}</p>` : ''}</section></div>
     <table><thead><tr><th>Paslauga</th><th>Kiekis</th><th>Vieneto kaina</th><th>Suma</th></tr></thead><tbody>
-      <tr><td>${escapeInvoiceHtml(invoice.planName)} · ${escapeInvoiceHtml(invoice.months)} mėn.</td><td>${escapeInvoiceHtml(invoice.months)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
+      <tr><td>${escapeInvoiceHtml(serviceDescription)}</td><td>${escapeInvoiceHtml(invoice.months)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
     </tbody></table>
     <div class="totals"><div><span>Suma be PVM</span><strong>${amount(invoice.netAmountCents)}</strong></div>
       ${invoice.vatRegistered ? `<div><span>${vatLabel}</span><strong>${amount(invoice.vatAmountCents)}</strong></div>` : '<div><span>PVM (netaikomas)</span><strong>0,00 €</strong></div>'}
