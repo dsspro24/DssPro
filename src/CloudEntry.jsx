@@ -590,7 +590,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
     })),
     subscriptionPlans: subscriptionPlansResult.data ?? [],
     subscriptionAccess: getSubscriptionAccess(currentSubscription),
-    initializeCreatorDefaults: !savedWorkspace,
+    initializeCreatorDefaults: !savedOrganization,
     managerName,
     catalog: hydratedCatalog,
     data: {
