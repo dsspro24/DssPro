@@ -5793,26 +5793,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
-  const cancelSubscription = async (subscriptionId) => {
-    if (!cloudMode) {
-      updateSubscription(subscriptionId, 'cancel');
-      return;
-    }
-    setSubscriptionActionBusy(true);
-    try {
-      const { error } = await supabase.rpc('cancel_workspace_subscription', {
-        input_subscription_id: subscriptionId,
-      });
-      if (error) throw error;
-      await refreshCurrentSubscription(currentOrg?.id);
-      setNotice('Atšaukimas užregistruotas. Prieiga liks aktyvi iki dabartinio laikotarpio pabaigos.');
-    } catch (error) {
-      setNotice(`Prenumeratos atšaukti nepavyko: ${error.message}`);
-    } finally {
-      setSubscriptionActionBusy(false);
-    }
-  };
-
   const createAdditionalWorkspace = async (name, code, planCode) => {
     if (!cloudMode) return;
     setSubscriptionActionBusy(true);
@@ -6984,7 +6964,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
               {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
-              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>}
+              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>}
             </div>
           </section>}
 
@@ -7385,7 +7365,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </Panel>
           </section>}
 
-          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-3xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinktas planas aktyvuojamas iškart. Išankstinę sąskaitą reikia apmokėti per 5 dienas." /><Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel><Panel title="Sąskaitos"><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} /></Panel></section>}
+          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-3xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinktas planas aktyvuojamas iškart 5 dienoms. Apmokėjus išankstinę sąskaitą, prenumerata pratęsiama pasirinktam laikotarpiui; neapmokėjus ji automatiškai baigiasi." /><Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel><Panel title="Sąskaitos"><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice /></Panel></section>}
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
@@ -9390,7 +9370,7 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
     return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas baigėsi'}</span>{signature && <SignatureImagePreview signature={signature} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
-function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onChangePlan, onCancel, onAddCompany, onDemoAction, onOpenInvoice }) {
+function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice }) {
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
   const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false);
   const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
@@ -9447,7 +9427,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Šis senesnis užsakymas dar neaktyvintas. Naują užsakymą pateikę iškart gausite 5 dienų prieigą ir išankstinę sąskaitą.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
-          : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; negavus mokėjimo per šį laiką, darbo sritis pereis į peržiūros režimą.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
+          : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
         {locked && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">Prieiga užblokuota. Pateikite naują užsakymą – prieiga bus suteikta iškart 5 dienoms.</p>}
@@ -9488,8 +9468,6 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         </button>
       </form> : <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
 
-    {subscription && subscription.status === 'Aktyvi' && !subscription.cancelAtPeriodEnd && <button type="button" className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50" disabled={busy} onClick={() => onCancel(subscription.id)}><X size={15} className="mr-1 inline" />Atšaukti prenumeratą</button>}
-    {subscription?.status === 'Laukiama sąskaitos' && <button type="button" className="rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50" disabled={busy} onClick={() => onCancel(subscription.id)}><X size={15} className="mr-1 inline" />Atšaukti užsakymą</button>}
     {cloudMode && <div className="border-t border-slate-200 pt-4">
       {!showAddCompany
         ? <button type="button" className="rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => setShowAddCompany(true)}>+ Pridėti įmonę</button>
@@ -9681,14 +9659,14 @@ function SubscriptionPlanPriceEditor({ plan, onSave }) {
   </form>;
 }
 
-function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '' }) {
+function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', hidePaidPreinvoice = false }) {
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const [page, setPage] = useState(1);
   const [loadingInvoice, setLoadingInvoice] = useState('');
   const [error, setError] = useState('');
   const pageSize = 20;
   const invoices = subscriptions.flatMap((subscription) => [
-    ...(subscription.preinvoiceNumber ? [{
+    ...(subscription.preinvoiceNumber && !(hidePaidPreinvoice && subscription.paymentStatus === 'Apmokėta') ? [{
       key: `${subscription.id}:preinvoice`,
       subscriptionId: subscription.id,
       type: 'preinvoice',

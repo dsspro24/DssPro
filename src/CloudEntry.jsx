@@ -135,18 +135,32 @@ function formatSubscription(subscription) {
     canceled: 'Atšaukta',
     expired: 'Pasibaigusi',
   };
-  const isExpired = subscription.status === 'active'
+  const preinvoiceDueDate = subscription.preinvoice_due_date ?? null;
+  const hasUnpaidOrder = subscription.payment_status === 'pending'
+    && Boolean(subscription.order_code)
+    && preinvoiceDueDate
+    && Number.isFinite(new Date(preinvoiceDueDate).getTime());
+  const pendingOrderActive = subscription.status === 'pending'
+    && hasUnpaidOrder
+    && new Date(preinvoiceDueDate).getTime() > Date.now();
+  const isExpired = (
+    subscription.status === 'active'
     && subscription.ends_at
-    && new Date(subscription.ends_at).getTime() <= Date.now();
+    && new Date(subscription.ends_at).getTime() <= Date.now()
+  ) || (
+    subscription.status === 'pending'
+    && hasUnpaidOrder
+    && new Date(preinvoiceDueDate).getTime() <= Date.now()
+  );
   return {
     id: subscription.id,
     orgId: subscription.organization_id,
     plan: subscription.plan_name,
     planCode: subscription.plan_code,
-    status: isExpired ? 'Pasibaigusi' : statusLabels[subscription.status] ?? subscription.status,
+    status: isExpired ? 'Pasibaigusi' : pendingOrderActive ? 'Aktyvi' : statusLabels[subscription.status] ?? subscription.status,
     price: subscription.amount_cents / 100,
     startsAt: subscription.starts_at,
-    endsAt: subscription.ends_at,
+    endsAt: subscription.ends_at ?? (hasUnpaidOrder ? preinvoiceDueDate : null),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     isAddon: subscription.is_addon,
     orderCode: subscription.order_code ?? '',
@@ -154,7 +168,7 @@ function formatSubscription(subscription) {
     orderMonths: subscription.order_months ?? 1,
     paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
     isPlanChange: subscription.preinvoice_plan_change === 'true',
-    dueDate: subscription.preinvoice_due_date ?? null,
+    dueDate: preinvoiceDueDate,
     preinvoiceNumber: subscription.preinvoice_number ?? '',
     preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? null,
     preinvoiceTotalAmountCents: Number(subscription.preinvoice_total_amount_cents) || null,
