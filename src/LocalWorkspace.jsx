@@ -9450,7 +9450,7 @@ function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, onSave })
   return <form onSubmit={save} className="mt-4 space-y-3 border-t border-slate-100 pt-4">
     <h3 className="text-sm font-semibold">Duomenys sąskaitoms</h3>
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm font-medium">PVM mokėtojo kodas <span className="font-normal text-slate-500">(neprivaloma)</span><input className={`${inputClass} mt-1`} maxLength={40} value={vatCode} onChange={(event) => setVatCode(event.target.value)} placeholder="LT123456789" /></label>
+      <label className="text-sm font-medium">PVM mokėtojo kodas<input className={`${inputClass} mt-1`} maxLength={40} value={vatCode} onChange={(event) => setVatCode(event.target.value)} placeholder="LT123456789" /></label>
       <label className="text-sm font-medium sm:col-span-2">Adresas<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Gatvė, miestas, pašto kodas, šalis" /></label>
     </div>
     <p className="text-xs text-slate-500">Šie duomenys bus įrašyti į naujų prenumeratų išankstines ir galutines sąskaitas. Jau išrašytos sąskaitos nekeičiamos.</p>

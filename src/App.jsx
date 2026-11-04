@@ -260,8 +260,6 @@ function DemoApp({ cloudMode = false }) {
     const fullName = String(signupForm.get('fullName') ?? '').trim();
     const email = String(signupForm.get('email') ?? '').trim();
     const password = String(signupForm.get('password') ?? '');
-    const companyName = String(signupForm.get('companyName') ?? '').trim();
-    const companyCode = String(signupForm.get('companyCode') ?? '').trim();
     const signingPin = String(signupForm.get('signingPin') ?? '');
     const confirmSigningPin = String(signupForm.get('confirmSigningPin') ?? '');
 
@@ -282,7 +280,6 @@ function DemoApp({ cloudMode = false }) {
             full_name: fullName,
             account_type: registerRole === 'dss' ? 'dss_specialist' : 'manager',
             ...(registerRole === 'vadovas' ? { plan_code: registerPlan } : { plan_code: 'free' }),
-            ...(registerRole === 'vadovas' ? { company_name: companyName, company_code: companyCode } : {}),
             signing_pin: signingPin,
           },
           emailRedirectTo: window.location.origin,
@@ -498,7 +495,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
             {cloudMode && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-950">
               {registerRole === 'vadovas'
-                ? `Pasirinktas ${subscriptionPlans.find((plan) => plan.code === registerPlan)?.name ?? 'planas'}. Sukurkite paskyrą ir patvirtinkite el. paštą; prisijungę galėsite užsakyti prenumeratą.`
+                ? `Pasirinktas ${subscriptionPlans.find((plan) => plan.code === registerPlan)?.name ?? 'planas'}. Sukurkite paskyrą ir patvirtinkite el. paštą; tada galėsite sukurti įmonę ir užsakyti prenumeratą.`
                 : 'Sukurkite atskirą DSS specialisto paskyrą ir patvirtinkite el. paštą. Įmonės duomenų įvesti nereikia; vadovo kvietimą priimsite prisijungę.'}
             </p>}
 
@@ -515,14 +512,14 @@ function DemoApp({ cloudMode = false }) {
 
               {cloudMode && <div><label className="block text-slate-500 mb-1">Slaptažodis</label><input name="password" type="password" minLength={8} autoComplete="new-password" required placeholder="Bent 8 simboliai" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" /></div>}
 
-              {(!cloudMode || registerRole === 'vadovas') && <div className="grid grid-cols-2 gap-3">
+              {!cloudMode && <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1">Įmonės pavadinimas</label>
-                  <input name="companyName" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="companyName" type="text" required placeholder="UAB Įmonė" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1">Įmonės kodas</label>
-                  <input name="companyCode" type="text" required={!cloudMode || registerRole === 'vadovas'} placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
+                  <input name="companyCode" type="text" required placeholder="300000000" className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1bc880]" />
                 </div>
               </div>}
 
