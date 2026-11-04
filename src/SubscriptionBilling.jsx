@@ -73,7 +73,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
-        {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite, kiek mėnesių norite, ir pateikite užsakymą paspausdami „Užsakyti prenumeratą“.</p>}
+        {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
           : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
