@@ -115,7 +115,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         <p className="text-sm text-slate-600">Papildomos įmonės planas pagal aktyvių darbuotojų skaičių. Šios darbo srities duomenys atskirti nuo kitų įmonių.</p>
         {canOrder && <div className="flex flex-wrap items-end gap-2">
           <label className="text-sm font-medium">Darbuotojų skaičiaus planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)}>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>
-          <label className="text-sm font-medium">Laikotarpis (mėn.)<input className={`${inputClass} mt-2 w-16 max-w-16`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
+          <label className="text-sm font-medium"><span className="block">Laikotarpis (mėn.)</span><input className={`${inputClass} mt-2 w-16 max-w-16`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
           <button type="button" className={buttonClass} disabled={busy || !effectiveAddonPlanCode || !Number.isInteger(Number(orderMonths)) || Number(orderMonths) < 1 || Number(orderMonths) > 36} onClick={() => onOrder(effectiveAddonPlanCode, Number(orderMonths))}><RotateCcw size={16} />{activeSubscription ? 'Pratęsti prenumeratą' : 'Užsakyti papildomos įmonės prenumeratą'}</button>
         </div>}
         {activeSubscription && canOrder && <p className="text-xs text-slate-600">Išankstinę sąskaitą galite užsisakyti dabar. Apmokėjus mėnesiai bus pridėti prie esamos galiojimo pabaigos.</p>}
@@ -126,7 +126,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
             {availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}
           </select>
         </label>
-        <label className="block text-sm font-medium">Užsakymo laikotarpis (mėn.)<input className={`${inputClass} mt-2 w-16 max-w-16`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
+        <label className="block text-sm font-medium"><span className="block">Užsakymo laikotarpis (mėn.)</span><input className={`${inputClass} mt-2 w-16 max-w-16`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
         <p className="text-xs text-slate-500">Aktyvūs darbuotojai: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
           <CreditCard size={16} />{busy ? 'Pateikiama…' : activeSubscription ? 'Pratęsti prenumeratą' : 'Užsakyti prenumeratą'}
