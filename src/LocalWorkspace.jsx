@@ -1382,10 +1382,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
+  const managerSubscriptionNotificationsStorageKey = `dsspro-manager-subscription-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
     if (sandboxMode) return [];
     try {
       const savedIds = JSON.parse(localStorage.getItem(managerNotificationsStorageKey) ?? '[]');
+      return Array.isArray(savedIds) ? savedIds : [];
+    } catch {
+      return [];
+    }
+  });
+  const [readManagerSubscriptionNotificationIds, setReadManagerSubscriptionNotificationIds] = useState(() => {
+    if (sandboxMode) return [];
+    try {
+      const savedIds = JSON.parse(localStorage.getItem(managerSubscriptionNotificationsStorageKey) ?? '[]');
       return Array.isArray(savedIds) ? savedIds : [];
     } catch {
       return [];
@@ -5934,8 +5944,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const downloadSubscriptionInvoice = async (invoiceData) => {
     try {
       await printPdfHtml(renderSubscriptionInvoiceHtml(invoiceData), invoiceData.invoiceNumber ?? invoiceData.orderCode);
+      return true;
     } catch (error) {
       setNotice(`Sąskaitos PDF paruošti nepavyko: ${error.message}`);
+      return false;
     }
   };
 
@@ -5950,9 +5962,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (error) throw error;
       const invoiceData = invoiceRow?.[column];
       if (!invoiceData) throw new Error('Pasirinkta sąskaita nerasta.');
-      await downloadSubscriptionInvoice(invoiceData);
+      const opened = await downloadSubscriptionInvoice(invoiceData);
+      if (opened && cloudMode && userRole === 'vadovas') {
+        markManagerSubscriptionNotificationAsRead(subscriptionId, invoiceType, invoiceData.invoiceNumber);
+      }
+      return opened;
     } catch (error) {
       setNotice(`Sąskaitos atidaryti nepavyko: ${error.message}`);
+      return false;
     }
   };
 
@@ -6145,6 +6162,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
+  const markManagerSubscriptionNotificationAsRead = (subscriptionId, invoiceType, invoiceNumber) => {
+    if (!invoiceNumber) return;
+    const notificationId = `subscription-${invoiceType}-${subscriptionId}-${invoiceNumber}`;
+    const nextReadIds = [...new Set([...readManagerSubscriptionNotificationIds, notificationId])];
+    setReadManagerSubscriptionNotificationIds(nextReadIds);
+    if (!sandboxMode) {
+      try {
+        localStorage.setItem(managerSubscriptionNotificationsStorageKey, JSON.stringify(nextReadIds));
+      } catch {
+        // The notification remains dismissed for the current session.
+      }
+    }
+  };
+
   const signedCount = data.signatures.filter((signature) => signature.orgId === currentOrg?.id).length;
   const pendingCount = orgEmployees.reduce((total, employee) => total + employee.resourceIds.filter((resourceId) => {
     const resource = data.resources.find((item) => item.id === resourceId);
@@ -6236,6 +6267,39 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ]
       : userRole === 'vadovas'
         ? [
+          ...(cloudMode ? data.subscriptions
+            .filter((subscription) => subscription.orgId === currentOrg?.id)
+            .flatMap((subscription) => {
+              const organizationName = currentOrg?.name ?? 'Įmonė';
+              const invoiceNotifications = [];
+              if (subscription.paymentStatus === 'Laukiama apmokėjimo'
+                && subscription.preinvoiceNumber
+                && (!subscription.dueDate || new Date(subscription.dueDate).getTime() > validityCheckTime)) {
+                const id = `subscription-preinvoice-${subscription.id}-${subscription.preinvoiceNumber}`;
+                if (!readManagerSubscriptionNotificationIds.includes(id)) {
+                  invoiceNotifications.push({
+                    id,
+                    title: 'Išankstinę sąskaitą reikia apmokėti',
+                    description: `${organizationName} · ${subscription.plan} · ${subscription.preinvoiceNumber}${subscription.dueDate ? ` · apmokėti iki ${new Date(subscription.dueDate).toLocaleDateString('lt-LT')}` : ''}`,
+                    actionLabel: 'Peržiūrėti / atsisiųsti išankstinę sąskaitą',
+                    subscriptionInvoice: { subscriptionId: subscription.id, invoiceType: 'preinvoice' },
+                  });
+                }
+              }
+              if (subscription.paymentStatus === 'Apmokėta' && subscription.finalInvoiceNumber) {
+                const id = `subscription-final-${subscription.id}-${subscription.finalInvoiceNumber}`;
+                if (!readManagerSubscriptionNotificationIds.includes(id)) {
+                  invoiceNotifications.push({
+                    id,
+                    title: 'Sąskaita faktūra paruošta atsisiųsti',
+                    description: `${organizationName} · ${subscription.plan} · ${subscription.finalInvoiceNumber}`,
+                    actionLabel: 'Peržiūrėti / atsisiųsti SF',
+                    subscriptionInvoice: { subscriptionId: subscription.id, invoiceType: 'final' },
+                  });
+                }
+              }
+              return invoiceNotifications;
+            }) : []),
           ...currentManagerTasks.map((task) => ({
             id: `manager-signature-${task.employeeId}-${task.resourceId}`,
             title: data.resources.find((item) => item.id === task.resourceId)?.title ?? 'Dokumentas',
@@ -6569,10 +6633,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               {notificationsOpen && <div className="workspace-notifications-menu mt-2 z-30 overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h2 className="font-semibold">Pranešimai</h2><div className="flex items-center gap-3"><span className="text-xs text-slate-500">{notifications.length} pranešimų</span><button type="button" aria-label="Uždaryti pranešimus" className="grid size-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => setNotificationsOpen(false)}><X size={18} /></button></div></div>
                 {notifications.length ? <ul>{notifications.map((item) => <li key={item.id} className="border-b border-slate-100 last:border-0">
-                  <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={() => {
+                  <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={async () => {
                     setNotificationsOpen(false);
                     setNotice('');
-                    if (userRole === 'kurejas' && item.creatorSubscription) {
+                    if (userRole === 'vadovas' && item.subscriptionInvoice) {
+                      setActiveTab('prenumerata');
+                      await openSubscriptionInvoice(item.subscriptionInvoice.subscriptionId, item.subscriptionInvoice.invoiceType);
+                    } else if (userRole === 'kurejas' && item.creatorSubscription) {
                       setActiveTab('prenumeratos');
                     } else if (userRole === 'darbuotojas') {
                       setActiveTab('uzduotys');
@@ -6643,7 +6710,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       requestEmployerSign(item.employee, item.resource);
                     }
                   }}>
-                    <span className="block text-sm font-semibold">{item.title}</span><span className="mt-1 block text-xs text-slate-500">{item.description}</span>
+                    <span className="block text-sm font-semibold">{item.title}</span><span className="mt-1 block text-xs text-slate-500">{item.description}</span>{item.actionLabel && <span className="mt-2 block text-xs font-semibold text-emerald-800">{item.actionLabel}</span>}
                   </button>
                 </li>)}</ul> : <p className="px-4 py-5 text-sm text-slate-500">Naujų veiksmų nėra.</p>}
               </div>}
