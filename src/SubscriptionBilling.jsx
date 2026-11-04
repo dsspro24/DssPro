@@ -70,16 +70,15 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
       ? <>
         <p className="text-lg font-bold">{subscription.plan} · {formatPrice(subscription.price)} €/mėn.</p>
         <p className={`text-sm font-semibold ${subscription.status === 'Laukiama sąskaitos' ? 'text-amber-800' : 'text-slate-700'}`}>
-          Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status}
+          Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
-        {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Šis senesnis užsakymas dar neaktyvintas. Naują užsakymą pateikę iškart gausite 5 dienų prieigą ir išankstinę sąskaitą.</p>}
+        {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite, kiek mėnesių norite, ir pateikite užsakymą paspausdami „Užsakyti prenumeratą“.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
           : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
-        {locked && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">Prieiga užblokuota. Pateikite naują užsakymą – prieiga bus suteikta iškart 5 dienoms.</p>}
       </>
       : <p className="text-sm text-slate-600">Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.</p>}
 
@@ -243,4 +242,3 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </div>;
 }
-
