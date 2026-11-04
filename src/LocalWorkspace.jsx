@@ -1017,7 +1017,7 @@ function createInitialCloudWorkspace(organization, managerName = '', defaultReso
     id: organization.id,
     name: organization.name,
     companyCode: organization.company_code ?? '',
-    manager: managerName,
+    manager: organization.manager_name || managerName,
     managerPin: '',
     commission: [],
     commissionPins: {},
@@ -5834,12 +5834,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const { data: organizationId, error } = await supabase.rpc('create_additional_organization_with_billing_details', {
         organization_name: details.companyName.trim(),
         organization_code: details.companyCode.trim(),
+        input_manager_name: details.managerName.trim(),
         input_billing_address: details.billingAddress.trim(),
         input_vat_code: details.vatCode.trim(),
         input_plan_code: details.planCode,
       });
       if (error) throw error;
-      await onRefreshWorkspace(organizationId);
+      await onRefreshWorkspace(organizationId, 'prenumerata');
       setNotice('Papildoma įmonė sukurta. Planas aktyvus 5 dienas; išankstinę sąskaitą rasite prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Papildomos įmonės sukurti nepavyko: ${error.message}`);
@@ -7402,7 +7403,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
             <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
-            <Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} now={validityCheckTime} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>
+            <Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
               <SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice />
@@ -9417,7 +9418,7 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
     return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas baigėsi'}</span>{signature && <SignatureImagePreview signature={signature} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
-function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, now = 0, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice }) {
+function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, managerName = '', now = 0, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice }) {
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
   const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false);
   const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
@@ -9431,6 +9432,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyCode, setCompanyCode] = useState('');
+  const [companyManagerName, setCompanyManagerName] = useState(managerName);
   const [companyBillingAddress, setCompanyBillingAddress] = useState('');
   const [companyVatCode, setCompanyVatCode] = useState('');
   const [orderMonths, setOrderMonths] = useState('1');
@@ -9467,12 +9469,14 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
     onAddCompany({
       companyName,
       companyCode,
+      managerName: companyManagerName,
       billingAddress: companyBillingAddress,
       vatCode: companyVatCode,
       planCode: effectiveAddonPlanCode,
     });
     setCompanyName('');
     setCompanyCode('');
+    setCompanyManagerName(managerName);
     setCompanyBillingAddress('');
     setCompanyVatCode('');
     setShowAddCompany(false);
@@ -9536,6 +9540,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         : <form onSubmit={submitAdditionalCompany} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium">Naujos įmonės pavadinimas<input className={`${inputClass} mt-1`} value={companyName} onChange={(event) => setCompanyName(event.target.value)} required /></label>
           <label className="text-sm font-medium">Įmonės kodas<input className={`${inputClass} mt-1`} value={companyCode} onChange={(event) => setCompanyCode(event.target.value)} required /></label>
+          <label className="text-sm font-medium sm:col-span-2">Vadovo vardas ir pavardė<input className={`${inputClass} mt-1`} autoComplete="name" value={companyManagerName} onChange={(event) => setCompanyManagerName(event.target.value)} required /></label>
           <label className="text-sm font-medium sm:col-span-2">Adresas<textarea className={`${inputClass} mt-1 min-h-20`} maxLength={500} value={companyBillingAddress} onChange={(event) => setCompanyBillingAddress(event.target.value)} required /></label>
           <label className="text-sm font-medium sm:col-span-2">PVM mokėtojo kodas<input className={`${inputClass} mt-1`} maxLength={40} value={companyVatCode} onChange={(event) => setCompanyVatCode(event.target.value)} /></label>
           <label className="text-sm font-medium sm:col-span-2">Papildomos įmonės planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)} required>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>

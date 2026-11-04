@@ -41,7 +41,7 @@ function getWorkspaceStatus(workspace) {
 }
 
 async function loadOrganizationRecords(organizationIds = null) {
-  const optionalColumns = ['parent_organization_id', 'billing_address', 'vat_code'];
+  const optionalColumns = ['parent_organization_id', 'billing_address', 'vat_code', 'manager_name'];
   let selectedOptionalColumns = [...optionalColumns];
   while (true) {
     let query = supabase.from('organizations')
@@ -57,6 +57,7 @@ async function loadOrganizationRecords(organizationIds = null) {
           parent_organization_id: organization.parent_organization_id ?? null,
           billing_address: organization.billing_address ?? '',
           vat_code: organization.vat_code ?? '',
+          manager_name: organization.manager_name ?? '',
         })),
       };
     }
@@ -566,6 +567,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
     company_code: savedOrganization?.companyCode ?? listedOrganization?.company_code ?? companyDetails.companyCode,
     billing_address: listedOrganization?.billing_address ?? '',
     vat_code: listedOrganization?.vat_code ?? '',
+    manager_name: listedOrganization?.manager_name ?? '',
   };
   const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
   const currentSubscription = (hydratedWorkspace?.subscriptions ?? [])[0];
@@ -584,6 +586,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       company_code: item.company_code ?? '',
       billing_address: item.billing_address ?? '',
       vat_code: item.vat_code ?? '',
+      manager_name: item.manager_name ?? '',
     })),
     subscriptionPlans: subscriptionPlansResult.data ?? [],
     subscriptionAccess: getSubscriptionAccess(currentSubscription),
@@ -856,9 +859,10 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     return loadedWorkspace;
   };
 
-  const refreshSignedInWorkspace = useCallback(async (organizationId = workspace?.organization?.id) => {
+  const refreshSignedInWorkspace = useCallback(async (organizationId = workspace?.organization?.id, initialTab = '') => {
     if (!session?.user) return null;
     const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+    if (initialTab) setInitialWorkspaceTab(initialTab);
     setWorkspace(loadedWorkspace);
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
     return loadedWorkspace;
