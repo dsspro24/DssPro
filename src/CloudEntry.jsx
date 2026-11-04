@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 
@@ -6,6 +6,29 @@ const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
 function WorkspaceLoading() {
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4"><p className="text-sm text-slate-600">Įkeliama darbo sritis…</p></main>;
+}
+
+class WorkspaceRenderBoundary extends Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Could not render the workspace.', error, errorInfo);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
+      <section className="w-full max-w-lg rounded-lg border border-rose-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold">Darbo srities parodyti nepavyko</h1>
+        <p className="mt-2 text-sm text-rose-800">{this.state.error.message || 'Įvyko netikėta klaida.'}</p>
+        <button type="button" className="mt-5 w-full rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => window.location.reload()}>Įkelti iš naujo</button>
+      </section>
+    </main>;
+  }
 }
 
 function getWorkspaceStatus(workspace) {
@@ -786,6 +809,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     if (!session?.user) return;
     setErrorMessage('');
     setSubmitting(true);
+    let organizationCreated = false;
     try {
       const { data: organizationId, error } = await supabase.rpc('create_organization_with_billing_details', {
         organization_name: form.companyName.trim(),
@@ -794,13 +818,18 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         input_vat_code: form.vatCode.trim(),
       });
       if (error) throw error;
+      organizationCreated = true;
       const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+      if (loadedWorkspace?.requiresOrganization || loadedWorkspace?.organization?.id !== organizationId) {
+        throw new Error('Įmonė sukurta, bet jos darbo srities duomenys dar nepasiekiami. Bandykite įkelti iš naujo.');
+      }
       setInitialWorkspaceTab('prenumerata');
       setInitialWorkspaceNotice('Įmonė sukurta. Planas aktyvus 5 dienas; atsisiųskite išankstinę sąskaitą ir apmokėkite ją per 5 dienas.');
       setWorkspace(loadedWorkspace);
       setWorkspaceStatus('ready');
     } catch (error) {
       setErrorMessage(error.message || 'Nepavyko sukurti įmonės.');
+      if (organizationCreated) setWorkspaceStatus('error');
     } finally {
       setSubmitting(false);
     }
@@ -1002,7 +1031,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           resourceTypes: sourceData?.resourceTypes ?? workspace.data.resourceTypes,
           subscriptions: (sourceData?.subscriptions ?? []).filter((subscription) => subscription.orgId === creatorPreview.organizationId),
         };
-        return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
+        return <WorkspaceRenderBoundary><Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
           key={`creator-preview-${creatorPreview.organizationId}-${creatorPreview.role}`}
           userRole={creatorPreview.role}
           onRoleChange={() => {}}
@@ -1017,10 +1046,10 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
           onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
-        /></Suspense>;
+        /></Suspense></WorkspaceRenderBoundary>;
       }
     }
-    return <Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
+    return <WorkspaceRenderBoundary><Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
         key={workspace.creator ? 'creator-workspace' : `signed-in-workspace-${workspace.organization?.id ?? workspace.data.organizations?.[0]?.id ?? ''}`}
       userRole={workspace.creator ? 'kurejas' : workspace.employee ? 'darbuotojas' : workspace.dss ? 'dss' : 'vadovas'}
       onRoleChange={() => {}}
@@ -1048,7 +1077,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onSwitchOrganization={switchManagerOrganization}
       cloudMode
       cloudUserId={session.user.id}
-    /></Suspense>;
+    /></Suspense></WorkspaceRenderBoundary>;
   }
 
   return <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-900">
