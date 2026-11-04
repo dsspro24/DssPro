@@ -167,6 +167,9 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     && (subscription.isAddon ? plan.code.startsWith('additional_workspace_') : !plan.code.startsWith('additional_workspace')));
   const price = Number(amount.replace(',', '.'));
   const remainingDays = subscription.endsAt ? Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000) : null;
+  const paymentEndDateMinimum = subscription.isRenewal
+    ? new Date(Math.max(new Date(subscription.serviceStart ?? now).getTime(), now)).toISOString().slice(0, 10)
+    : subscription.orderedAt?.slice(0, 10);
   const lifecycle = subscription.paymentStatus === 'Laukiama apmokėjimo'
     ? ['Laukia apmokėjimo', 'bg-orange-100 text-orange-900']
     : subscription.status === 'Aktyvi' && remainingDays !== null && remainingDays <= 0
@@ -248,8 +251,12 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     {subscription.orderCode && subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
       <p className="text-sm text-amber-950">{subscription.isPlanChange
         ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite plano pakeitimo sąskaitą. Pakeistas planas galios iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'dabartinio laikotarpio pabaigos'}.</>
-        : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
-      {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={subscription.orderedAt?.slice(0, 10)} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
+        : subscription.isRenewal
+          ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite pratęsimą. Jei prenumerata dar galioja, {subscription.orderMonths} mėn. bus pridėti prie esamos pabaigos; jei jau pasibaigė, laikotarpis prasidės nuo apmokėjimo patvirtinimo.</>
+          : subscription.isReactivation
+            ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Po apmokėjimo patvirtinimo prasidės naujas {subscription.orderMonths} mėn. laikotarpis.</>
+            : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
+      {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
       <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
     </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">

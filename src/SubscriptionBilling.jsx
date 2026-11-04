@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
 
-export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, managerName = '', now = 0, onOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
+export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, managerName = '', now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
   const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
   const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && isPlanSelectable(plan));
@@ -20,18 +20,25 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   const [companyBillingAddress, setCompanyBillingAddress] = useState('');
   const [companyVatCode, setCompanyVatCode] = useState('');
   const [orderMonths, setOrderMonths] = useState('1');
-  const canOrder = !subscription || subscription.status !== 'Aktyvi';
+  const pendingOrder = subscription?.paymentStatus === 'Laukiama apmokėjimo'
+    && Boolean(subscription.preinvoiceNumber)
+    && subscription.status !== 'Atšaukta';
+  const canOrder = !pendingOrder && (!subscription || subscription.status !== 'Aktyvi' || cloudMode);
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
     : availablePlans[0]?.code ?? '';
-  const currentPlan = plans.find((plan) => plan.code === subscription?.planCode);
+  const currentPlanCode = subscription?.isRenewal && pendingOrder
+    ? subscription.paidPlanCode ?? subscription.planCode
+    : subscription?.planCode;
+  const currentPlan = plans.find((plan) => plan.code === currentPlanCode);
   const selectedPlan = planOptions.find((plan) => plan.code === selectedPlanCode);
   const effectiveAddonPlanCode = addonPlans.some((plan) => plan.code === selectedAddonPlanCode)
     ? selectedAddonPlanCode
     : addonPlans[0]?.code ?? '';
   const selectedAddonPlan = addonPlans.find((plan) => plan.code === effectiveAddonPlanCode);
   const pendingPlanChange = subscription?.isPlanChange && subscription.paymentStatus === 'Laukiama apmokėjimo';
-  const canChangePlan = cloudMode && subscription?.status === 'Aktyvi' && !pendingPlanChange;
+  const canChangePlan = cloudMode && subscription?.status === 'Aktyvi' && !pendingOrder;
+  const activeSubscription = subscription?.status === 'Aktyvi';
   const activeEmployeeLimit = currentPlan?.employee_limit;
   const subscriptionRemainingTime = subscription?.endsAt
     ? new Date(subscription.endsAt).getTime() > now
@@ -73,15 +80,20 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
     </p>
     {subscription
       ? <>
-        <p className="text-lg font-bold">{subscription.plan} · {formatPrice(subscription.price)} €/mėn.</p>
+        <p className="text-lg font-bold">{subscription.isRenewal && pendingOrder ? subscription.paidPlanName ?? subscription.plan : subscription.plan} · {formatPrice(subscription.isRenewal && pendingOrder ? subscription.paidPrice ?? subscription.price : subscription.price)} €/mėn.</p>
         <p className={`text-sm font-semibold ${subscription.status === 'Laukiama sąskaitos' ? 'text-amber-800' : 'text-slate-700'}`}>
           Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
         {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
-        {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
+        {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
-          : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
+          : subscription.isRenewal
+            ? <>Pratęsimo užsakymas <strong>{subscription.orderCode}</strong> pateiktas pasirinkus planą „{subscription.plan}“. Dabartinis planas galioja iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'esamo laikotarpio pabaigos'}; apmokėjus laikotarpis bus pratęstas {subscription.orderMonths} mėn. Jei prenumerata baigsis iki apmokėjimo patvirtinimo, pratęsimas prasidės nuo patvirtinimo datos. Išankstinę sąskaitą apmokėkite per 5 dienas.</>
+            : subscription.isReactivation
+              ? <>Užsakymas <strong>{subscription.orderCode}</strong> suteikia 5 dienų prieigą. Apmokėjus pilnas {subscription.orderMonths} mėn. laikotarpis prasidės nuo apmokėjimo patvirtinimo datos. Išankstinę sąskaitą apmokėkite per 5 dienas.</>
+              : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}{!subscription.isPlanChange && onCancelOrder && <button type="button" className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-rose-700 px-3 py-2 font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50" disabled={busy} onClick={() => { if (window.confirm('Atšaukti šį neapmokėtą užsakymą? Išankstinė sąskaita liks sąskaitų istorijoje.')) onCancelOrder(subscription.id); }}>Atšaukti užsakymą</button>}</div>}
+        {subscription.status === 'Atšaukta' && subscription.paymentStatus === 'Laukiama apmokėjimo' && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">Šis užsakymas atšauktas. Išankstinė sąskaita palikta sąskaitų istorijoje ir apmokėti jos nereikia.</p>}
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
       </>
@@ -104,9 +116,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         {canOrder && <div className="flex flex-wrap items-end gap-2">
           <label className="text-sm font-medium">Darbuotojų skaičiaus planas<select className={`${inputClass} mt-1`} value={effectiveAddonPlanCode} onChange={(event) => setSelectedAddonPlanCode(event.target.value)}>{addonPlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}</select></label>
           <label className="text-sm font-medium">Laikotarpis (mėn.)<input className={`${inputClass} mt-1 w-28`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
-          <button type="button" className={buttonClass} disabled={busy || !effectiveAddonPlanCode || !Number.isInteger(Number(orderMonths)) || Number(orderMonths) < 1 || Number(orderMonths) > 36} onClick={() => onOrder(effectiveAddonPlanCode, Number(orderMonths))}><RotateCcw size={16} />Užsakyti papildomos įmonės prenumeratą</button>
+          <button type="button" className={buttonClass} disabled={busy || !effectiveAddonPlanCode || !Number.isInteger(Number(orderMonths)) || Number(orderMonths) < 1 || Number(orderMonths) > 36} onClick={() => onOrder(effectiveAddonPlanCode, Number(orderMonths))}><RotateCcw size={16} />{activeSubscription ? 'Pratęsti prenumeratą' : 'Užsakyti papildomos įmonės prenumeratą'}</button>
         </div>}
-        {!canOrder && <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
+        {activeSubscription && canOrder && <p className="text-xs text-slate-600">Išankstinę sąskaitą galite užsisakyti dabar. Apmokėjus mėnesiai bus pridėti prie esamos galiojimo pabaigos.</p>}
       </div>
       : canOrder ? <form onSubmit={handleOrder} className="space-y-3">
         <label className="block text-sm font-medium">Darbuotojų skaičiaus planas
@@ -117,9 +129,10 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         <label className="block text-sm font-medium">Užsakymo laikotarpis (mėn.)<input className={`${inputClass} mt-1 max-w-36`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
         <p className="text-xs text-slate-500">Aktyvūs darbuotojai: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
-          <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti prenumeratą'}
+          <CreditCard size={16} />{busy ? 'Pateikiama…' : activeSubscription ? 'Pratęsti prenumeratą' : 'Užsakyti prenumeratą'}
         </button>
-      </form> : <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
+        {activeSubscription && <p className="text-xs text-slate-600">Išankstinę sąskaitą galite užsisakyti dabar. Apmokėjus mėnesiai bus pridėti prie esamos galiojimo pabaigos.</p>}
+      </form> : <p className="text-sm text-slate-600">{pendingOrder ? 'Pirmiausia apmokėkite arba atšaukite esamą išankstinę sąskaitą.' : 'Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.'}</p>}
 
     {cloudMode && !readOnly && !locked && <div className="border-t border-slate-200 pt-4">
       {!showAddCompany
@@ -233,7 +246,7 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
     {visibleInvoices.length > 0 && <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
       {visibleInvoices.map((invoice) => <div key={invoice.key} className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{invoice.number} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${invoice.type === 'final' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-700'}`}>{invoice.title}</span></p>
+          <p className="font-semibold">{invoice.number} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${invoice.type === 'final' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-700'}`}>{invoice.title}</span>{invoice.type === 'preinvoice' && invoice.subscription.status === 'Atšaukta' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo' && <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-900">Atšaukta · nemokėti</span>}</p>
           <p className="mt-1 text-xs text-slate-500">{new Date(invoice.date).toLocaleDateString('lt-LT')} · {invoice.subscription.plan}{invoice.subscription.orderMonths > 1 ? ` · ${invoice.subscription.orderMonths} mėn.` : ''}</p>
         </div>
         <div className="flex shrink-0 gap-2">
