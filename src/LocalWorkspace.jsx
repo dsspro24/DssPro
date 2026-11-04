@@ -1211,7 +1211,7 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onSwitchOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -5733,6 +5733,35 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     return refreshedWorkspace;
   };
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'vadovas' || creatorReadOnlyPreview || !onRefreshSubscription || !currentOrg?.id) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshSubscriptions = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const subscriptions = await onRefreshSubscription(currentOrg.id);
+        if (active && subscriptions) {
+          setData((current) => ({ ...current, subscriptions }));
+        }
+      } catch (error) {
+        if (active) setNotice(`Prenumeratos atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshSubscriptions();
+    };
+    const intervalId = window.setInterval(refreshSubscriptions, 30_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [cloudMode, userRole, creatorReadOnlyPreview, currentOrg?.id, onRefreshSubscription]);
 
   const reportWorkspaceSaveFailure = useCallback((error, context) => {
     if (/active employee|employee limit.*plan|plan.*employee limit/i.test(error?.message ?? '')) {
@@ -9666,7 +9695,7 @@ function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInv
   const [error, setError] = useState('');
   const pageSize = 20;
   const invoices = subscriptions.flatMap((subscription) => [
-    ...(subscription.preinvoiceNumber && !(hidePaidPreinvoice && subscription.paymentStatus === 'Apmokėta') ? [{
+    ...(subscription.preinvoiceNumber && !(hidePaidPreinvoice && subscription.finalInvoiceNumber) ? [{
       key: `${subscription.id}:preinvoice`,
       subscriptionId: subscription.id,
       type: 'preinvoice',

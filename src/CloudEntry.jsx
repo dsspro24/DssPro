@@ -827,13 +827,31 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     return loadedWorkspace;
   };
 
-  const refreshSignedInWorkspace = async (organizationId = workspace?.organization?.id) => {
+  const refreshSignedInWorkspace = useCallback(async (organizationId = workspace?.organization?.id) => {
     if (!session?.user) return null;
     const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
     setWorkspace(loadedWorkspace);
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
     return loadedWorkspace;
-  };
+  }, [session, workspace?.organization?.id]);
+
+  const refreshSignedInSubscription = useCallback(async (organizationId) => {
+    if (!organizationId) return [];
+    const { data: subscriptionRows, error } = await supabase.from('workspace_subscriptions')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const subscriptions = prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription));
+    setWorkspace((current) => current?.organization?.id === organizationId
+      ? {
+        ...current,
+        subscriptionAccess: getSubscriptionAccess(subscriptions[0]),
+        data: { ...current.data, subscriptions },
+      }
+      : current);
+    return subscriptions;
+  }, []);
 
   const switchManagerOrganization = async (organizationId) => {
     if (!session?.user) return;
@@ -1015,6 +1033,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
       onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
       onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
+      onRefreshSubscription={refreshSignedInSubscription}
       cloudOrganization={workspace.organization}
       initialActiveTab={initialWorkspaceTab}
       onInitialTabApplied={() => setInitialWorkspaceTab('')}
