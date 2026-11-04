@@ -153,6 +153,8 @@ function formatSubscription(subscription) {
     orderedAt: subscription.ordered_at ?? null,
     orderMonths: subscription.order_months ?? 1,
     paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+    isPlanChange: subscription.preinvoice_plan_change === 'true',
+    dueDate: subscription.preinvoice_due_date ?? null,
     preinvoiceNumber: subscription.preinvoice_number ?? '',
     preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? null,
     preinvoiceTotalAmountCents: Number(subscription.preinvoice_total_amount_cents) || null,
@@ -160,6 +162,17 @@ function formatSubscription(subscription) {
     finalInvoiceDate: subscription.final_invoice_issue_date ?? subscription.paid_at ?? null,
     paidAt: subscription.paid_at ?? null,
   };
+}
+
+function prioritizeEffectiveSubscription(subscriptions) {
+  const currentIndex = subscriptions.findIndex((subscription) => !(
+    subscription.isPlanChange
+    && subscription.paymentStatus === 'Laukiama apmokėjimo'
+    && subscription.dueDate
+    && new Date(subscription.dueDate).getTime() <= Date.now()
+  ));
+  if (currentIndex <= 0) return subscriptions;
+  return [subscriptions[currentIndex], ...subscriptions.slice(0, currentIndex), ...subscriptions.slice(currentIndex + 1)];
 }
 
 function addCalendarMonths(date, months) {
@@ -206,7 +219,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
       .eq('organization_id', organizationId)
       .eq('active', true),
     supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
   ]);
@@ -239,7 +252,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
   return scopedWorkspace
     ? {
       ...scopedWorkspace,
-      subscriptions: (subscriptionRows ?? []).map(formatSubscription),
+      subscriptions: prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription)),
       resources: [
         ...sharedCatalogResources,
         ...mapDocuments(organizationDocuments ?? [], organizationId),
@@ -283,7 +296,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
       supabase.rpc('creator_list_accounts'),
       supabase.from('workspace_subscriptions')
-        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
         .order('created_at', { ascending: false }),
       supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active').order('employee_limit'),
       supabase.from('creator_billing_settings').select('issuer_details, vat_registered, vat_rate, vat_included, invoice_note').eq('id', true).maybeSingle(),
@@ -577,6 +590,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const [authMode, setAuthMode] = useState('login');
   const [signupRole, setSignupRole] = useState('manager');
   const [workspace, setWorkspace] = useState(null);
+  const [initialWorkspaceTab, setInitialWorkspaceTab] = useState('');
+  const [initialWorkspaceNotice, setInitialWorkspaceNotice] = useState('');
   const [creatorPreview, setCreatorPreview] = useState(null);
   const [creatorPreviewLoading, setCreatorPreviewLoading] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
@@ -766,6 +781,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       });
       if (error) throw error;
       const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+      setInitialWorkspaceTab('prenumerata');
+      setInitialWorkspaceNotice('Įmonė sukurta. Planas aktyvus 5 dienas; atsisiųskite išankstinę sąskaitą ir apmokėkite ją per 5 dienas.');
       setWorkspace(loadedWorkspace);
       setWorkspaceStatus('ready');
     } catch (error) {
@@ -985,6 +1002,10 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
       onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
       cloudOrganization={workspace.organization}
+      initialActiveTab={initialWorkspaceTab}
+      onInitialTabApplied={() => setInitialWorkspaceTab('')}
+      initialNotice={initialWorkspaceNotice}
+      onInitialNoticeApplied={() => setInitialWorkspaceNotice('')}
       availableOrganizations={workspace.availableOrganizations ?? []}
       subscriptionPlans={workspace.subscriptionPlans ?? []}
       subscriptionAccess={workspace.subscriptionAccess ?? { readOnly: false, locked: false }}

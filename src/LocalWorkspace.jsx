@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
@@ -1211,7 +1211,7 @@ const archivePageSize = 12;
 const dssTaskPageSize = 10;
 const dssSignatureBatchSize = 10;
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onSwitchOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onSwitchOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorReadOnlyPreview = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -1319,17 +1319,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [creatorInvoiceSettings, setCreatorInvoiceSettings] = useState(() => initialCloudData?.creatorInvoiceSettings ?? defaultCreatorInvoiceSettings);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [subscriptionActionBusy, setSubscriptionActionBusy] = useState(false);
-  const [activeTab, setActiveTabState] = useState(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis');
-  const setActiveTab = (tab) => {
-    if (tab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive) tab = 'skydelis';
-    if (tab === activeTab) return;
-    const currentState = window.history.state;
-    window.history.pushState({
-      ...(currentState && typeof currentState === 'object' ? currentState : {}),
-      dssProWorkspaceTab: tab,
-    }, '');
-    setActiveTabState(tab);
-  };
+  const [activeTab, setActiveTabState] = useState(initialActiveTab || (userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis'));
+  const initialTabAppliedRef = useRef(false);
   useEffect(() => {
     const currentState = window.history.state;
     window.history.replaceState({
@@ -1337,6 +1328,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       dssProWorkspaceTab: activeTab,
     }, '');
   }, [activeTab]);
+  useEffect(() => {
+    if (!initialActiveTab || initialTabAppliedRef.current) return;
+    initialTabAppliedRef.current = true;
+    onInitialTabApplied();
+  }, [initialActiveTab, onInitialTabApplied]);
+  useEffect(() => {
+    if (!initialNotice || initialNoticeAppliedRef.current) return;
+    initialNoticeAppliedRef.current = true;
+    onInitialNoticeApplied();
+  }, [initialNotice, onInitialNoticeApplied]);
   const [selectedOrgId, setSelectedOrgId] = useState(sandboxMode
     ? 'org-demo-sandbox'
     : cloudMode && userRole === 'vadovas'
@@ -1353,7 +1354,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     && openedDssOrganizationId === selectedOrgId
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.dss.includes(selectedSpecialistId));
   const dssWorkspaceIsReady = !cloudMode || (dssWorkspaceLoadState.organizationId === selectedOrgId && dssWorkspaceLoadState.status === 'ready');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(initialNotice);
+  const initialNoticeAppliedRef = useRef(false);
   const [protocolAccessPopup, setProtocolAccessPopup] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
@@ -1468,6 +1470,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const workspaceAutosaveRequestRef = useRef(Promise.resolve());
   const skipNextWorkspaceAutosaveRef = useRef(false);
   const employeeAssignmentRpcInFlightRef = useRef(false);
+  const employeeLimitUpgradePendingRef = useRef(false);
+  const reportWorkspaceSaveFailureRef = useRef(null);
   const commissionRevocationInFlightRef = useRef(new Set());
   const previewFrameRef = useRef(null);
   const resourceHtmlCacheRef = useRef(new Map());
@@ -1533,6 +1537,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const isWorkspaceReadOnly = isSubscriptionReadOnly || isSubscriptionLocked || Boolean(creatorReadOnlyPreview);
   const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
+  const setActiveTab = useCallback((tab) => {
+    if (tab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive) tab = 'skydelis';
+    if (tab === activeTab) return;
+    const currentState = window.history.state;
+    window.history.pushState({
+      ...(currentState && typeof currentState === 'object' ? currentState : {}),
+      dssProWorkspaceTab: tab,
+    }, '');
+    setActiveTabState(tab);
+  }, [activeTab, userRole, canViewCompanyArchive]);
   useEffect(() => {
     if (!cloudMode || userRole !== 'vadovas' || !subscriptionAccess.periodEnd) return undefined;
     const intervalId = window.setInterval(() => setValidityCheckTime(Date.now()), 60_000);
@@ -1548,7 +1562,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1576,6 +1590,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             orderedAt: subscription.ordered_at ?? null,
             orderMonths: subscription.order_months ?? 1,
             paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+            isPlanChange: subscription.preinvoice_plan_change === 'true',
+            dueDate: subscription.preinvoice_due_date ?? null,
             preinvoiceNumber: subscription.preinvoice_number ?? '',
             preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? null,
             preinvoiceTotalAmountCents: Number(subscription.preinvoice_total_amount_cents) || null,
@@ -1836,13 +1852,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       workspaceAutosaveRequestRef.current = Promise.resolve(saveRequest)
         .then(({ error }) => {
           if (error) {
-            setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
+            reportWorkspaceSaveFailureRef.current(error, 'Cloud duomenų išsaugoti nepavyko');
             return error;
           }
           return null;
         })
         .catch((error) => {
-          setNotice(`Cloud duomenų išsaugoti nepavyko: ${error.message}`);
+          reportWorkspaceSaveFailureRef.current(error, 'Cloud duomenų išsaugoti nepavyko');
           return error;
         });
       await workspaceAutosaveRequestRef.current;
@@ -4910,7 +4926,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           input_sequence_numbers: numberedEmployee.sequenceNumbersByResource,
         });
         if (sequenceError) {
-          setNotice(`Darbuotojo eilės numerių išsaugoti nepavyko: ${sequenceError.message}`);
+          reportWorkspaceSaveFailure(sequenceError, 'Darbuotojo eilės numerių išsaugoti nepavyko');
           return;
         }
         const { error } = await supabase.rpc('save_organization_employee', {
@@ -4922,7 +4938,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           input_protocol_batches: changedProtocolBatches,
         });
         if (error) {
-          setNotice(`Darbuotojo priskyrimų išsaugoti nepavyko: ${error.message}`);
+          reportWorkspaceSaveFailure(error, 'Darbuotojo priskyrimų išsaugoti nepavyko');
           return;
         }
 
@@ -4935,7 +4951,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
         closeEmployeeEditor();
       } catch (error) {
-        setNotice(`Darbuotojo priskyrimų išsaugoti nepavyko: ${error.message}`);
+        reportWorkspaceSaveFailure(error, 'Darbuotojo priskyrimų išsaugoti nepavyko');
       } finally {
         employeeAssignmentRpcInFlightRef.current = false;
         setEmployeeAssignmentSaving(false);
@@ -5718,6 +5734,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return refreshedWorkspace;
   };
 
+  const reportWorkspaceSaveFailure = useCallback((error, context) => {
+    if (/active employee|employee limit.*plan|plan.*employee limit/i.test(error?.message ?? '')) {
+      employeeLimitUpgradePendingRef.current = true;
+      setActiveTab('prenumerata');
+      setNotice('Pasiektas aktyvių darbuotojų skaičiaus plano limitas. Archyvuoti darbuotojai neskaičiuojami. Atnaujinkite planą, kad galėtumėte pridėti aktyvų darbuotoją.');
+      return;
+    }
+    setNotice(`${context}: ${error?.message ?? 'įvyko klaida.'}`);
+  }, [setActiveTab]);
+  useEffect(() => {
+    reportWorkspaceSaveFailureRef.current = reportWorkspaceSaveFailure;
+  }, [reportWorkspaceSaveFailure]);
+
   const orderSubscription = async (planCode, months = 1) => {
     if (!cloudMode || !currentOrg?.id) return;
     setSubscriptionActionBusy(true);
@@ -5732,6 +5761,33 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice('Užsakymas pateiktas. Prieiga suteikta 5 dienoms, išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
+    } finally {
+      setSubscriptionActionBusy(false);
+    }
+  };
+
+  const changeSubscriptionPlan = async (planCode) => {
+    if (!cloudMode || !currentOrg?.id) return;
+    setSubscriptionActionBusy(true);
+    try {
+      const { error } = await supabase.rpc('manager_change_workspace_subscription_plan', {
+        input_organization_id: currentOrg.id,
+        input_plan_code: planCode,
+      });
+      if (error) throw error;
+      const refreshedWorkspace = await refreshCurrentSubscription(currentOrg.id);
+      if (employeeLimitUpgradePendingRef.current) {
+        employeeLimitUpgradePendingRef.current = false;
+        setData((current) => ({ ...current, employees: [...current.employees] }));
+      }
+      const updatedSubscription = refreshedWorkspace?.data?.subscriptions?.find((item) => item.orgId === currentOrg.id);
+      setNotice(updatedSubscription?.paymentStatus === 'Laukiama apmokėjimo'
+        ? updatedSubscription.isPlanChange
+          ? 'Planas pakeistas iškart. Išankstinę sąskaitą už likusio laikotarpio kainų skirtumą atsisiųskite prenumeratos skiltyje ir apmokėkite per 5 dienas.'
+          : 'Planas aktyvuotas iškart. Išankstinę sąskaitą atsisiųskite prenumeratos skiltyje ir apmokėkite per 5 dienas.'
+        : 'Planas pakeistas iškart. Sumažinimo kreditas bus pritaikytas kitai sąskaitai.');
+    } catch (error) {
+      setNotice(`Plano pakeisti nepavyko: ${error.message}`);
     } finally {
       setSubscriptionActionBusy(false);
     }
@@ -6928,7 +6984,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
               {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
-              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>}
+              {userRole === 'vadovas' && <Panel title="Prenumerata"><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel>}
             </div>
           </section>}
 
@@ -7329,7 +7385,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </Panel>
           </section>}
 
-          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-3xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinktas planas aktyvuojamas iškart. Išankstinę sąskaitą reikia apmokėti per 5 dienas." /><Panel title={currentOrg?.name}><SubscriptionCard subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel><Panel title="Sąskaitos"><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} /></Panel></section>}
+          {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-3xl space-y-5" data-readonly-allowed><PageTitle title="Įmonės prenumerata" subtitle="Pasirinktas planas aktyvuojamas iškart. Išankstinę sąskaitą reikia apmokėti per 5 dienas." /><Panel title={currentOrg?.name}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} onOrder={orderSubscription} onChangePlan={changeSubscriptionPlan} onCancel={cancelSubscription} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} /></Panel><Panel title="Sąskaitos"><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} /></Panel></section>}
 
           {activeTab === 'prenumeratos' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Prenumeratų valdymas" subtitle="Tvarkykite išankstines ir galutines sąskaitas, patvirtinkite mokėjimus bei koreguokite prenumeratas." />
@@ -9334,11 +9390,13 @@ function RequiredSignerList({ employee, resource, org, signatures, now, speciali
     return <div key={`${signer.role}-${signer.name}`} title={`${signer.role}: ${signer.name} · ${statusLabel}`} className={`min-w-0 rounded-md border px-2.5 py-2 ${tone}`}><span className="block truncate text-xs font-semibold">{signer.role} · {signer.name}</span><span className="mt-0.5 block text-xs">{statusLabel === 'pasirašė PIN kodu' ? 'Pasirašė PIN kodu' : statusLabel === 'trūksta' ? 'Trūksta parašo' : 'Parašo galiojimas baigėsi'}</span>{signature && <SignatureImagePreview signature={signature} />}{signer.signedAt && <time className="mt-0.5 block text-xs tabular-nums opacity-80" dateTime={signer.signedAt}>{new Date(signer.signedAt).toLocaleDateString('lt-LT')}</time>}</div>;
   })}</div>;
 }
-function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onCancel, onAddCompany, onDemoAction, onOpenInvoice }) {
+function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, onOrder, onChangePlan, onCancel, onAddCompany, onDemoAction, onOpenInvoice }) {
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && plan.active !== false);
-  const availablePlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false && plan.employee_limit >= employeeCount);
+  const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && plan.active !== false);
+  const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
+  const availablePlans = planOptions.filter((plan) => plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
-    availablePlans.some((plan) => plan.code === subscription?.planCode) ? subscription.planCode : availablePlans[0]?.code ?? 'up_to_20',
+    subscription?.planCode ?? availablePlans[0]?.code ?? 'up_to_20',
   );
   const [selectedAddonPlanCode, setSelectedAddonPlanCode] = useState(subscription?.isAddon
     ? subscription.planCode
@@ -9351,10 +9409,14 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
     : availablePlans[0]?.code ?? '';
+  const currentPlan = planOptions.find((plan) => plan.code === subscription?.planCode);
+  const selectedPlan = planOptions.find((plan) => plan.code === selectedPlanCode);
   const effectiveAddonPlanCode = addonPlans.some((plan) => plan.code === selectedAddonPlanCode)
     ? selectedAddonPlanCode
     : addonPlans[0]?.code ?? '';
   const selectedAddonPlan = addonPlans.find((plan) => plan.code === effectiveAddonPlanCode);
+  const pendingPlanChange = subscription?.isPlanChange && subscription.paymentStatus === 'Laukiama apmokėjimo';
+  const canChangePlan = cloudMode && subscription?.status === 'Aktyvi' && !pendingPlanChange;
   const formatPrice = (price) => new Intl.NumberFormat('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price ?? 0);
 
   const handleOrder = (event) => {
@@ -9383,12 +9445,25 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}
         </p>
         {subscription.status === 'Laukiama sąskaitos' && <p className="text-sm text-slate-600">Šis senesnis užsakymas dar neaktyvintas. Naują užsakymą pateikę iškart gausite 5 dienų prieigą ir išankstinę sąskaitą.</p>}
-        {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; negavus mokėjimo per šį laiką, darbo sritis pereis į peržiūros režimą.</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
+        {subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
+          ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
+          : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; negavus mokėjimo per šį laiką, darbo sritis pereis į peržiūros režimą.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}</div>}
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
         {locked && <p className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">Prieiga užblokuota. Pateikite naują užsakymą – prieiga bus suteikta iškart 5 dienoms.</p>}
       </>
       : <p className="text-sm text-slate-600">Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.</p>}
+
+    {canChangePlan && <form onSubmit={(event) => { event.preventDefault(); if (selectedPlan && selectedPlan.code !== subscription.planCode && selectedPlan.employee_limit >= employeeCount) onChangePlan(selectedPlan.code); }} className="space-y-3 rounded-md border border-slate-200 p-3">
+      <label className="block text-sm font-medium">Keisti darbuotojų skaičiaus planą
+        <select className={`${inputClass} mt-1`} value={selectedPlanCode} onChange={(event) => setSelectedPlanCode(event.target.value)}>
+          {planOptions.map((plan) => <option key={plan.code} value={plan.code} disabled={plan.employee_limit < employeeCount && plan.code !== subscription.planCode}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.{plan.employee_limit < employeeCount && plan.code !== subscription.planCode ? ' · nepakanka aktyvių darbuotojų limitui' : ''}</option>)}
+        </select>
+      </label>
+      <p className="text-xs text-slate-500">Aktyvių darbuotojų: {employeeCount}. Archyvuoti darbuotojai į plano limitą neįskaičiuojami. Pakeitimas įsigalioja iškart; kaina perskaičiuojama už likusį laikotarpį.</p>
+      {selectedPlan?.code !== subscription.planCode && <button type="submit" className={buttonClass} disabled={busy || !selectedPlan || selectedPlan.employee_limit < employeeCount}><CreditCard size={16} />{busy ? 'Keičiama…' : `${selectedPlan && currentPlan && selectedPlan.amount_cents < currentPlan.amount_cents ? 'Sumažinti' : 'Atnaujinti'} planą`}</button>}
+    </form>}
+    {pendingPlanChange && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Palaukite, kol bus patvirtintas plano pakeitimo sąskaitos apmokėjimas, arba apmokėkite ją per 5 dienas.</p>}
 
     {subscription?.isAddon
       ? <div className="space-y-3">
@@ -9409,7 +9484,7 @@ function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked
         <label className="block text-sm font-medium">Užsakymo laikotarpis (mėn.)<input className={`${inputClass} mt-1 max-w-36`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
         <p className="text-xs text-slate-500">Aktyvių darbuotojų šiame workspace: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
-          <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti ir gauti 5 d. prieigą'}
+          <CreditCard size={16} />{busy ? 'Pateikiama…' : 'Užsakyti prenumeratą'}
         </button>
       </form> : <p className="text-sm text-slate-600">Užsakymą galėsite pateikti pasibaigus aktyviam laikotarpiui.</p>}
 
@@ -9782,9 +9857,11 @@ function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSa
       {subscription.orderCode && <><div><dt className="text-slate-500">Užsakymo kodas</dt><dd className="font-mono">{subscription.orderCode}</dd></div><div><dt className="text-slate-500">Apmokėta</dt><dd>{subscription.paidAt ? new Date(subscription.paidAt).toLocaleString('lt-LT') : 'Ne'}</dd></div></>}
     </dl>}
     {subscription.orderCode && subscription.paymentStatus === 'Laukiama apmokėjimo' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-      <p className="text-sm text-amber-950">Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</p>
-      <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={subscription.orderedAt?.slice(0, 10)} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>
-      <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
+      <p className="text-sm text-amber-950">{subscription.isPlanChange
+        ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite plano pakeitimo sąskaitą. Pakeistas planas galios iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'dabartinio laikotarpio pabaigos'}.</>
+        : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
+      {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={subscription.orderedAt?.slice(0, 10)} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
+      <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
     </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
