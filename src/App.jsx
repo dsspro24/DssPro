@@ -577,7 +577,7 @@ function DemoApp({ cloudMode = false }) {
               </details>
               <details className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar galiu išbandyti sistemą prieš registruodamasis?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Paspauskite „Išbandyti demo“ ir peržiūrėkite demonstracinę aplinką be registracijos.</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Paspauskite „Išbandyti be registracijos“ ir peržiūrėkite demonstracinę aplinką.</p>
               </details>
               <details className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar DSS Pro galiu naudoti vietoje popierinių žurnalų?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
