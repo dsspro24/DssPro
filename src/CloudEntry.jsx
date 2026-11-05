@@ -1092,11 +1092,19 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           onRoleChange={() => {}}
           onExit={signOut}
           initialCloudData={previewData}
-          cloudOrganization={{ id: sourceOrganization.id, name: sourceOrganization.name, company_code: sourceOrganization.companyCode }}
+          cloudOrganization={{
+            id: sourceOrganization.id,
+            name: sourceOrganization.name,
+            company_code: sourceOrganization.companyCode,
+            billing_address: sourceOrganization.billingAddress,
+            vat_code: sourceOrganization.vatCode,
+          }}
           cloudManagerName={workspace.managerName}
+          subscriptionPlans={workspace.subscriptionPlans ?? []}
+          onRefreshSubscription={refreshSignedInSubscription}
           cloudMode
           cloudUserId={session.user.id}
-          creatorReadOnlyPreview={`${sourceOrganization.name} · kaip ${creatorPreview.role === 'vadovas' ? 'vadovas' : 'DSS specialistas'}`}
+          creatorManagementContext={creatorPreview.role === 'vadovas' ? `${sourceOrganization.name} · vadovas` : ''}
           onExitCreatorPreview={() => setCreatorPreview(null)}
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
