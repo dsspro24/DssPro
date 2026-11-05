@@ -211,7 +211,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
           ? endsAt ? new Date(endsAt).toISOString() : ''
           : new Date().toISOString(),
         cancelAtPeriodEnd: false,
-      });
+      }, true);
       setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
       setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
       setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');

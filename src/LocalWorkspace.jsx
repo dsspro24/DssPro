@@ -6125,16 +6125,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return refreshedSubscription;
   };
 
-  const saveCreatorSubscription = async (subscriptionId, values) => {
-    const { data: updatedSubscription, error } = await supabase.rpc('creator_update_workspace_subscription', {
-      input_subscription_id: subscriptionId,
-      input_status: values.status,
-      input_plan_code: values.planCode,
-      input_amount_cents: values.amountCents,
-      input_starts_at: values.startsAt || null,
-      input_ends_at: values.endsAt || null,
-      input_cancel_at_period_end: values.cancelAtPeriodEnd,
-    });
+  const saveCreatorSubscription = async (subscriptionId, values, cancelOrder = false) => {
+    const { data: updatedSubscription, error } = cancelOrder
+      ? await supabase.rpc('creator_cancel_workspace_subscription_order', {
+        input_subscription_id: subscriptionId,
+      })
+      : await supabase.rpc('creator_update_workspace_subscription', {
+        input_subscription_id: subscriptionId,
+        input_status: values.status,
+        input_plan_code: values.planCode,
+        input_amount_cents: values.amountCents,
+        input_starts_at: values.startsAt || null,
+        input_ends_at: values.endsAt || null,
+        input_cancel_at_period_end: values.cancelAtPeriodEnd,
+      });
     if (error) throw error;
     const statusLabels = { pending: 'Laukiama sąskaitos', active: 'Aktyvi', canceled: 'Atšaukta', expired: 'Pasibaigusi' };
     const refreshedWorkspace = await onCreatorWorkspaceChanged();
