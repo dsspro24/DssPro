@@ -7639,8 +7639,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <option value="all">Visos būsenos</option><option value="action">Reikia dėmesio</option><option value="active">Aktyvios</option><option value="expiring">Baigiasi per 5 d.</option><option value="expired">Pasibaigusios</option><option value="pending">Laukia apmokėjimo</option><option value="canceled">Atšauktos</option>
                   </select></label>
                 </div>
-                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių · {creatorSubscriptionPageSize} kortelių puslapyje. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
-                <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių · iki {creatorSubscriptionPageSize} grupių puslapyje. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
+                <div className="space-y-3">
                   {paginatedCreatorSubscriptionGroups.map(({ root, workspaces }) => {
                   const groupId = root?.id ?? 'unassigned';
                   const expanded = expandedCreatorSubscriptionGroups[groupId] === true;
