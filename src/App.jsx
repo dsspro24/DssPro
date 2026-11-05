@@ -18,7 +18,8 @@ import {
   Check,
   Key,
   CreditCard,
-  FileBarChart
+  FileBarChart,
+  BellRing
 } from 'lucide-react';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
@@ -464,6 +465,14 @@ function DemoApp({ cloudMode = false }) {
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50/80">Darbuotojas gali priimti kvietimus iš skirtingų įmonių tuo pačiu el. paštu ir pasirinkti, kurios įmonės darbo vietoje dirba.</p>
                 </div>
                 <Users size={34} className="hidden text-emerald-200 sm:block" aria-hidden="true" />
+              </div>
+              <div className="mt-5 grid gap-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 sm:grid-cols-[auto_1fr] sm:items-start sm:p-8">
+                <span className="grid size-12 place-items-center rounded-xl bg-white text-emerald-800 shadow-sm"><BellRing size={22} /></span>
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">Svarbūs terminai — matomi laiku</p>
+                  <h3 className="mt-2 text-xl font-bold text-slate-950">Pranešimas apie artėjantį medicininio pažymėjimo galiojimo pabaigos terminą</h3>
+                  <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">Vadovo aplinkoje rodomas sistemos pranešimas likus 14 dienų iki darbuotojo medicininio pažymėjimo galiojimo pabaigos. Taip pat galite stebėti pasibaigusius terminus ir periodinių instruktavimų bei parašų būsenas.</p>
+                </div>
               </div>
             </div>
           </section>
