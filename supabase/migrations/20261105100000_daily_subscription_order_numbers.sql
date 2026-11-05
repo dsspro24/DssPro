@@ -30,7 +30,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  order_date date;
+  v_order_date date;
   daily_number integer;
 begin
   if new.order_code is null or new.order_code !~ '^DSS[0-9]{7,}$' then
@@ -40,19 +40,19 @@ begin
     return new;
   end if;
 
-  order_date := coalesce(
+  v_order_date := coalesce(
     (new.ordered_at at time zone 'UTC')::date,
     (new.created_at at time zone 'UTC')::date,
     (now() at time zone 'UTC')::date
   );
 
   insert into public.workspace_subscription_daily_order_counters (order_date, last_value)
-  values (order_date, 1)
+  values (v_order_date, 1)
   on conflict (order_date) do update
     set last_value = public.workspace_subscription_daily_order_counters.last_value + 1
   returning last_value into daily_number;
 
-  new.order_code := 'DSS' || to_char(order_date, 'YYMMDD') || daily_number::text;
+  new.order_code := 'DSS' || to_char(v_order_date, 'YYMMDD') || daily_number::text;
   if new.preinvoice_data is not null then
     new.preinvoice_data := jsonb_set(
       jsonb_set(new.preinvoice_data, '{invoiceNumber}', to_jsonb(new.order_code), true),
