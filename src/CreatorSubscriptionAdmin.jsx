@@ -5,7 +5,8 @@ import dssProLogo from './assets/dss-pro-logo.webp';
 const issuerFields = [
   ['legalForm', 'Teisinė forma (IV, MB, UAB ir kt.)'],
   ['name', 'Pavadinimas / vardas, pavardė'],
-  ['companyCode', 'Įmonės / veiklos kodas'],
+  ['companyCode', 'Įmonės kodas'],
+  ['activityCertificateNumber', 'Individualios veiklos pažymos numeris'],
   ['vatCode', 'PVM mokėtojo kodas'],
   ['address', 'Adresas'],
   ['email', 'El. paštas'],
@@ -100,7 +101,7 @@ export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, default
       </div>
     </section>
     {editing && <form onSubmit={save} className="max-w-4xl space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/30 p-4">
-      <p className="text-sm text-slate-600">Visi laukai neprivalomi. Išsaugoti duomenys bus naudojami naujoms sąskaitoms; jau išrašytos sąskaitos nekeičiamos.</p>
+      <p className="text-sm text-slate-600">Atskirkite įmonės kodą nuo individualios veiklos pažymos numerio. Išankstinė sąskaita išsaugo užsakymo metu buvusius rekvizitus, o galutinė sąskaita faktūra naudoja jos išrašymo metu išsaugotus rekvizitus.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {issuerFields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={draft.issuer_details[key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, issuer_details: { ...current.issuer_details, [key]: event.target.value } }))} /></label>)}
       </div>

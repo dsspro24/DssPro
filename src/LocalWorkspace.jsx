@@ -151,6 +151,7 @@ function renderSubscriptionInvoiceHtml(invoice) {
     ['Teisinė forma', issuer.legalForm],
     ['Pavadinimas / vardas, pavardė', issuer.name],
     ['Įmonės kodas', issuer.companyCode],
+    ['Individualios veiklos pažymos numeris', issuer.activityCertificateNumber],
     ['PVM mokėtojo kodas', issuer.vatCode],
     ['Adresas', issuer.address],
     ['El. paštas', issuer.email],
@@ -5972,7 +5973,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const saveCreatorInvoiceSettings = async (values) => {
-    const issuerFields = ['legalForm', 'name', 'companyCode', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
+    const issuerFields = ['legalForm', 'name', 'companyCode', 'activityCertificateNumber', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
     const issuerDetails = Object.fromEntries(issuerFields
       .map((field) => [field, values.issuer_details?.[field]?.trim() ?? ''])
       .filter(([, value]) => value));
@@ -5986,7 +5987,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (error) throw error;
     const persistedSettings = savedSettings ?? values;
     setCreatorInvoiceSettings(persistedSettings);
-    setNotice('Sąskaitų rekvizitai išsaugoti. Nauji užsakymai naudos šiuos duomenis.');
+    setNotice('Sąskaitų rekvizitai išsaugoti. Veiklos pažymos numeris bus įtrauktas į galutines sąskaitas faktūras.');
     return persistedSettings;
   };
 
