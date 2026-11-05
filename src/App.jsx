@@ -7,7 +7,6 @@ import {
   Users, 
   Upload, 
   Shirt, 
-  Lock, 
   ChevronRight, 
   LogOut,
   Award,
@@ -315,142 +314,167 @@ function DemoApp({ cloudMode = false }) {
   // ==========================================
   if (currentPage === 'landing') {
     return (
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-        <div className="bg-[#0c4a3b] text-white pt-6 pb-20 px-6">
-          <div className="max-w-6xl mx-auto">
-            
-            <header className="flex items-center justify-between pb-12">
-              <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentPage('landing')}>
-                <span className="text-xl font-bold tracking-tight text-white flex items-center gap-1">
-                  Dss
-                  <span className="border border-[#20e090] text-[#20e090] text-xs px-2 py-0.5 rounded-full font-semibold">
-                    Pro
-                  </span>
-                </span>
-              </div>
-
-              <button 
-                onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
-                className="bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-bold px-5 py-2 rounded-full text-xs transition-all cursor-pointer shadow-md"
-              >
-                Prisijungti
-              </button>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-16">
-              <div className="lg:col-span-6 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#20e090] text-[11px] font-medium border border-white/10">
-                  <Sparkles size={12} /> Skaitmeninė darbuotojų sauga
-                </div>
-
-                <h1 className="text-3xl sm:text-5xl font-black text-white leading-tight">
-                  DSS žurnalai, testai ir parašai – vienoje vietoje
-                </h1>
-
-                <p className="text-emerald-100/80 text-sm max-w-md leading-relaxed">
-                  Vadovas pakviečia darbuotojus, priskiria testus ir žurnalus, o visi pasirašo savo PIN kodu.
-                </p>
-
-                <div className="flex items-center gap-4 pt-2">
-                  <button 
-                    onClick={scrollToSignup}
-                    className="bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-bold px-6 py-3 rounded-xl text-xs transition-all cursor-pointer shadow-lg hover:scale-105"
-                  >
-                    Peržiūrėti planus
-                  </button>
-                  <button 
-                    onClick={startSandbox}
-                    disabled={sandboxStarting}
-                    className="border border-white/30 hover:bg-white/10 text-white font-semibold px-6 py-3 rounded-xl text-xs transition-all cursor-pointer"
-                  >
-                    {sandboxStarting ? 'Ruošiama demo aplinka…' : 'Išbandyti be registracijos'}
-                  </button>
-                </div>
-                {sandboxStartError && <p role="alert" className="mt-3 max-w-md text-sm text-rose-200">{sandboxStartError}</p>}
-              </div>
-
-              <div className="lg:col-span-6">
-                <div className="bg-white text-slate-800 rounded-2xl p-6 shadow-2xl space-y-4 max-w-md mx-auto">
-                  <div className="border-b border-slate-100 pb-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PRIEŠGAISRINĖS SAUGOS ŽURNALAS</span>
-                  </div>
-
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-center justify-between py-1">
-                      <div>
-                        <p className="font-bold text-slate-800">Jonas Petraitis</p>
-                        <p className="text-[11px] text-slate-400">Darbuotojas</p>
-                      </div>
-                      <span className="text-[#1bc880] font-semibold flex items-center gap-1">
-                        <Check size={14} /> Pasirašyta PIN kodu
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between py-1 border-t border-slate-50">
-                      <div>
-                        <p className="font-bold text-slate-800">Rasa Kazlauskienė</p>
-                        <p className="text-[11px] text-slate-400">DSS specialistas</p>
-                      </div>
-                      <span className="text-[#1bc880] font-semibold flex items-center gap-1">
-                        <Check size={14} /> Pasirašyta PIN kodu
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between py-1 border-t border-slate-50">
-                      <div>
-                        <p className="font-bold text-slate-800">Tomas Vaitkus</p>
-                        <p className="text-[11px] text-slate-400">Komisijos narys</p>
-                      </div>
-                      <span className="text-amber-500 font-semibold bg-amber-50 px-2 py-0.5 rounded text-[10px]">
-                        Laukia parašo
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
-                  <Lock size={18} />
-                </div>
-                <h3 className="font-bold text-sm mb-1">Žurnalai su PIN parašu</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Darbuotojai, vadovai, DSS specialistai ir komisija pasirašo savo PIN kodu – be popieriaus.
-                </p>
-              </button>
-
-              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
-                  <Award size={18} />
-                </div>
-                <h3 className="font-bold text-sm mb-1">Testai ir instruktavimai</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Priskirkite gaisrinės, chemijos, elektrosaugos ir kitus testus vienu paspaudimu.
-                </p>
-              </button>
-
-              <button type="button" onClick={scrollToSignup} className="w-full text-left bg-white text-slate-800 p-5 rounded-2xl shadow-lg border border-slate-100 cursor-pointer hover:border-emerald-200 hover:shadow-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#1bc880] flex items-center justify-center mb-3">
-                  <Shirt size={18} />
-                </div>
-                <h3 className="font-bold text-sm mb-1">Darbuotojo kortelė</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Ūgis, svoris, drabužių ir batų dydžiai – AAP išdavimui visada po ranka.
-                </p>
-              </button>
-            </div>
-
+      <div className="min-h-screen bg-white font-sans text-slate-800">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
+            <a href="#top" className="flex items-center gap-2" aria-label="DSS Pro pradžia">
+              <span className="text-xl font-black tracking-tight text-[#0c4a3b]">DSS<span className="ml-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-sm font-bold text-emerald-800">Pro</span></span>
+            </a>
+            <nav aria-label="Pagrindinė navigacija" className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
+              <a className="transition hover:text-emerald-800" href="#how-it-works">Kaip veikia</a>
+              <a className="transition hover:text-emerald-800" href="#features">Galimybės</a>
+              <a className="transition hover:text-emerald-800" href="#pricing-signup">Kainos</a>
+            </nav>
+            <button
+              onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-700 hover:text-emerald-800"
+            >
+              Prisijungti
+            </button>
           </div>
-        </div>
+        </header>
+
+        <main id="top">
+          <section className="overflow-hidden bg-[#f2f8f5]">
+            <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
+              <div>
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-900">
+                  <Sparkles size={14} className="text-emerald-700" /> Darbuotojų saugos procesai vienoje sistemoje
+                </div>
+                <h1 className="max-w-2xl text-4xl font-black leading-[1.12] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                  Darbuotojų sauga – nuo instruktažo iki pasirašyto žurnalo.
+                </h1>
+                <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
+                  Pakvieskite darbuotojus, priskirkite jiems instruktažus ir testus, stebėkite atlikimo būsenas ir tvarkykite DSS dokumentus vienoje vietoje.
+                </p>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <button onClick={scrollToSignup} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c4a3b] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-900">
+                    Peržiūrėti planus <ChevronRight size={17} />
+                  </button>
+                  <button onClick={startSandbox} disabled={sandboxStarting} className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-700 hover:text-emerald-900 disabled:cursor-wait disabled:opacity-70">
+                    {sandboxStarting ? 'Ruošiama demo aplinka…' : 'Išbandyti demo'}
+                  </button>
+                </div>
+                {sandboxStartError && <p role="alert" className="mt-4 max-w-md text-sm text-rose-700">{sandboxStartError}</p>}
+                <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
+                  <span className="inline-flex items-center gap-2"><Check size={16} className="text-emerald-700" /> Darbuotojai prisijungia kvietimu</span>
+                  <span className="inline-flex items-center gap-2"><Check size={16} className="text-emerald-700" /> Dokumentai eksportuojami į PDF</span>
+                </div>
+              </div>
+
+              <div className="relative mx-auto w-full max-w-xl">
+                <div className="absolute -inset-5 rounded-[2rem] bg-emerald-200/50 blur-2xl" aria-hidden="true" />
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-emerald-950/10">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400">ĮMONĖS DARBO VIETA</p>
+                      <p className="mt-1 font-bold text-slate-900">UAB „Pavyzdys“</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">Vadovo aplinka</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 bg-slate-50 p-5">
+                    <div className="rounded-xl border border-slate-100 bg-white p-4">
+                      <p className="text-xs text-slate-500">Darbuotojai</p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">24</p>
+                      <p className="mt-1 text-xs text-slate-500">Įmonės komanda</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-white p-4">
+                      <p className="text-xs text-slate-500">Laukia atlikimo</p>
+                      <p className="mt-2 text-2xl font-bold text-amber-600">3</p>
+                      <p className="mt-1 text-xs text-slate-500">Užduotys ir parašai</p>
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-bold text-slate-900">Naujausios užduotys</p>
+                      <span className="text-xs font-medium text-slate-500">Šiandien</span>
+                    </div>
+                    <div className="space-y-2">
+                      {[
+                        { name: 'Priešgaisrinės saugos instruktažas', status: 'Atlikta', done: true },
+                        { name: 'Darbas aukštyje: žinių patikrinimas', status: 'Laukia', done: false },
+                        { name: 'Darbuotojo AAP kortelė', status: 'Atnaujinta', done: true },
+                      ].map((item) => (
+                        <div key={item.name} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-3">
+                          <span className="flex min-w-0 items-center gap-3 text-sm font-medium text-slate-700">
+                            <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${item.done ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {item.done ? <Check size={15} /> : <FileText size={15} />}
+                            </span>
+                            <span className="truncate">{item.name}</span>
+                          </span>
+                          <span className={`shrink-0 text-xs font-semibold ${item.done ? 'text-emerald-700' : 'text-amber-700'}`}>{item.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-right text-[11px] text-slate-400">Demonstracinis vaizdas</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="how-it-works" className="scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20">
+            <div className="mx-auto max-w-7xl">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">Paprasta pradėti</p>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Aiškus procesas visai komandai</h2>
+                <p className="mt-4 leading-7 text-slate-600">Vadovui — matomumas ir tvarka. Darbuotojui — aiškios užduotys ir patogus pasirašymas.</p>
+              </div>
+              <div className="mt-12 grid gap-5 md:grid-cols-4">
+                {[
+                  ['01', 'Sukurkite įmonę', 'Pasirinkite planą ir susikurkite įmonės darbo vietą.'],
+                  ['02', 'Pakvieskite komandą', 'Pridėkite darbuotojus ir suteikite jiems prieigą.'],
+                  ['03', 'Priskirkite užduotis', 'Parinkite reikalingus instruktažus, testus ir dokumentus.'],
+                  ['04', 'Stebėkite eigą', 'Matykite atlikimo būsenas, parašus ir paruoštus dokumentus.'],
+                ].map(([number, title, description]) => (
+                  <article key={number} className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-sm font-bold text-emerald-800">{number}</span>
+                    <h3 className="mt-5 font-bold text-slate-900">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section id="features" className="scroll-mt-24 bg-slate-50 px-5 py-16 sm:px-8 sm:py-20">
+            <div className="mx-auto max-w-7xl">
+              <div className="max-w-2xl">
+                <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">DSS Pro galimybės</p>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Kasdieniai saugos procesai vienoje vietoje</h2>
+              </div>
+              <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { icon: BookOpen, title: 'Žurnalai ir parašai', text: 'Tvarkykite instruktažų žurnalus ir rinkite dalyvių parašus PIN kodu.' },
+                  { icon: Award, title: 'Instruktažai ir testai', text: 'Priskirkite darbuotojams mokymų medžiagą bei žinių patikrinimus.' },
+                  { icon: Shirt, title: 'Darbuotojų kortelės', text: 'Vienoje vietoje peržiūrėkite darbuotojo duomenis ir AAP dydžius.' },
+                  { icon: FileBarChart, title: 'Būsenos ir dokumentai', text: 'Stebėkite užduočių eigą, peržiūrėkite įrašus ir atsisiųskite PDF.' },
+                ].map(({ icon: Icon, title, text }) => (
+                  <article key={title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-800"><Icon size={21} /></span>
+                    <h3 className="mt-5 font-bold text-slate-900">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="mt-6 grid gap-5 rounded-2xl bg-[#0c4a3b] p-6 text-white sm:grid-cols-[1fr_auto] sm:items-center sm:p-8">
+                <div>
+                  <p className="text-sm font-bold text-emerald-200">Dirbate keliose įmonėse?</p>
+                  <h3 className="mt-2 text-xl font-bold">Viena darbuotojo paskyra — prieiga prie kelių įmonių</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50/80">Darbuotojas gali priimti kvietimus iš skirtingų įmonių tuo pačiu el. paštu ir pasirinkti, kurios įmonės darbo vietoje dirba.</p>
+                </div>
+                <Users size={34} className="hidden text-emerald-200 sm:block" aria-hidden="true" />
+              </div>
+            </div>
+          </section>
 
         {/* KAINOS IR REGISTRACIJA */}
-        <div id="pricing-signup" className="max-w-6xl mx-auto scroll-mt-6 px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <section id="pricing-signup" className="mx-auto grid max-w-7xl scroll-mt-24 grid-cols-1 items-start gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-12">
           <div className="lg:col-span-6 space-y-6">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">Kainos</h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">Aiškūs planai</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Pasirinkite komandai tinkamą planą</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
                 Moka tik įmonės vadovas. DSS specialistams ir darbuotojams sistema nemokama.
               </p>
             </div>
@@ -475,9 +499,9 @@ function DemoApp({ cloudMode = false }) {
             </div>
           </div>
 
-          <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-md">
-            <h3 className="font-bold text-slate-800 text-base mb-1">Sukurkite paskyrą</h3>
-            <p className="mb-4 text-xs text-slate-500">Vadovo paskyrai reikia mokamo plano. DSS paskyra nemokama; darbuotojai prisijungia vadovo kvietimu.</p>
+          <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-900/5 sm:p-8">
+            <h3 className="text-xl font-bold text-slate-950">Pradėkite nuo paskyros</h3>
+            <p className="mb-5 mt-2 text-sm leading-6 text-slate-600">Vadovo paskyrai reikia mokamo plano. DSS specialistas gali susikurti nemokamą paskyrą, o darbuotojai prisijungia vadovo kvietimu.</p>
 
             <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs mb-5 font-semibold">
               <button 
@@ -541,9 +565,30 @@ function DemoApp({ cloudMode = false }) {
             </form>
           </div>
 
-        </div>
+        </section>
 
-        <footer className="border-t border-slate-200 py-6 text-center text-[11px] text-slate-400">
+        <section className="border-t border-slate-200 bg-white px-5 py-14 sm:px-8">
+          <div className="mx-auto max-w-4xl">
+            <h2 className="text-center text-2xl font-bold text-slate-950">Dažniausiai užduodami klausimai</h2>
+            <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
+              <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Kas apmoka DSS Pro planą?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Mokamą planą pasirenka ir apmoka įmonės vadovas. DSS specialistai ir darbuotojai prie įmonės prisijungia nemokamai.</p>
+              </details>
+              <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar galiu išbandyti sistemą prieš registruodamasis?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Paspauskite „Išbandyti demo“ ir peržiūrėkite demonstracinę aplinką be registracijos.</p>
+              </details>
+              <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar darbuotojas gali būti pakviestas į kelias įmones?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Darbuotojas gali naudoti tą pačią paskyrą kelių įmonių kvietimams ir pasirinkti, kurios įmonės darbo vietoje dirba.</p>
+              </details>
+            </div>
+          </div>
+        </section>
+        </main>
+
+        <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-xs text-slate-500">
           © 2026 DSS Pro. Visos teisės saugomos.
         </footer>
 
