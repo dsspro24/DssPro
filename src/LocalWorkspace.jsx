@@ -2682,10 +2682,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ];
         return {
           root,
-          workspaces: workspaces.map((organization) => ({
-            organization,
-            subscriptions: subscriptionsByOrganization.get(organization.id) ?? [],
-          })),
+          workspaces: workspaces.map((organization) => {
+            const invoiceSubscriptions = subscriptionsByOrganization.get(organization.id) ?? [];
+            const subscriptions = invoiceSubscriptions.filter((subscription) => (
+              subscription.status !== 'Atšaukta' && subscription.paymentStatus !== 'Atšaukta'
+            )).slice(0, 1);
+            return { organization, subscriptions, invoiceSubscriptions };
+          }),
         };
       });
     const includedOrganizationIds = new Set(groups.flatMap((group) => group.workspaces.map(({ organization }) => organization.id)));
@@ -2695,7 +2698,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         root: null,
         workspaces: [{
           organization: { id: 'unknown-organization', name: 'Nepriskirta įmonė' },
-          subscriptions: orphanSubscriptions,
+          subscriptions: orphanSubscriptions.filter((subscription) => (
+            subscription.status !== 'Atšaukta' && subscription.paymentStatus !== 'Atšaukta'
+          )).slice(0, 1),
+          invoiceSubscriptions: orphanSubscriptions,
         }],
       });
     }
@@ -2703,7 +2709,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [data.organizations, creatorSubscriptions]);
   const creatorSubscriptionSummary = useMemo(() => {
     const now = validityCheckTime;
-    const summary = { active: 0, expiring: 0, expired: 0, pending: 0, canceled: 0 };
+    const summary = { active: 0, expiring: 0, expired: 0, pending: 0 };
     for (const group of creatorSubscriptionGroups) {
       for (const workspace of group.workspaces) {
         const latest = workspace.subscriptions[0];
@@ -2718,8 +2724,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           summary.active += 1;
         } else if (latest.status === 'Pasibaigusi') {
           summary.expired += 1;
-        } else if (latest.status === 'Atšaukta') {
-          summary.canceled += 1;
         }
       }
     }
@@ -2737,14 +2741,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (creatorSubscriptionFilter === 'expiring') return expiring;
       if (creatorSubscriptionFilter === 'expired') return expired;
       if (creatorSubscriptionFilter === 'pending') return subscription.paymentStatus === 'Laukiama apmokėjimo';
-      if (creatorSubscriptionFilter === 'canceled') return subscription.status === 'Atšaukta';
       return true;
     };
     return creatorSubscriptionGroups.map((group) => {
-      const rootMatches = !query || `${group.root?.name ?? ''} ${group.workspaces.flatMap(({ organization, subscriptions }) => `${organization.name} ${subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+      const rootMatches = !query || `${group.root?.name ?? ''} ${group.workspaces.flatMap(({ organization, invoiceSubscriptions }) => `${organization.name} ${invoiceSubscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
       const workspaces = group.workspaces
         .map((workspace) => {
-          const workspaceMatches = !query || `${workspace.organization.name} ${workspace.subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+          const workspaceMatches = !query || `${workspace.organization.name} ${workspace.invoiceSubscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
           if (!rootMatches && !workspaceMatches) return null;
           const subscriptions = workspace.subscriptions.filter(matchesStatus);
           return subscriptions.length ? { ...workspace, subscriptions } : null;
@@ -7628,7 +7631,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     ['active', 'Aktyvios', creatorSubscriptionSummary.active, 'border-emerald-300 bg-emerald-50 text-emerald-950'],
                     ['expiring', 'Baigiasi per 5 d.', creatorSubscriptionSummary.expiring, 'border-yellow-300 bg-yellow-50 text-yellow-950'],
                     ['expired', 'Pasibaigusios', creatorSubscriptionSummary.expired, 'border-rose-300 bg-rose-50 text-rose-950'],
-                    ['canceled', 'Atšauktos', creatorSubscriptionSummary.canceled, 'border-slate-300 bg-slate-50 text-slate-800'],
                   ].map(([filter, label, count, color]) => <button key={filter} type="button" className={`rounded-lg border p-3 text-left ${color} ${creatorSubscriptionFilter === filter ? 'ring-2 ring-slate-700 ring-offset-1' : ''}`} onClick={() => { setCreatorSubscriptionFilter(creatorSubscriptionFilter === filter ? 'all' : filter); setCreatorSubscriptionPage(1); }}>
                     <span className="block text-xs font-medium">{label}</span><strong className="mt-1 block text-xl tabular-nums">{count}</strong>
                   </button>)}
@@ -7636,10 +7638,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <label className="relative block w-full max-w-xl text-sm font-medium"><span className="sr-only">Ieškoti prenumeratos ar įmonės</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={creatorSubscriptionSearch} onChange={(event) => { setCreatorSubscriptionSearch(event.target.value); setCreatorSubscriptionPage(1); }} placeholder="Įmonė, užsakymo kodas arba planas" /></label>
                   <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1 min-w-48`} value={creatorSubscriptionFilter} onChange={(event) => { setCreatorSubscriptionFilter(event.target.value); setCreatorSubscriptionPage(1); }}>
-                    <option value="all">Visos būsenos</option><option value="action">Reikia dėmesio</option><option value="active">Aktyvios</option><option value="expiring">Baigiasi per 5 d.</option><option value="expired">Pasibaigusios</option><option value="pending">Laukia apmokėjimo</option><option value="canceled">Atšauktos</option>
+                    <option value="all">Visos būsenos</option><option value="action">Reikia dėmesio</option><option value="active">Aktyvios</option><option value="expiring">Baigiasi per 5 d.</option><option value="expired">Pasibaigusios</option><option value="pending">Laukia apmokėjimo</option>
                   </select></label>
                 </div>
-                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių · iki {creatorSubscriptionPageSize} grupių puslapyje. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
+                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių · kiekvienoje rodoma tik naujausia neatšaukta prenumerata. Senesni užsakymai pasiekiami sąskaitų istorijoje.</p>
                 <div className="space-y-3">
                   {paginatedCreatorSubscriptionGroups.map(({ root, workspaces }) => {
                   const groupId = root?.id ?? 'unassigned';
@@ -7667,7 +7669,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     </button>
                     {additionalWorkspaces.length > 0 && !expanded && <p className="border-t border-slate-100 px-4 pb-3 text-xs text-slate-500">Papildomos įmonės: {additionalWorkspaces.map(({ organization }) => organization.name).join(' · ')}</p>}
                     {expanded && <div className="space-y-4 border-t border-slate-200 bg-slate-50/60 p-4">
-                      {workspaces.map(({ organization, subscriptions }) => {
+                      {workspaces.map(({ organization, subscriptions, invoiceSubscriptions }) => {
                         const isAdditional = Boolean(organization.parentOrganizationId);
                         const workspaceExpanded = expandedCreatorSubscriptionGroups[`workspace-${organization.id}`] === true;
                         const workspaceContent = <>
@@ -7681,12 +7683,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             inputClass={inputClass}
                             buttonClass={buttonClass}
                           /></Suspense>)}
-                          <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas sąskaitų archyvas...</p>}><SubscriptionInvoiceArchive
-                            subscriptions={subscriptions}
-                            organizationName={organization.name}
-                            onOpenInvoice={openSubscriptionInvoice}
-                            onDeleteInvoice={deleteCreatorSubscriptionInvoice}
-                            deletingInvoiceId={deletingInvoiceId} inputClass={inputClass} /></Suspense>
+                          {invoiceSubscriptions.some((item) => item.preinvoiceNumber || item.finalInvoiceNumber) && <details className="rounded-md border border-slate-200 bg-white">
+                            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-700">Sąskaitų istorija · {invoiceSubscriptions.reduce((count, item) => count + Number(Boolean(item.preinvoiceNumber)) + Number(Boolean(item.finalInvoiceNumber)), 0)} dok.</summary>
+                            <div className="border-t border-slate-200 p-3"><Suspense fallback={<p className="text-sm text-slate-500">Kraunamas sąskaitų archyvas...</p>}><SubscriptionInvoiceArchive
+                              subscriptions={invoiceSubscriptions}
+                              organizationName={organization.name}
+                              onOpenInvoice={openSubscriptionInvoice}
+                              onDeleteInvoice={deleteCreatorSubscriptionInvoice}
+                              deletingInvoiceId={deletingInvoiceId} inputClass={inputClass} /></Suspense></div>
+                          </details>}
                         </>;
                         return isAdditional
                           ? <section key={organization.id} className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
