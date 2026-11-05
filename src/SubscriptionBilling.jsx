@@ -181,7 +181,7 @@ export function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, on
   </form>;
 }
 
-export function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', hidePaidPreinvoice = false, inputClass }) {
+export function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', hidePaidPreinvoice = false, hideCanceledPreinvoice = false, inputClass }) {
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const [page, setPage] = useState(1);
   const [loadingInvoice, setLoadingInvoice] = useState('');
@@ -250,7 +250,7 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
           <p className="mt-1 text-xs text-slate-500">{new Date(invoice.date).toLocaleDateString('lt-LT')} · {invoice.subscription.plan}{invoice.subscription.orderMonths > 1 ? ` · ${invoice.subscription.orderMonths} mėn.` : ''}</p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 disabled:opacity-50" disabled={loadingInvoice === invoice.key} onClick={() => openInvoice(invoice)}><Download size={15} />{loadingInvoice === invoice.key ? 'Atidaroma…' : 'Peržiūrėti / atsisiųsti'}</button>
+          {!(hideCanceledPreinvoice && invoice.type === 'preinvoice' && invoice.subscription.status === 'Atšaukta') && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 disabled:opacity-50" disabled={loadingInvoice === invoice.key} onClick={() => openInvoice(invoice)}><Download size={15} />{loadingInvoice === invoice.key ? 'Atidaroma…' : 'Peržiūrėti / atsisiųsti'}</button>}
           {onDeleteInvoice && <button type="button" aria-label={`Ištrinti sąskaitą ${invoice.number}`} title={invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo' ? 'Negalima ištrinti, kol laukiama apmokėjimo.' : undefined} className="grid size-10 place-items-center rounded-md border border-rose-300 text-rose-800 hover:bg-rose-50 disabled:opacity-40" disabled={deletingInvoiceId === invoice.subscriptionId || invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo'} onClick={() => deleteInvoice(invoice)}><Trash2 size={15} /></button>}
         </div>
       </div>)}

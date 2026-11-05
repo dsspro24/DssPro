@@ -196,6 +196,32 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     }
   };
 
+  const closeCanceledOrder = async () => {
+    if (!window.confirm(`Pažymėti užsakymą ${subscription.orderCode} kaip atšauktą? Mokėjimas nebebus laukiamas.`)) return;
+    setSaving(true);
+    setError('');
+    try {
+      const saved = await onSave(subscription.id, {
+        status: 'canceled',
+        planCode,
+        amountCents: Math.round(price * 100),
+        startsAt: startsAt ? new Date(startsAt).toISOString() : '',
+        endsAt: subscription.isRenewal
+          ? endsAt ? new Date(endsAt).toISOString() : ''
+          : new Date().toISOString(),
+        cancelAtPeriodEnd: false,
+      });
+      setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
+      setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
+      setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
+      setCancelAtPeriodEnd(saved.cancelAtPeriodEnd === true);
+    } catch (saveError) {
+      setError(saveError.message || 'Užsakymo atšaukti nepavyko.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     if (!Number.isFinite(price) || price < 0) {
@@ -258,6 +284,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
             : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
       {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
       <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
+      {!subscription.isPlanChange && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Uždaroma…' : 'Pažymėti atšauktu'}</button>}
     </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

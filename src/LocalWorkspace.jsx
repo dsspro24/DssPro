@@ -6013,12 +6013,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const openSubscriptionInvoice = async (subscriptionId, invoiceType) => {
     try {
       const column = invoiceType === 'preinvoice' ? 'preinvoice_data' : 'final_invoice_data';
-      const { data: invoiceRow, error } = await supabase
+      let invoiceRow;
+      if (userRole === 'vadovas' && invoiceType === 'preinvoice') {
+        const { data: order, error: orderError } = await supabase
+          .from('workspace_subscriptions')
+          .select('status, payment_status')
+          .eq('id', subscriptionId)
+          .maybeSingle();
+        if (orderError) throw orderError;
+        if (order?.status === 'canceled' || order?.payment_status === 'canceled') {
+          throw new Error('Atšaukta išankstinė sąskaita neperžiūrima.');
+        }
+      }
+      const { data, error } = await supabase
         .from('workspace_subscriptions')
         .select(column)
         .eq('id', subscriptionId)
         .maybeSingle();
       if (error) throw error;
+      invoiceRow = data;
       const invoiceData = invoiceRow?.[column];
       if (!invoiceData) throw new Error('Pasirinkta sąskaita nerasta.');
       const opened = await downloadSubscriptionInvoice(invoiceData);
@@ -7581,7 +7594,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
-              <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice inputClass={inputClass} /></Suspense>
+              <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice hideCanceledPreinvoice inputClass={inputClass} /></Suspense>
             </Panel>
           </section>}
 
