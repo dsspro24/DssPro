@@ -123,7 +123,7 @@ function printPdfHtml(html, title) {
         reject(error);
       }
     }, { once: true });
-    frame.srcdoc = html;
+    frame.srcdoc = preparePagedPrintHtml(html);
     document.body.append(frame);
   });
 }
@@ -8561,12 +8561,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   const proof = (item, entry) => {
     if (!entry) return '';
     const signature = findSignature(item, entry.role, entry.signedBy);
-    const name = signature?.signer ?? entry.name;
-    if (!signature) return `<span class="signature-pending">${escapeHtml(name)}<br>Laukia parašo</span>`;
+    if (!signature) return '<span class="signature-pending">Laukia parašo</span>';
     const signedAt = new Date(signature.signedAt);
     const dateTime = Number.isNaN(signedAt.getTime()) ? '' : `${dateFormatter.format(signedAt)} ${timeFormatter.format(signedAt)}`;
     const status = entry.status === 'expired' ? 'Galiojimas pasibaigė' : pinSignedStatusLabel;
-    return `<span class="signature-proof"><strong>${escapeHtml(name)}</strong>${signatureImageHtml(signature)}<small>${status} · ${escapeHtml(dateTime)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+    return `<span class="signature-proof">${signatureImageHtml(signature)}<small>${status} · ${escapeHtml(dateTime)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
   };
   const writeRow = (row, values) => [...row.cells].forEach((cell, index) => { cell.innerHTML = values[index] ?? ''; });
   const nameFor = (entry) => entry ? escapeHtml(entry.signedBy ?? entry.name) : '';
@@ -8724,11 +8723,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const relatedProof = (linkedResource, signature, role = 'Darbuotojas') => {
           if (!linkedResource) return '';
           if (role === 'niekas') return '';
-          if (!signature) return item.resourceIds?.includes(linkedResource.id) ? `<span class="signature-pending">Laukia ${role === 'Vadovas' ? 'vadovo' : role === 'DSS specialistas' ? 'DSS specialisto' : 'darbuotojo'} parašo</span>` : '';
+          if (!signature) return item.resourceIds?.includes(linkedResource.id) ? '<span class="signature-pending">Laukia parašo</span>' : '';
           const date = formatDate(signature.signedAt);
           const time = new Date(signature.signedAt);
           const timeText = Number.isNaN(time.getTime()) ? '' : timeFormatter.format(time);
-          return `<span class="signature-proof"><strong>${escapeHtml(role)} · ${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+          return `<span class="signature-proof"><strong>${escapeHtml(role)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(date)} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const [dssResource, fireResource, rulesResource, positionResource, riskResource, sdsResource] = related;
         const instructorRoleFor = (linkedResource, fieldKey) => {
@@ -8823,11 +8822,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         const instructorSignature = latestSignature(resource.id, 'DSS specialistas') ?? latestSignature(relatedTestId, 'DSS specialistas');
         const assignedInstructor = specialists.find((person) => org?.dss?.includes(person.id))?.name ?? 'DSS specialistas';
         const instructorName = instructorSignature?.signer ?? assignedInstructor;
-        const cardProof = (signature, signerName, pending) => {
-          if (!signature) return pending ? `<span class="signature-pending">${escapeHtml(signerName)}<br>Laukia parašo</span>` : '';
+        const cardProof = (signature, pending) => {
+          if (!signature) return pending ? '<span class="signature-pending">Laukia parašo</span>' : '';
           const signedAt = new Date(signature.signedAt);
           const timeText = Number.isNaN(signedAt.getTime()) ? '' : timeFormatter.format(signedAt);
-          return `<span class="signature-proof"><strong>${escapeHtml(signature.signer)}</strong>${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
+          return `<span class="signature-proof">${signatureImageHtml(signature)}<small>${pinSignedStatusLabel} · ${escapeHtml(formatDate(signature.signedAt))} ${escapeHtml(timeText)}</small><small>IP / aplinka: ${escapeHtml(signature.ip ?? '127.0.0.1 (demo)')}</small></span>`;
         };
         const hasCardAssignment = item.resourceIds?.includes(resource.id);
         const instructionDate = workerSignature?.signedAt ?? testResult?.completedAt;
@@ -8836,9 +8835,9 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           formatDate(instructionDate),
           escapeHtml(item.name),
           escapeHtml(positionFor(item)),
-          cardProof(workerSignature, item.name, hasCardAssignment),
+          cardProof(workerSignature, hasCardAssignment),
           escapeHtml(instructorName),
-          cardProof(instructorSignature, instructorName, hasCardAssignment && Boolean(org?.dss?.length)),
+          cardProof(instructorSignature, hasCardAssignment && Boolean(org?.dss?.length)),
         ]);
       }
     });
@@ -9236,15 +9235,6 @@ function numberDocumentSequenceColumn(html) {
 
 function prepareResourcePrintLayout(html) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  parsed.querySelectorAll('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table, .employee-instruction-table')
-    .forEach((table) => [...table.tBodies].forEach((body) => {
-      const hasContent = (row) => [...row.cells].some((cell) => (
-        cell.textContent.trim() || cell.querySelector('img, svg, canvas, input, textarea, select')
-      ));
-      while (body.rows.length && !hasContent(body.rows[body.rows.length - 1])) {
-        body.deleteRow(body.rows.length - 1);
-      }
-    }));
   const style = parsed.createElement('style');
   const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
   const header = table?.closest('.journal-page, .protocol-container, .card-page, .card-container, .document-page')
@@ -9279,6 +9269,16 @@ function prepareResourcePrintLayout(html) {
         width: 100%;
         break-inside: auto;
         page-break-inside: auto;
+        font-size: 8px;
+      }
+      .journal-page th, .journal-page td, .protocol-container th, .protocol-container td,
+      .card-page th, .card-page td, .card-container th, .card-container td,
+      .document-page th, .document-page td {
+        padding: 2px 3px;
+      }
+      .journal-page tbody tr, .protocol-container tbody tr, .card-page tbody tr,
+      .card-container tbody tr, .document-page tbody tr {
+        height: 24px;
       }
       .journal-page thead, .protocol-container thead, .card-page thead, .card-container thead, .document-page thead {
         display: table-header-group;
@@ -9293,6 +9293,47 @@ function prepareResourcePrintLayout(html) {
     }
   `;
   parsed.head.append(style);
+  return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+}
+
+function preparePagedPrintHtml(html) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const table = parsed.querySelector('.employee-instruction-table')
+    ?? parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
+  const body = table?.tBodies[0];
+  const pageSize = Number(table?.dataset.pageSize);
+  const container = table?.closest('.journal-page, .protocol-container, .card-page, .card-container, .document-page');
+  if (!body || !Number.isInteger(pageSize) || pageSize < 1 || body.rows.length <= pageSize
+    || !container || container.querySelectorAll('table').length !== 1) return html;
+
+  const rows = [...body.rows];
+  const hasContent = (row) => [...row.cells].some((cell) => (
+    cell.textContent.trim() || cell.querySelector('img, svg, canvas, input, textarea, select')
+  ));
+  const blankRow = rows.find((row) => !hasContent(row));
+  const pageCount = Math.ceil(rows.length / pageSize);
+  const pageContainers = [container];
+  let lastPageContainer = container;
+  for (let pageIndex = 1; pageIndex < pageCount; pageIndex += 1) {
+    const nextPage = container.cloneNode(true);
+    lastPageContainer.after(nextPage);
+    pageContainers.push(nextPage);
+    lastPageContainer = nextPage;
+  }
+  pageContainers.forEach((pageContainer, pageIndex) => {
+    const pageBody = pageContainer.querySelector('table')?.tBodies[0];
+    if (!pageBody) return;
+    const pageRows = rows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+      .map((row) => parsed.importNode(row, true));
+    while (pageRows.length < pageSize) {
+      const emptyRow = parsed.importNode(blankRow ?? rows[0], true);
+      if (!blankRow) [...emptyRow.cells].forEach((cell) => { cell.replaceChildren(); });
+      pageRows.push(emptyRow);
+    }
+    pageBody.replaceChildren(...pageRows);
+    pageContainer.style.breakAfter = pageIndex < pageCount - 1 ? 'page' : 'auto';
+    pageContainer.style.pageBreakAfter = pageIndex < pageCount - 1 ? 'always' : 'auto';
+  });
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 
@@ -9311,8 +9352,18 @@ function getRecordPreviewPage(html, pageIndex, fallbackPageSize = 20) {
     ?? pageDocument.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table'))?.tBodies[0];
   if (!pageBody) return { html, pageCount: 1 };
   const start = pageIndex * pageSize;
-  const pageRows = rows.slice(start, start + pageSize);
-  pageBody.replaceChildren(...pageRows.map((row) => pageDocument.importNode(row, true)));
+  const pageRows = rows.slice(start, start + pageSize)
+    .map((row) => pageDocument.importNode(row, true));
+  const hasContent = (row) => [...row.cells].some((cell) => (
+    cell.textContent.trim() || cell.querySelector('img, svg, canvas, input, textarea, select')
+  ));
+  const blankRow = rows.find((row) => !hasContent(row));
+  while (pageRows.length < pageSize) {
+    const emptyRow = pageDocument.importNode(blankRow ?? rows[0], true);
+    if (!blankRow) [...emptyRow.cells].forEach((cell) => { cell.replaceChildren(); });
+    pageRows.push(emptyRow);
+  }
+  pageBody.replaceChildren(...pageRows);
   if (pageIndex > 0) {
     pageDocument.querySelector('.cover-page')?.remove();
     [...pageDocument.querySelectorAll('.journal-page')]
