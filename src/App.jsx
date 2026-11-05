@@ -352,7 +352,7 @@ function DemoApp({ cloudMode = false }) {
                     Peržiūrėti planus <ChevronRight size={17} />
                   </button>
                   <button onClick={startSandbox} disabled={sandboxStarting} className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-700 hover:text-emerald-900 disabled:cursor-wait disabled:opacity-70">
-                    {sandboxStarting ? 'Ruošiama demo aplinka…' : 'Išbandyti demo'}
+                    {sandboxStarting ? 'Ruošiama demo aplinka…' : 'Išbandyti be registracijos'}
                   </button>
                 </div>
                 {sandboxStartError && <p role="alert" className="mt-4 max-w-md text-sm text-rose-700">{sandboxStartError}</p>}
