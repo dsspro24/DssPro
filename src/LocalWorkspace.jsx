@@ -7644,6 +7644,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   const expanded = expandedCreatorSubscriptionGroups[groupId] === true;
                   const groupSubscriptions = workspaces.flatMap(({ subscriptions }) => subscriptions);
                   const latestGroupSubscriptions = workspaces.map(({ subscriptions }) => subscriptions[0]).filter(Boolean);
+                  const additionalWorkspaces = workspaces.filter(({ organization }) => organization.parentOrganizationId);
                   const now = validityCheckTime;
                   const groupBadge = latestGroupSubscriptions.some((subscription) => subscription.paymentStatus === 'Laukiama apmokėjimo')
                     ? ['Laukia apmokėjimo', 'bg-orange-100 text-orange-900']
@@ -7656,33 +7657,51 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                           : ['Atšaukta', 'bg-slate-100 text-slate-700'];
                   return <section key={groupId} className="overflow-hidden rounded-lg border border-slate-200">
                     <button type="button" className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left hover:bg-slate-50" aria-expanded={expanded} onClick={() => setExpandedCreatorSubscriptionGroups((current) => ({ ...current, [groupId]: !current[groupId] }))}>
-                      <span className="flex min-w-0 items-center gap-2"><ChevronDown size={17} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} /><span className="truncate font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${groupBadge[1]}`}>{groupBadge[0]}</span></span>
-                      <span className="text-xs text-slate-500">{workspaces.length} {workspaces.length === 1 ? 'įmonė' : 'įmonių'} · {groupSubscriptions.length} {groupSubscriptions.length === 1 ? 'įrašas' : 'įrašų'}{workspaces.length > 1 ? ` · ${workspaces.length - 1} papild.` : ''}</span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2"><ChevronDown size={17} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} /><span className="truncate font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${groupBadge[1]}`}>{groupBadge[0]}</span></span>
+                      <span className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                        {additionalWorkspaces.length > 0 && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-900">+{additionalWorkspaces.length} papild. {additionalWorkspaces.length === 1 ? 'įmonė' : 'įmonės'}</span>}
+                        <span>{workspaces.length} {workspaces.length === 1 ? 'įmonė' : 'įmonių'} · {groupSubscriptions.length} {groupSubscriptions.length === 1 ? 'įrašas' : 'įrašų'}</span>
+                      </span>
                     </button>
+                    {additionalWorkspaces.length > 0 && !expanded && <p className="border-t border-slate-100 px-4 pb-3 text-xs text-slate-500">Papildomos įmonės: {additionalWorkspaces.map(({ organization }) => organization.name).join(' · ')}</p>}
                     {expanded && <div className="space-y-4 border-t border-slate-200 bg-slate-50/60 p-4">
-                      {workspaces.map(({ organization, subscriptions }) => <div key={organization.id} className={organization.parentOrganizationId ? 'ml-3 space-y-3 border-l-2 border-emerald-200 pl-3 sm:ml-5 sm:pl-4' : 'space-y-3'}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {organization.parentOrganizationId && <span aria-hidden="true" className="text-emerald-700">↳</span>}
-                          <p className="text-sm font-semibold">{organization.name}</p>
-                          {organization.parentOrganizationId && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">Papildoma įmonė</span>}
-                        </div>
-                        {subscriptions.map((subscription) => <Suspense key={`${subscription.id}-${subscription.status}-${subscription.paymentStatus}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`} fallback={<p className="text-sm text-slate-500">Atidaroma prenumerata…</p>}><CreatorSubscriptionEditor
-                          subscription={subscription}
-                          organizationName={organization.name}
-                          plans={subscriptionPlans}
-                          onSave={saveCreatorSubscription}
-                          onConfirmPayment={confirmSubscriptionPayment}
-                          now={validityCheckTime}
-                          inputClass={inputClass}
-                          buttonClass={buttonClass}
-                        /></Suspense>)}
-                        <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive
-                          subscriptions={subscriptions}
-                          organizationName={organization.name}
-                          onOpenInvoice={openSubscriptionInvoice}
-                          onDeleteInvoice={deleteCreatorSubscriptionInvoice}
-                          deletingInvoiceId={deletingInvoiceId} inputClass={inputClass} /></Suspense>
-                      </div>)}
+                      {workspaces.map(({ organization, subscriptions }) => {
+                        const isAdditional = Boolean(organization.parentOrganizationId);
+                        const workspaceExpanded = expandedCreatorSubscriptionGroups[`workspace-${organization.id}`] === true;
+                        const workspaceContent = <>
+                          {subscriptions.map((subscription) => <Suspense key={`${subscription.id}-${subscription.status}-${subscription.paymentStatus}-${subscription.planCode}-${subscription.price}-${subscription.startsAt ?? ''}-${subscription.endsAt ?? ''}-${subscription.cancelAtPeriodEnd}`} fallback={<p className="text-sm text-slate-500">Atidaroma prenumerata…</p>}><CreatorSubscriptionEditor
+                            subscription={subscription}
+                            organizationName={organization.name}
+                            plans={subscriptionPlans}
+                            onSave={saveCreatorSubscription}
+                            onConfirmPayment={confirmSubscriptionPayment}
+                            now={validityCheckTime}
+                            inputClass={inputClass}
+                            buttonClass={buttonClass}
+                          /></Suspense>)}
+                          <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas sąskaitų archyvas...</p>}><SubscriptionInvoiceArchive
+                            subscriptions={subscriptions}
+                            organizationName={organization.name}
+                            onOpenInvoice={openSubscriptionInvoice}
+                            onDeleteInvoice={deleteCreatorSubscriptionInvoice}
+                            deletingInvoiceId={deletingInvoiceId} inputClass={inputClass} /></Suspense>
+                        </>;
+                        return isAdditional
+                          ? <section key={organization.id} className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
+                            <button type="button" className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left hover:bg-emerald-50/50" aria-expanded={workspaceExpanded} onClick={() => setExpandedCreatorSubscriptionGroups((current) => ({ ...current, [`workspace-${organization.id}`]: !current[`workspace-${organization.id}`] }))}>
+                              <span className="flex min-w-0 items-center gap-2"><ChevronDown size={15} className={`shrink-0 text-emerald-800 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} /><span className="truncate text-sm font-semibold">{organization.name}</span><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">Papildoma įmonė</span></span>
+                              <span className="text-xs text-slate-500">{subscriptions.length} {subscriptions.length === 1 ? 'prenumeratos įrašas' : 'prenumeratos įrašai'}</span>
+                            </button>
+                            {workspaceExpanded && <div className="space-y-3 border-t border-emerald-100 bg-emerald-50/30 p-3">{workspaceContent}</div>}
+                          </section>
+                          : <section key={organization.id} className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{root ? 'Pagrindinė įmonė' : 'Įmonė'}</p><p className="font-semibold">{organization.name}</p></div>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{subscriptions.length} {subscriptions.length === 1 ? 'įrašas' : 'įrašai'}</span>
+                            </div>
+                            {workspaceContent}
+                          </section>;
+                      })}
                     </div>}
                   </section>;
                 })}
