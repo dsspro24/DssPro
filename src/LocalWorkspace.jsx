@@ -9257,12 +9257,22 @@ function prepareResourcePrintLayout(html) {
     @media print {
       .print-document-heading { display: table-row; }
       .print-original-document-heading { display: none; }
-      .cover-page { break-after: page; page-break-after: always; }
+      .cover-page {
+        display: flex;
+        min-height: 267mm;
+        height: 267mm;
+        padding: 12mm !important;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
+        break-after: page;
+        page-break-after: always;
+      }
       .journal-page, .protocol-container, .card-page, .card-container, .document-page {
         display: block;
         min-height: 0;
         overflow: visible;
-        padding-top: 6mm !important;
+        padding-top: 10mm !important;
         break-after: auto;
         page-break-after: auto;
       }
