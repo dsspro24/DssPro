@@ -9262,6 +9262,7 @@ function prepareResourcePrintLayout(html) {
         display: block;
         min-height: 0;
         overflow: visible;
+        padding-top: 6mm !important;
         break-after: auto;
         page-break-after: auto;
       }
