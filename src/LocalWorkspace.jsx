@@ -7623,11 +7623,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                   {[
-                    ['action', 'Reikia dėmesio', creatorSubscriptionSummary.pending + creatorSubscriptionSummary.expiring, 'border-amber-300 bg-amber-50 text-amber-950'],
+                    ['action', 'Reikia dėmesio', creatorSubscriptionSummary.pending + creatorSubscriptionSummary.expiring, 'border-amber-400 bg-amber-50 text-amber-950'],
+                    ['pending', 'Laukia apmokėjimo', creatorSubscriptionSummary.pending, 'border-orange-300 bg-orange-50 text-orange-950'],
                     ['active', 'Aktyvios', creatorSubscriptionSummary.active, 'border-emerald-300 bg-emerald-50 text-emerald-950'],
                     ['expiring', 'Baigiasi per 5 d.', creatorSubscriptionSummary.expiring, 'border-yellow-300 bg-yellow-50 text-yellow-950'],
                     ['expired', 'Pasibaigusios', creatorSubscriptionSummary.expired, 'border-rose-300 bg-rose-50 text-rose-950'],
-                    ['pending', 'Laukia apmokėjimo', creatorSubscriptionSummary.pending, 'border-orange-300 bg-orange-50 text-orange-950'],
+                    ['canceled', 'Atšauktos', creatorSubscriptionSummary.canceled, 'border-slate-300 bg-slate-50 text-slate-800'],
                   ].map(([filter, label, count, color]) => <button key={filter} type="button" className={`rounded-lg border p-3 text-left ${color} ${creatorSubscriptionFilter === filter ? 'ring-2 ring-slate-700 ring-offset-1' : ''}`} onClick={() => { setCreatorSubscriptionFilter(creatorSubscriptionFilter === filter ? 'all' : filter); setCreatorSubscriptionPage(1); }}>
                     <span className="block text-xs font-medium">{label}</span><strong className="mt-1 block text-xl tabular-nums">{count}</strong>
                   </button>)}
@@ -7638,8 +7639,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     <option value="all">Visos būsenos</option><option value="action">Reikia dėmesio</option><option value="active">Aktyvios</option><option value="expiring">Baigiasi per 5 d.</option><option value="expired">Pasibaigusios</option><option value="pending">Laukia apmokėjimo</option><option value="canceled">Atšauktos</option>
                   </select></label>
                 </div>
-                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
-                {paginatedCreatorSubscriptionGroups.map(({ root, workspaces }) => {
+                <p className="text-xs text-slate-500">Rodoma {filteredCreatorSubscriptionGroups.length} įmonių grupių · {creatorSubscriptionPageSize} kortelių puslapyje. Sąskaitos šalinimas nekeičia prenumeratos ar apmokėjimo istorijos.</p>
+                <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {paginatedCreatorSubscriptionGroups.map(({ root, workspaces }) => {
                   const groupId = root?.id ?? 'unassigned';
                   const expanded = expandedCreatorSubscriptionGroups[groupId] === true;
                   const groupSubscriptions = workspaces.flatMap(({ subscriptions }) => subscriptions);
@@ -7704,8 +7706,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       })}
                     </div>}
                   </section>;
-                })}
-                {filteredCreatorSubscriptionGroups.length > creatorSubscriptionPageSize && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Puslapis {Math.min(creatorSubscriptionPage, creatorSubscriptionPageCount)} iš {creatorSubscriptionPageCount}</span><nav className="flex items-center gap-2" aria-label="Prenumeratų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage <= 1} onClick={() => setCreatorSubscriptionPage((page) => Math.max(1, page - 1))}>Atgal</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage >= creatorSubscriptionPageCount} onClick={() => setCreatorSubscriptionPage((page) => Math.min(creatorSubscriptionPageCount, page + 1))}>Toliau</button></nav></div>}
+                  })}
+                </div>
+                {filteredCreatorSubscriptionGroups.length > creatorSubscriptionPageSize && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Rodoma {(creatorSubscriptionPage - 1) * creatorSubscriptionPageSize + 1}–{Math.min(creatorSubscriptionPage * creatorSubscriptionPageSize, filteredCreatorSubscriptionGroups.length)} iš {filteredCreatorSubscriptionGroups.length} · puslapis {Math.min(creatorSubscriptionPage, creatorSubscriptionPageCount)} iš {creatorSubscriptionPageCount}</span><nav className="flex items-center gap-2" aria-label="Prenumeratų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage <= 1} onClick={() => setCreatorSubscriptionPage((page) => Math.max(1, page - 1))}>Atgal</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={creatorSubscriptionPage >= creatorSubscriptionPageCount} onClick={() => setCreatorSubscriptionPage((page) => Math.min(creatorSubscriptionPageCount, page + 1))}>Toliau</button></nav></div>}
                 {!creatorSubscriptions.length && <p className="text-sm text-slate-500">Prenumeratų užsakymų kol kas nėra.</p>}
                 {creatorSubscriptions.length > 0 && filteredCreatorSubscriptionGroups.length === 0 && <p className="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Pagal paiešką ar būseną įmonių nerasta.</p>}
               </div>
