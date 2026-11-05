@@ -369,7 +369,7 @@ function DemoApp({ cloudMode = false }) {
                   <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                     <div>
                       <p className="text-xs font-semibold text-slate-400">ĮMONĖS DARBO VIETA</p>
-                      <p className="mt-1 font-bold text-slate-900">UAB „Pavyzdys“</p>
+                      <p className="mt-1 font-bold text-slate-900">UAB „DSS Sauga“</p>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">Vadovo aplinka</span>
                   </div>
