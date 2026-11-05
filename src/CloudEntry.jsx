@@ -190,7 +190,11 @@ function formatSubscription(subscription) {
     orderCode: subscription.order_code ?? '',
     orderedAt: subscription.ordered_at ?? null,
     orderMonths: subscription.order_months ?? 1,
-    paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+    paymentStatus: subscription.payment_status === 'paid'
+      ? 'Apmokėta'
+      : subscription.payment_status === 'canceled'
+        ? 'Atšaukta'
+        : subscription.order_code ? 'Laukiama apmokėjimo' : '',
     isPlanChange: subscription.preinvoice_plan_change === 'true',
     dueDate: preinvoiceDueDate,
     preinvoiceNumber: subscription.preinvoice_number ?? '',
@@ -227,7 +231,7 @@ function prioritizeEffectiveSubscription(subscriptions) {
 
   const canceledRenewal = subscriptions[0]?.isRenewal
     && subscriptions[0].status === 'Atšaukta'
-    && subscriptions[0].paymentStatus === 'Laukiama apmokėjimo';
+    && ['Laukiama apmokėjimo', 'Atšaukta'].includes(subscriptions[0].paymentStatus);
   const activePaidIndex = canceledRenewal ? subscriptions.findIndex((subscription) => (
     subscription.status === 'Aktyvi'
     && subscription.paymentStatus !== 'Laukiama apmokėjimo'

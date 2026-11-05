@@ -1621,7 +1621,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             orderCode: subscription.order_code ?? '',
             orderedAt: subscription.ordered_at ?? null,
             orderMonths: subscription.order_months ?? 1,
-            paymentStatus: subscription.payment_status === 'paid' ? 'Apmokėta' : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+            paymentStatus: subscription.payment_status === 'paid'
+              ? 'Apmokėta'
+              : subscription.payment_status === 'canceled'
+                ? 'Atšaukta'
+                : subscription.order_code ? 'Laukiama apmokėjimo' : '',
             isPlanChange: subscription.preinvoice_plan_change === 'true',
             isRenewal: subscription.preinvoice_renewal === 'true',
             isReactivation: subscription.preinvoice_reactivation === 'true',
@@ -6095,7 +6099,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       orderCode: updatedSubscription.order_code ?? '',
       orderedAt: updatedSubscription.ordered_at ?? null,
       orderMonths: updatedSubscription.order_months ?? 1,
-      paymentStatus: updatedSubscription.payment_status === 'paid' ? 'Apmokėta' : updatedSubscription.order_code ? 'Laukiama apmokėjimo' : '',
+      paymentStatus: updatedSubscription.payment_status === 'paid'
+        ? 'Apmokėta'
+        : updatedSubscription.payment_status === 'canceled'
+          ? 'Atšaukta'
+          : updatedSubscription.order_code ? 'Laukiama apmokėjimo' : '',
       preinvoiceNumber: updatedSubscription.preinvoice_data?.invoiceNumber ?? '',
       preinvoiceDate: updatedSubscription.preinvoice_data?.issueDate ?? updatedSubscription.ordered_at ?? null,
       preinvoiceTotalAmountCents: Number(updatedSubscription.preinvoice_data?.totalAmountCents) || null,
