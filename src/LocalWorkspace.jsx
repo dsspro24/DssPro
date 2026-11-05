@@ -8469,6 +8469,7 @@ function signatureImageHtml(signature) {
   if (!signature?.signatureImage) return '';
   return `<img class="signature-image" src="${escapeHtml(signature.signatureImage)}" alt="${escapeHtml(signature.signer ?? 'Pasirašiusio asmens')} parašas">`;
 }
+const signatureImageStyles = '.signature-image{display:block;width:100%;max-width:84px;height:26px;object-fit:contain;box-sizing:border-box;margin:2px auto}.signature-proof,.signature-pending{display:block;max-width:100%;font-size:6px;line-height:1.1;overflow-wrap:anywhere}.signature-proof strong,.signature-proof small{display:block;max-width:100%;overflow-wrap:anywhere}.signature-proof small{font-size:5px}.signature-pending{color:#92400e;font-style:italic}';
 function appendSignatureAudit(html, resource, employee, org, signatures, specialists) {
   const employees = Array.isArray(resource.previewEmployees) ? resource.previewEmployees : employee ? [employee] : [];
   if (!employees.length) return html;
@@ -8487,7 +8488,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   const auditMarkup = `<section class="signature-audit"><h2>Parašų registras</h2><table><thead><tr><th>Darbuotojas / sutarties Nr.</th><th>Rolė</th><th>Pasirašantis asmuo</th><th>Parašas</th><th>Data</th><th>Tikslus laikas</th><th>IP adresas / aplinka</th><th>Būsena</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const style = parsed.createElement('style');
-  style.textContent = '.signature-audit{break-inside:avoid;page-break-inside:avoid;margin:18px 0 0;padding-top:10px;border-top:1px solid #94a3b8;color:#0f172a;font:10px/1.35 Arial,sans-serif}.signature-audit h2{margin:0 0 6px;font-size:12px}.signature-audit table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}.signature-audit th,.signature-audit td{border:1px solid #94a3b8;padding:4px;text-align:left;overflow-wrap:anywhere}.signature-audit th{background:#f1f5f9}.signature-image{display:block;width:96px;height:30px;object-fit:contain}';
+  style.textContent = `.signature-audit{break-inside:avoid;page-break-inside:avoid;margin:18px 0 0;padding-top:10px;border-top:1px solid #94a3b8;color:#0f172a;font:10px/1.35 Arial,sans-serif}.signature-audit h2{margin:0 0 6px;font-size:12px}.signature-audit table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}.signature-audit th,.signature-audit td{border:1px solid #94a3b8;padding:4px;text-align:left;overflow-wrap:anywhere}.signature-audit th{background:#f1f5f9}${signatureImageStyles}`;
   parsed.head.append(style);
   const pageContainers = [...parsed.querySelectorAll('.journal-page, .card-container')];
   (pageContainers.at(-1) ?? parsed.body).insertAdjacentHTML('beforeend', auditMarkup);
@@ -8571,7 +8572,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
   const nameFor = (entry) => entry ? escapeHtml(entry.signedBy ?? entry.name) : '';
   const otherEntries = (entries) => entries.filter((entry) => entry.role !== 'Darbuotojas');
   const style = parsed.createElement('style');
-  style.textContent = '.signature-proof,.signature-pending{display:block;font-size:7.5px;line-height:1.2;overflow-wrap:anywhere}.signature-proof strong,.signature-proof small{display:block}.signature-image{display:block;width:96px;height:30px;object-fit:contain;margin:2px 0}.signature-pending{color:#92400e;font-style:italic}';
+  style.textContent = signatureImageStyles;
   parsed.head.append(style);
 
   if (resource.templateKind === 'fire-safety-journal') {
