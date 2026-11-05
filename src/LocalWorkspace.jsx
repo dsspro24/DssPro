@@ -89,6 +89,7 @@ import {
 function printPdfHtml(html, title) {
   const frame = document.createElement('iframe');
   const fileTitle = sanitizePdfFileTitle(title);
+  const originalDocumentTitle = document.title;
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
   frame.title = fileTitle;
   frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1000px;height:800px;border:0';
@@ -106,6 +107,7 @@ function printPdfHtml(html, title) {
       cleaned = true;
       window.clearTimeout(timeout);
       frame.remove();
+      document.title = originalDocumentTitle;
       resolve();
     };
     const timeout = window.setTimeout(cleanup, 10 * 60 * 1000);
@@ -124,10 +126,12 @@ function printPdfHtml(html, title) {
         await Promise.all([...printDocument.images].map((image) => image.decode().catch(() => {})));
         printWindow.addEventListener('afterprint', cleanup, { once: true });
         printWindow.focus();
+        document.title = fileTitle;
         printWindow.print();
       } catch (error) {
         window.clearTimeout(timeout);
         frame.remove();
+        document.title = originalDocumentTitle;
         reject(error);
       }
     }, { once: true });
