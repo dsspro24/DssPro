@@ -260,3 +260,55 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </div>;
 }
+
+export function LazySubscriptionInvoiceArchive({ organizationId, organizationName, onLoadInvoices, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', inputClass }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [invoices, setInvoices] = useState(null);
+  const [error, setError] = useState('');
+
+  const loadInvoices = async (refresh = false) => {
+    if (loading || invoices && !refresh) return;
+    setLoading(true);
+    setError('');
+    try {
+      const loadedInvoices = await onLoadInvoices(organizationId);
+      setInvoices(loadedInvoices);
+      return loadedInvoices;
+    } catch (loadError) {
+      setError(loadError.message || 'Sąskaitų istorijos užkrauti nepavyko.');
+      throw loadError;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteInvoice = async (...args) => {
+    await onDeleteInvoice(...args);
+    await loadInvoices(true);
+  };
+
+  return <details className="rounded-md border border-slate-200 bg-white" onToggle={(event) => {
+    const isOpen = event.currentTarget.open;
+    setOpen(isOpen);
+    if (isOpen && !invoices && !loading) {
+      loadInvoices().catch((loadError) => setError(loadError.message || 'Sąskaitų istorijos užkrauti nepavyko.'));
+    }
+  }}>
+    <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-700">
+      Sąskaitų istorija{loading ? ' · įkeliama…' : invoices ? ` · ${invoices.reduce((count, item) => count + Number(Boolean(item.preinvoiceNumber)) + Number(Boolean(item.finalInvoiceNumber)), 0)} dok.` : ''}
+    </summary>
+    {open && <div className="border-t border-slate-200 p-3">
+      {loading && <p className="text-sm text-slate-500">Kraunama sąskaitų istorija…</p>}
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      {invoices && <SubscriptionInvoiceArchive
+        subscriptions={invoices}
+        organizationName={organizationName}
+        onOpenInvoice={onOpenInvoice}
+        onDeleteInvoice={onDeleteInvoice ? deleteInvoice : undefined}
+        deletingInvoiceId={deletingInvoiceId}
+        inputClass={inputClass}
+      />}
+    </div>}
+  </details>;
+}

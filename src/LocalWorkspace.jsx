@@ -1230,6 +1230,7 @@ const CreatorFinalInvoiceArchive = lazy(() => import('./CreatorFinalInvoiceArchi
 const SubscriptionCard = lazy(() => import('./SubscriptionBilling.jsx').then((module) => ({ default: module.SubscriptionCard })));
 const CompanyBillingDetailsEditor = lazy(() => import('./SubscriptionBilling.jsx').then((module) => ({ default: module.CompanyBillingDetailsEditor })));
 const SubscriptionInvoiceArchive = lazy(() => import('./SubscriptionBilling.jsx').then((module) => ({ default: module.SubscriptionInvoiceArchive })));
+const LazySubscriptionInvoiceArchive = lazy(() => import('./SubscriptionBilling.jsx').then((module) => ({ default: module.LazySubscriptionInvoiceArchive })));
 const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorInvoiceSettingsEditor })));
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
@@ -2683,11 +2684,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         return {
           root,
           workspaces: workspaces.map((organization) => {
-            const invoiceSubscriptions = subscriptionsByOrganization.get(organization.id) ?? [];
-            const subscriptions = invoiceSubscriptions.filter((subscription) => (
+            const subscriptions = (subscriptionsByOrganization.get(organization.id) ?? []).filter((subscription) => (
               subscription.status !== 'Atšaukta' && subscription.paymentStatus !== 'Atšaukta'
             )).slice(0, 1);
-            return { organization, subscriptions, invoiceSubscriptions };
+            return { organization, subscriptions };
           }),
         };
       });
@@ -2701,7 +2701,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           subscriptions: orphanSubscriptions.filter((subscription) => (
             subscription.status !== 'Atšaukta' && subscription.paymentStatus !== 'Atšaukta'
           )).slice(0, 1),
-          invoiceSubscriptions: orphanSubscriptions,
         }],
       });
     }
@@ -2744,10 +2743,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return true;
     };
     return creatorSubscriptionGroups.map((group) => {
-      const rootMatches = !query || `${group.root?.name ?? ''} ${group.workspaces.flatMap(({ organization, invoiceSubscriptions }) => `${organization.name} ${invoiceSubscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+      const rootMatches = !query || `${group.root?.name ?? ''} ${group.workspaces.flatMap(({ organization, subscriptions }) => `${organization.name} ${subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
       const workspaces = group.workspaces
         .map((workspace) => {
-          const workspaceMatches = !query || `${workspace.organization.name} ${workspace.invoiceSubscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
+          const workspaceMatches = !query || `${workspace.organization.name} ${workspace.subscriptions.map((subscription) => `${subscription.orderCode} ${subscription.plan}`).join(' ')}`.toLocaleLowerCase('lt').includes(query);
           if (!rootMatches && !workspaceMatches) return null;
           const subscriptions = workspace.subscriptions.filter(matchesStatus);
           return subscriptions.length ? { ...workspace, subscriptions } : null;
@@ -6048,6 +6047,43 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
+  const loadCreatorSubscriptionInvoices = async (organizationId) => {
+    const { data: subscriptionRows, error } = await supabase.from('workspace_subscriptions')
+      .select('id, organization_id, plan_name, status, amount_cents, starts_at, ends_at, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const statusLabels = { pending: 'Laukiama sąskaitos', active: 'Aktyvi', canceled: 'Atšaukta', expired: 'Pasibaigusi' };
+    return (subscriptionRows ?? []).map((subscription) => {
+      const expired = subscription.status === 'active'
+        && subscription.ends_at
+        && new Date(subscription.ends_at).getTime() <= Date.now();
+      return {
+        id: subscription.id,
+        orgId: subscription.organization_id,
+        plan: subscription.plan_name,
+        status: expired ? 'Pasibaigusi' : statusLabels[subscription.status] ?? subscription.status,
+        price: subscription.amount_cents / 100,
+        startsAt: subscription.starts_at,
+        endsAt: subscription.ends_at,
+        orderCode: subscription.order_code ?? '',
+        orderedAt: subscription.ordered_at ?? null,
+        orderMonths: subscription.order_months ?? 1,
+        paymentStatus: subscription.payment_status === 'paid'
+          ? 'Apmokėta'
+          : subscription.payment_status === 'canceled'
+            ? 'Atšaukta'
+            : subscription.order_code ? 'Laukiama apmokėjimo' : '',
+        preinvoiceNumber: subscription.preinvoice_number ?? '',
+        preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? subscription.created_at,
+        finalInvoiceNumber: subscription.final_invoice_number ?? '',
+        finalInvoiceDate: subscription.final_invoice_issue_date ?? subscription.paid_at ?? null,
+        paidAt: subscription.paid_at ?? null,
+        createdAt: subscription.created_at,
+      };
+    });
+  };
+
   const confirmSubscriptionPayment = async (subscriptionId, endDate = '') => {
     const { data: updatedSubscription, error } = await supabase.rpc('creator_confirm_workspace_subscription_payment', {
       input_subscription_id: subscriptionId,
@@ -6162,6 +6198,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(invoiceType === 'preinvoice' ? 'Išankstinė sąskaita ištrinta.' : 'Galutinė sąskaita ištrinta.');
     } catch (error) {
       setNotice(`Sąskaitos ištrinti nepavyko: ${error.message}`);
+      throw error;
     } finally {
       setDeletingInvoiceId('');
     }
@@ -7669,7 +7706,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     </button>
                     {additionalWorkspaces.length > 0 && !expanded && <p className="border-t border-slate-100 px-4 pb-3 text-xs text-slate-500">Papildomos įmonės: {additionalWorkspaces.map(({ organization }) => organization.name).join(' · ')}</p>}
                     {expanded && <div className="space-y-4 border-t border-slate-200 bg-slate-50/60 p-4">
-                      {workspaces.map(({ organization, subscriptions, invoiceSubscriptions }) => {
+                      {workspaces.map(({ organization, subscriptions }) => {
                         const isAdditional = Boolean(organization.parentOrganizationId);
                         const workspaceExpanded = expandedCreatorSubscriptionGroups[`workspace-${organization.id}`] === true;
                         const workspaceContent = <>
@@ -7683,15 +7720,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             inputClass={inputClass}
                             buttonClass={buttonClass}
                           /></Suspense>)}
-                          {invoiceSubscriptions.some((item) => item.preinvoiceNumber || item.finalInvoiceNumber) && <details className="rounded-md border border-slate-200 bg-white">
-                            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-700">Sąskaitų istorija · {invoiceSubscriptions.reduce((count, item) => count + Number(Boolean(item.preinvoiceNumber)) + Number(Boolean(item.finalInvoiceNumber)), 0)} dok.</summary>
-                            <div className="border-t border-slate-200 p-3"><Suspense fallback={<p className="text-sm text-slate-500">Kraunamas sąskaitų archyvas...</p>}><SubscriptionInvoiceArchive
-                              subscriptions={invoiceSubscriptions}
-                              organizationName={organization.name}
-                              onOpenInvoice={openSubscriptionInvoice}
-                              onDeleteInvoice={deleteCreatorSubscriptionInvoice}
-                              deletingInvoiceId={deletingInvoiceId} inputClass={inputClass} /></Suspense></div>
-                          </details>}
+                          <Suspense fallback={<p className="text-sm text-slate-500">Atidaroma sąskaitų istorija…</p>}><LazySubscriptionInvoiceArchive
+                            organizationId={organization.id}
+                            organizationName={organization.name}
+                            onLoadInvoices={loadCreatorSubscriptionInvoices}
+                            onOpenInvoice={openSubscriptionInvoice}
+                            onDeleteInvoice={deleteCreatorSubscriptionInvoice}
+                            deletingInvoiceId={deletingInvoiceId}
+                            inputClass={inputClass}
+                          /></Suspense>
                         </>;
                         return isAdditional
                           ? <section key={organization.id} className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
