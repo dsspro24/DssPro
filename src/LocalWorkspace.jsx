@@ -88,9 +88,17 @@ import {
 
 function printPdfHtml(html, title) {
   const frame = document.createElement('iframe');
+  const fileTitle = sanitizePdfFileTitle(title);
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
-  frame.title = title;
+  frame.title = fileTitle;
   frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1000px;height:800px;border:0';
+  const printDocumentHtml = new DOMParser().parseFromString(html, 'text/html');
+  let titleElement = printDocumentHtml.head.querySelector('title');
+  if (!titleElement) {
+    titleElement = printDocumentHtml.createElement('title');
+    printDocumentHtml.head.append(titleElement);
+  }
+  titleElement.textContent = fileTitle;
   return new Promise((resolve, reject) => {
     let cleaned = false;
     const cleanup = () => {
@@ -111,7 +119,7 @@ function printPdfHtml(html, title) {
         const printWindow = frame.contentWindow;
         const printDocument = frame.contentDocument;
         if (!printWindow || !printDocument) throw new Error('Nepavyko atidaryti dokumento.');
-        printDocument.title = title;
+        printDocument.title = fileTitle;
         await printDocument.fonts?.ready;
         await Promise.all([...printDocument.images].map((image) => image.decode().catch(() => {})));
         printWindow.addEventListener('afterprint', cleanup, { once: true });
@@ -123,9 +131,20 @@ function printPdfHtml(html, title) {
         reject(error);
       }
     }, { once: true });
-    frame.srcdoc = preparePagedPrintHtml(html);
+    frame.srcdoc = preparePagedPrintHtml(`<!doctype html>\n${printDocumentHtml.documentElement.outerHTML}`);
     document.body.append(frame);
   });
+}
+
+function sanitizePdfFileTitle(title) {
+  const safeTitle = String(title ?? '')
+    .normalize('NFC')
+    .replace(/[<>:"/\\|?*]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/[. ]+$/g, '')
+    .trim()
+    .slice(0, 120);
+  return safeTitle || 'Dokumentas';
 }
 
 function escapeInvoiceHtml(value) {
