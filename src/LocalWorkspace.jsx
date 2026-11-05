@@ -9236,6 +9236,15 @@ function numberDocumentSequenceColumn(html) {
 
 function prepareResourcePrintLayout(html) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
+  parsed.querySelectorAll('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table, .employee-instruction-table')
+    .forEach((table) => [...table.tBodies].forEach((body) => {
+      const hasContent = (row) => [...row.cells].some((cell) => (
+        cell.textContent.trim() || cell.querySelector('img, svg, canvas, input, textarea, select')
+      ));
+      while (body.rows.length && !hasContent(body.rows[body.rows.length - 1])) {
+        body.deleteRow(body.rows.length - 1);
+      }
+    }));
   const style = parsed.createElement('style');
   const table = parsed.querySelector('.journal-page .journal-table, .protocol-table, .card-page .card-table, .card-container table, .document-page .journal-table');
   const header = table?.closest('.journal-page, .protocol-container, .card-page, .card-container, .document-page')
