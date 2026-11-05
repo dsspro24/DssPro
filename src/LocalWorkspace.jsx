@@ -5863,16 +5863,62 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!cloudMode || !currentOrg?.id) return;
     setSubscriptionActionBusy(true);
     try {
-      const { error } = await supabase.rpc('request_workspace_subscription', {
+      const { data: orderedSubscription, error } = await supabase.rpc('request_workspace_subscription', {
         input_organization_id: currentOrg.id,
         input_plan_code: planCode,
         input_months: months,
       });
       if (error) throw error;
-      await refreshCurrentSubscription(currentOrg.id);
-      setNotice(currentSubscription?.status === 'Aktyvi'
-        ? 'Pratęsimo užsakymas pateiktas. Dabartinis planas ir galiojimas nesikeičia, kol nepatvirtintas mokėjimas. Išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.'
-        : 'Užsakymas pateiktas. Prieiga suteikta 5 dienoms, išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.');
+      if (creatorReadOnlyPreview && userRole === 'vadovas') {
+        const preinvoice = orderedSubscription.preinvoice_data ?? {};
+        const statusLabels = { pending: 'Laukiama sąskaitos', active: 'Aktyvi', canceled: 'Atšaukta', expired: 'Pasibaigusi' };
+        const refreshedSubscription = {
+          id: orderedSubscription.id,
+          orgId: orderedSubscription.organization_id,
+          plan: orderedSubscription.plan_name,
+          planCode: orderedSubscription.plan_code,
+          status: statusLabels[orderedSubscription.status] ?? orderedSubscription.status,
+          price: orderedSubscription.amount_cents / 100,
+          startsAt: orderedSubscription.starts_at,
+          endsAt: orderedSubscription.ends_at,
+          cancelAtPeriodEnd: orderedSubscription.cancel_at_period_end,
+          isAddon: orderedSubscription.is_addon,
+          orderCode: orderedSubscription.order_code ?? '',
+          orderedAt: orderedSubscription.ordered_at ?? null,
+          orderMonths: orderedSubscription.order_months ?? 1,
+          paymentStatus: 'Laukiama apmokėjimo',
+          isPlanChange: preinvoice.planChange === true || preinvoice.planChange === 'true',
+          dueDate: preinvoice.dueDate ?? null,
+          preinvoiceNumber: preinvoice.invoiceNumber ?? '',
+          preinvoiceDate: preinvoice.issueDate ?? orderedSubscription.ordered_at,
+          preinvoiceTotalAmountCents: Number(preinvoice.totalAmountCents) || null,
+          isRenewal: preinvoice.renewal === true || preinvoice.renewal === 'true',
+          isReactivation: preinvoice.reactivation === true || preinvoice.reactivation === 'true',
+          serviceStart: preinvoice.serviceStart ?? null,
+          finalInvoiceNumber: orderedSubscription.final_invoice_number ?? '',
+          finalInvoiceDate: orderedSubscription.final_invoice_data?.issueDate ?? orderedSubscription.paid_at ?? null,
+          paidAt: orderedSubscription.paid_at ?? null,
+        };
+        setData((current) => ({
+          ...current,
+          subscriptions: [
+            refreshedSubscription,
+            ...current.subscriptions.filter((subscription) => subscription.orgId !== currentOrg.id
+              || subscription.id !== refreshedSubscription.id),
+          ],
+        }));
+        try {
+          await onCreatorWorkspaceChanged();
+          setNotice('Užsakymas pateiktas. Atsisiųskite išankstinę sąskaitą ir nusiųskite ją įmonei el. paštu rankiniu būdu.');
+        } catch (refreshError) {
+          setNotice(`Užsakymas pateiktas, tačiau administratoriaus sąrašo atnaujinti nepavyko: ${refreshError.message}`);
+        }
+      } else {
+        await refreshCurrentSubscription(currentOrg.id);
+        setNotice(currentSubscription?.status === 'Aktyvi'
+          ? 'Pratęsimo užsakymas pateiktas. Dabartinis planas ir galiojimas nesikeičia, kol nepatvirtintas mokėjimas. Išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.'
+          : 'Užsakymas pateiktas. Prieiga suteikta 5 dienoms, išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.');
+      }
     } catch (error) {
       setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
     } finally {

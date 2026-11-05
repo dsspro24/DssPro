@@ -949,13 +949,27 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           : null;
         throw new Error(`Nepavyko paruošti įmonės failų: ${details?.error ?? assetMigrationError.message}`);
       }
-      const { data: savedWorkspace, error } = await supabase
-        .from('organization_data')
-        .select('data')
-        .eq('organization_id', organizationId)
-        .maybeSingle();
+      const [
+        { data: savedWorkspace, error },
+        { data: subscriptionRows, error: subscriptionError },
+      ] = await Promise.all([
+        supabase
+          .from('organization_data')
+          .select('data')
+          .eq('organization_id', organizationId)
+          .maybeSingle(),
+        supabase.from('workspace_subscriptions')
+          .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+          .eq('organization_id', organizationId)
+          .order('created_at', { ascending: false }),
+      ]);
       if (error) throw error;
-      const data = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
+      if (subscriptionError) throw subscriptionError;
+      const hydratedData = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
+      const data = {
+        ...(hydratedData ?? {}),
+        subscriptions: prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription)),
+      };
       setCreatorPreview({ organizationId, role, data });
     } catch (error) {
       setErrorMessage(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
