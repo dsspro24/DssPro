@@ -148,8 +148,14 @@ function renderSubscriptionInvoiceHtml(invoice) {
   const isPaid = Boolean(invoice.paidAt);
   const amount = (cents) => new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((cents ?? 0) / 100);
   const issuerFields = [
-    ['Teisinė forma', issuer.legalForm],
-    ['Pavadinimas / vardas, pavardė', issuer.name],
+    ['Pavadinimas', issuer.businessName ?? (
+      issuer.legalForm && !/^(iv|individuali veikla)$/i.test(issuer.legalForm.trim())
+        ? [issuer.legalForm.trim(), issuer.name?.trim()].filter(Boolean).join(' ')
+        : ''
+    )],
+    ['Vardas, pavardė', issuer.businessName ? issuer.name : (
+      issuer.legalForm && !/^(iv|individuali veikla)$/i.test(issuer.legalForm.trim()) ? '' : issuer.name
+    )],
     ['Įmonės kodas', issuer.companyCode],
     ['Individualios veiklos pažymos numeris', issuer.activityCertificateNumber],
     ['PVM mokėtojo kodas', issuer.vatCode],
@@ -203,7 +209,7 @@ function renderSubscriptionInvoiceHtml(invoice) {
 }
 
 const defaultCreatorInvoiceSettings = {
-  issuer_details: { legalForm: 'Individuali veikla' },
+  issuer_details: {},
   vat_registered: false,
   vat_rate: 21,
   vat_included: false,
@@ -6032,7 +6038,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const saveCreatorInvoiceSettings = async (values) => {
-    const issuerFields = ['legalForm', 'name', 'companyCode', 'activityCertificateNumber', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
+    const issuerFields = ['businessName', 'name', 'companyCode', 'activityCertificateNumber', 'vatCode', 'address', 'email', 'phone', 'bankName', 'bankAccount'];
     const issuerDetails = Object.fromEntries(issuerFields
       .map((field) => [field, values.issuer_details?.[field]?.trim() ?? ''])
       .filter(([, value]) => value));

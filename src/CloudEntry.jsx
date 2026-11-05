@@ -400,7 +400,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       creatorAccounts: accountsResult.data ?? [],
       subscriptionPlans: plansResult.data ?? [],
       creatorInvoiceSettings: billingSettingsResult.data ?? {
-        issuer_details: { legalForm: 'Individuali veikla' },
+        issuer_details: {},
         vat_registered: false,
         vat_rate: 21,
         vat_included: false,

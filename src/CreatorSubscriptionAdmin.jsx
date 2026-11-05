@@ -3,8 +3,8 @@ import { Eye, Pencil } from 'lucide-react';
 import dssProLogo from './assets/dss-pro-logo.webp';
 
 const issuerFields = [
-  ['legalForm', 'Teisinė forma (IV, MB, UAB ir kt.)'],
-  ['name', 'Pavadinimas / vardas, pavardė'],
+  ['businessName', 'Pavadinimas'],
+  ['name', 'Vardas, pavardė'],
   ['companyCode', 'Įmonės kodas'],
   ['activityCertificateNumber', 'Individualios veiklos pažymos numeris'],
   ['vatCode', 'PVM mokėtojo kodas'],
@@ -15,14 +15,25 @@ const issuerFields = [
   ['bankAccount', 'Banko sąskaita (IBAN)'],
 ];
 
+function getIssuerDetails(settings, defaults) {
+  const issuerDetails = {
+    ...defaults.issuer_details,
+    ...(settings?.issuer_details ?? {}),
+  };
+  const legacyForm = issuerDetails.legalForm?.trim();
+  if (!issuerDetails.businessName?.trim() && legacyForm && !/^(iv|individuali veikla)$/i.test(legacyForm)) {
+    issuerDetails.businessName = [legacyForm, issuerDetails.name?.trim()].filter(Boolean).join(' ');
+    issuerDetails.name = '';
+  }
+  delete issuerDetails.legalForm;
+  return issuerDetails;
+}
+
 export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, defaults, inputClass, buttonClass }) {
   const [draft, setDraft] = useState(() => ({
     ...defaults,
     ...settings,
-    issuer_details: {
-      ...defaults.issuer_details,
-      ...(settings?.issuer_details ?? {}),
-    },
+    issuer_details: getIssuerDetails(settings, defaults),
   }));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,10 +50,7 @@ export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, default
       setDraft({
         ...defaults,
         ...updatedSettings,
-        issuer_details: {
-          ...defaults.issuer_details,
-          ...(updatedSettings?.issuer_details ?? {}),
-        },
+        issuer_details: getIssuerDetails(updatedSettings, defaults),
       });
       setEditing(false);
     } catch (saveError) {
@@ -65,10 +73,7 @@ export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, default
       setDraft({
         ...defaults,
         ...saved,
-        issuer_details: {
-          ...defaults.issuer_details,
-          ...(saved?.issuer_details ?? {}),
-        },
+        issuer_details: getIssuerDetails(saved, defaults),
       });
       setEditing(true);
     } catch (loadError) {
@@ -79,7 +84,7 @@ export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, default
   };
 
   const savedIssuerDetails = issuerFields
-    .map(([key, label]) => ({ label: label.replace(/\s*\([^)]*\)\s*/g, '').trim(), value: draft.issuer_details[key]?.trim() }))
+    .map(([key, label]) => ({ label, value: draft.issuer_details[key]?.trim() }))
     .filter(({ value }) => value);
 
   return <div className="space-y-4">
@@ -88,20 +93,19 @@ export function CreatorInvoiceSettingsEditor({ settings, onLoad, onSave, default
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3">
           <img src={dssProLogo} alt="DSS Pro" className="size-14 rounded-full object-contain" />
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Pardavėjas</p><h3 className="text-lg font-bold">{draft.issuer_details.name || 'Pavadinimas / vardas, pavardė'}</h3></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Pardavėjas</p><h3 className="text-lg font-bold">{draft.issuer_details.businessName || draft.issuer_details.name || 'Pardavėjo pavadinimas'}</h3></div>
         </div>
         <button type="button" className={buttonClass} onClick={toggleEditing} disabled={loading}>{loading ? 'Užkraunama…' : editing ? 'Slėpti redagavimą' : 'Redaguoti rekvizitus'}</button>
       </div>
       <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        {draft.issuer_details.legalForm && <p><span className="text-slate-500">Teisinė forma: </span><strong>{draft.issuer_details.legalForm}</strong></p>}
-        {savedIssuerDetails.filter(({ label }) => label !== 'Pavadinimas / vardas, pavardė' && label !== 'Teisinė forma').map(({ label, value }) => <p key={label}><span className="text-slate-500">{label}: </span><strong className="break-words">{value}</strong></p>)}
+        {savedIssuerDetails.map(({ label, value }) => <p key={label}><span className="text-slate-500">{label}: </span><strong className="break-words">{value}</strong></p>)}
         <p><span className="text-slate-500">PVM: </span><strong>{draft.vat_registered ? `${draft.vat_rate ?? 21} %${draft.vat_included ? ' (įskaičiuotas į kainą)' : ' (pridedamas prie kainos)'}` : 'netaikomas'}</strong></p>
         {draft.invoice_note?.trim() && <p className="whitespace-pre-wrap sm:col-span-2"><span className="text-slate-500">Pastaba: </span>{draft.invoice_note}</p>}
         {!savedIssuerDetails.length && !draft.invoice_note?.trim() && <p className="text-slate-500 sm:col-span-2">Pardavėjo rekvizitai dar nesužymėti.</p>}
       </div>
     </section>
     {editing && <form onSubmit={save} className="max-w-4xl space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/30 p-4">
-      <p className="text-sm text-slate-600">Atskirkite įmonės kodą nuo individualios veiklos pažymos numerio. Išankstinė sąskaita išsaugo užsakymo metu buvusius rekvizitus, o galutinė sąskaita faktūra naudoja jos išrašymo metu išsaugotus rekvizitus.</p>
+      <p className="text-sm text-slate-600">Įmonės pavadinimą, įskaitant teisinę formą (pvz., „UAB Pavadinimas“), rašykite į lauką „Pavadinimas“. Jei sąskaitą išrašote savo vardu, nurodykite jį lauke „Vardas, pavardė“. Išankstinė sąskaita išsaugo užsakymo metu buvusius rekvizitus, o galutinė sąskaita faktūra naudoja jos išrašymo metu išsaugotus rekvizitus.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {issuerFields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={draft.issuer_details[key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, issuer_details: { ...current.issuer_details, [key]: event.target.value } }))} /></label>)}
       </div>
