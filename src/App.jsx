@@ -580,6 +580,10 @@ function DemoApp({ cloudMode = false }) {
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Paspauskite „Išbandyti demo“ ir peržiūrėkite demonstracinę aplinką be registracijos.</p>
               </details>
               <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar DSS Pro galiu naudoti vietoje popierinių žurnalų?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">DSS Pro leidžia pildyti žurnalus elektroniniu būdu, rinkti PIN parašus ir atsisiųsti dokumentus PDF formatu. Įmonės dokumentų archyvas pasiekiamas galiojant prenumeratai, o jai pasibaigus dar 2 mėnesius lieka tik peržiūros prieiga. Ar konkrečiam dokumentui pakanka elektroninio formato, priklauso nuo jam taikomų teisės aktų reikalavimų.</p>
+              </details>
+              <details className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar darbuotojas gali būti pakviestas į kelias įmones?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Darbuotojas gali naudoti tą pačią paskyrą kelių įmonių kvietimams ir pasirinkti, kurios įmonės darbo vietoje dirba.</p>
               </details>
