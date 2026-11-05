@@ -487,7 +487,7 @@ function DemoApp({ cloudMode = false }) {
                     <span className={`grid size-5 shrink-0 place-items-center rounded-full border ${registerRole === 'vadovas' && registerPlan === plan.code ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-transparent'}`}><Check size={13} strokeWidth={3} /></span>
                     <span className="min-w-0">
                       <span className="block font-semibold text-slate-900">{plan.name}</span>
-                      <span className="mt-1 block text-xs text-slate-500">VDI žurnalai <span className="px-1 text-slate-300">·</span> PDF dokumentai</span>
+                      <span className="mt-1 block text-xs text-slate-500">DSS žurnalų ir dokumentų valdymas <span className="px-1 text-slate-300">·</span> PDF eksportas</span>
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
