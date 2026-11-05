@@ -494,8 +494,19 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   }
 
   if (profile?.account_type === 'employee') {
-    const employeeMembership = memberships.find((membership) => membership.role === 'employee');
-    if (!employeeMembership) return { requiresEmployee: true, managerName };
+    const { data: employeeOrganizations, error: employeeOrganizationsError } = await supabase.rpc('get_employee_organizations');
+    if (employeeOrganizationsError) throw employeeOrganizationsError;
+    if (!employeeOrganizations?.length) return { requiresEmployee: true, managerName };
+    let employeeMembership = memberships.find((membership) =>
+      membership.role === 'employee'
+      && employeeOrganizations.some((organization) => organization.id === membership.organization_id));
+    if (!employeeMembership) {
+      const { error: organizationSwitchError } = await supabase.rpc('set_employee_organization', {
+        input_organization_id: employeeOrganizations[0].id,
+      });
+      if (organizationSwitchError) throw organizationSwitchError;
+      employeeMembership = { organization_id: employeeOrganizations[0].id };
+    }
     const [
       { data: employeeWorkspace, error: employeeWorkspaceError },
       { data: aapIssuances, error: aapIssuancesError },
@@ -555,6 +566,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
           }),
         })),
       },
+      employeeOrganizations,
     };
   }
 
@@ -938,6 +950,17 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     }
   };
 
+  const switchEmployeeOrganization = async (organizationId) => {
+    if (!session?.user) return;
+    const { error } = await supabase.rpc('set_employee_organization', {
+      input_organization_id: organizationId,
+    });
+    if (error) throw error;
+    const loadedWorkspace = await loadManagerWorkspace(session.user);
+    setWorkspace(loadedWorkspace);
+    setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
+  };
+
   const openCreatorPreview = async (organizationId, role) => {
     setErrorMessage('');
     setCreatorPreviewLoading(true);
@@ -1138,6 +1161,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
       onRefreshWorkspace={refreshSignedInWorkspace}
       onSwitchOrganization={switchManagerOrganization}
+      employeeOrganizations={workspace.employeeOrganizations ?? []}
+      onSwitchEmployeeOrganization={switchEmployeeOrganization}
       cloudMode
       cloudUserId={session.user.id}
     /></Suspense></WorkspaceRenderBoundary>;

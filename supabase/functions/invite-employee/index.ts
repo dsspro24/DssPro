@@ -133,6 +133,14 @@ Deno.serve(async (request) => {
   };
   if (!safeEmployee.name || !safeEmployee.contractNumber) return response(400, { error: 'Employee name and contract number are required' });
 
+  const { data: existingEmployeeUserId, error: existingEmployeeLookupError } = await adminClient.rpc(
+    'find_employee_account_by_email',
+    { input_email: email },
+  );
+  if (existingEmployeeLookupError) {
+    return response(500, { error: `Could not check for an existing employee account: ${existingEmployeeLookupError.message}` });
+  }
+
   const currentBatches = Array.isArray(workspace.data.protocolBatches) ? workspace.data.protocolBatches : [];
   const proposedBatches = Array.isArray(body.protocolBatches) ? body.protocolBatches : [];
   const nextBatches = [...currentBatches];
@@ -163,43 +171,79 @@ Deno.serve(async (request) => {
     .eq('organization_id', organizationId);
   if (saveError) return response(500, { error: `Could not save employee assignment: ${saveError.message}` });
 
-  const { data: invitation, error: invitationError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: {
-      full_name: safeEmployee.name,
-      account_type: 'employee',
-      employee_needs_password: true,
-    },
-    redirectTo: redirectUrl.toString(),
-  });
+  let employeeUserId = existingEmployeeUserId;
+  let invitedNewAccount = false;
+  if (!employeeUserId) {
+    const { data: invitation, error: invitationError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: {
+        full_name: safeEmployee.name,
+        account_type: 'employee',
+        employee_needs_password: true,
+      },
+      redirectTo: redirectUrl.toString(),
+    });
 
-  if (invitationError || !invitation.user) {
-    await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
-    return response(400, { error: invitationError?.message ?? 'Could not create employee account' });
+    if (invitationError || !invitation.user) {
+      await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+      return response(400, { error: invitationError?.message ?? 'Could not create employee account' });
+    }
+    employeeUserId = invitation.user.id;
+    invitedNewAccount = true;
   }
 
-  const { error: membershipError } = await adminClient.from('organization_memberships').insert({
+  const { error: accessError } = await adminClient.from('employee_organization_access').upsert({
     organization_id: organizationId,
-    user_id: invitation.user.id,
-    role: 'employee',
+    user_id: employeeUserId,
     employee_id: employeeId,
-  });
+  }, { onConflict: 'organization_id,user_id' });
 
-  if (membershipError) {
-    await adminClient.auth.admin.deleteUser(invitation.user.id);
+  if (accessError) {
+    if (invitedNewAccount) await adminClient.auth.admin.deleteUser(employeeUserId);
     await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
-    return response(500, { error: `Could not link employee account: ${membershipError.message}` });
+    return response(500, { error: `Could not link employee to this organization: ${accessError.message}` });
+  }
+
+  const { data: employeeMemberships, error: membershipsError } = await adminClient.from('organization_memberships')
+    .select('organization_id')
+    .eq('user_id', employeeUserId)
+    .eq('role', 'employee');
+  if (membershipsError) {
+    await adminClient.from('employee_organization_access').delete().eq('organization_id', organizationId).eq('user_id', employeeUserId);
+    if (invitedNewAccount) await adminClient.auth.admin.deleteUser(employeeUserId);
+    await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+    return response(500, { error: `Could not check employee organization access: ${membershipsError.message}` });
+  }
+
+  if (!employeeMemberships?.length) {
+    const { error: membershipError } = await adminClient.from('organization_memberships').insert({
+      organization_id: organizationId,
+      user_id: employeeUserId,
+      role: 'employee',
+      employee_id: employeeId,
+    });
+    if (membershipError) {
+      await adminClient.from('employee_organization_access').delete().eq('organization_id', organizationId).eq('user_id', employeeUserId);
+      if (invitedNewAccount) await adminClient.auth.admin.deleteUser(employeeUserId);
+      await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+      return response(500, { error: `Could not link employee account: ${membershipError.message}` });
+    }
   }
 
   const { error: employeeLinkError } = await adminClient
     .from('organization_employees')
-    .update({ auth_user_id: invitation.user.id })
+    .update({ auth_user_id: employeeUserId })
     .eq('employee_id', employeeId);
   if (employeeLinkError) {
-    await adminClient.from('organization_memberships').delete().eq('organization_id', organizationId).eq('user_id', invitation.user.id);
-    await adminClient.auth.admin.deleteUser(invitation.user.id);
+    await adminClient.from('employee_organization_access').delete().eq('organization_id', organizationId).eq('user_id', employeeUserId);
+    if (invitedNewAccount || !employeeMemberships?.length) {
+      await adminClient.from('organization_memberships').delete().eq('organization_id', organizationId).eq('user_id', employeeUserId);
+    }
+    if (invitedNewAccount) {
+      await adminClient.auth.admin.deleteUser(employeeUserId);
+    }
     await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
     return response(500, { error: `Could not link employee record: ${employeeLinkError.message}` });
   }
 
-  return response(200, { employeeId, email });
+  return response(200, { employeeId, email, existingAccount: !invitedNewAccount });
 });

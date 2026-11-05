@@ -1236,7 +1236,7 @@ const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdm
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -2467,6 +2467,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const employeeBeingEdited = data.employees.find((employee) => employee.id === editingEmployeeId);
   const accessibleOrganizations = userRole === 'dss'
     ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId))
+    : cloudMode && userRole === 'darbuotojas'
+      ? employeeOrganizations
     : cloudMode && userRole === 'vadovas' && cloudOrganization?.id
       ? availableOrganizations
       : data.organizations;
@@ -4726,10 +4728,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       inviteDialog?.close();
     }
     let sequenceSaveError = null;
+    let existingEmployeeAccount = false;
     try {
       if (cloudMode) {
         if (rehireRecord) {
-          const { error } = await supabase.rpc('restore_archived_employee', {
+          const { error } = await supabase.rpc('manager_restore_archived_employee', {
             input_organization_id: currentOrg.id,
             input_archive_id: rehireRecord.id,
             input_employee: employeeToInvite,
@@ -4743,7 +4746,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           });
           sequenceSaveError = numberError;
         } else {
-          const { error } = await supabase.functions.invoke('invite-employee', {
+          const { data: invitationResult, error } = await supabase.functions.invoke('invite-employee', {
             body: {
               organizationId: currentOrg.id,
               employee: employeeToInvite,
@@ -4759,6 +4762,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             }
             throw new Error(message);
           }
+          existingEmployeeAccount = invitationResult?.existingAccount === true;
         }
       }
       setData((current) => ({
@@ -4775,13 +4779,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ? `${name} atkurtas, tačiau dokumentų eilės numerių išsaugoti nepavyko: ${sequenceSaveError.message}`
         : rehireRecord
           ? `${name} atkurtas kaip naujas darbuotojas. Prisijungimo paskyra, slaptažodis ir PIN išsaugoti; archyvo įrašas nepakeistas.`
-          : cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
+          : cloudMode && existingEmployeeAccount
+            ? `${name} pridėtas prie įmonės. Darbuotojas naudos esamą paskyrą ir gali pasirinkti šią įmonę prisijungęs.`
+            : cloudMode ? `Kvietimo nuoroda išsiųsta ${email}. Darbuotojas susikurs slaptažodį ir pasirašymo PIN.` : `Kvietimas ${email} paruoštas demo aplinkoje.`);
       inviteDialog?.close();
     } catch (error) {
       setPendingEmployeeInvites((current) => current.filter((employee) => employee.id !== employeeToInvite.id));
       const errorMessage = error.message || 'patikrinkite el. pašto siuntimo nustatymus.';
-      if (rehireRecord && /could not find the function.*restore_archived_employee/i.test(errorMessage)) {
-        setNotice('Darbuotojo paskyros atkurti nepavyko: Supabase duomenų bazėje nėra restore_archived_employee funkcijos. Pritaikykite migraciją 20261023140000_restore_archived_employee.sql. Naujas kvietimas nebuvo išsiųstas.');
+      if (rehireRecord && /could not find the function.*manager_restore_archived_employee/i.test(errorMessage)) {
+        setNotice('Darbuotojo paskyros atkurti nepavyko: Supabase duomenų bazėje nėra manager_restore_archived_employee funkcijos. Pritaikykite naujausias darbuotojų prieigos migracijas. Naujas kvietimas nebuvo išsiųstas.');
       } else {
         setNotice(`${rehireRecord ? 'Darbuotojo paskyros atkurti' : 'Darbuotojo pakviesti'} nepavyko: ${errorMessage}`);
       }
@@ -6780,11 +6786,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </label>}
         {userRole === 'dss' && dssOrganizationIsOpen && <button type="button" onClick={returnToDssOrganizations} className="mb-4 w-full rounded-lg border border-white/20 px-3 py-2 text-left text-sm font-semibold text-emerald-50 hover:bg-white/10">← Pasirinkti kitą įmonę</button>}
         {userRole !== 'dss' && userRole !== 'kurejas' && accessibleOrganizations.length > 1 && (
-          <label className="mb-4 text-xs text-emerald-100">Aktyvi įmonė
+          <label className="mb-4 text-xs text-emerald-100">{userRole === 'darbuotojas' ? 'Įmonė, kurios dokumentus tvarkote' : 'Aktyvi įmonė'}
             <select value={selectedOrgId} onChange={(event) => {
               const orgId = event.target.value;
               if (cloudMode && userRole === 'vadovas') {
                 void onSwitchOrganization(orgId);
+              } else if (cloudMode && userRole === 'darbuotojas') {
+                void onSwitchEmployeeOrganization(orgId).catch((error) => {
+                  setNotice(`Įmonės pakeisti nepavyko: ${error.message}`);
+                });
               } else {
                 const org = data.organizations.find((item) => item.id === orgId);
                 setSelectedOrgId(orgId);
@@ -6814,6 +6824,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <div className="flex min-w-0 items-center gap-3">
             <h1 className="text-lg font-bold text-slate-900">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</h1>
             {creatorManagementContext && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">Administratoriaus valdymas · {creatorManagementContext}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti darbą</button></div>}
+            {cloudMode && userRole === 'darbuotojas' && currentOrg?.name && <div className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900"><Building2 size={14} /><span>Aktyvi įmonė: {currentOrg.name}</span></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
@@ -7295,7 +7306,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {!sandboxMode && <div className="flex justify-end"><button type="button" className={buttonClass} onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pakviesti darbuotoją</button></div>}
             {!sandboxMode && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               <form onSubmit={inviteEmployee} className="space-y-5">
-                <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
+                <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus. Jei el. paštas jau turi darbuotojo paskyrą, ji bus susieta su šia įmone — naujos paskyros kurti nereikės.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="text-sm font-medium">Vardas<input className={`${inputClass} mt-1`} value={employeeForm.firstName} onChange={(event) => setEmployeeForm({ ...employeeForm, firstName: event.target.value })} required /></label>
                   <label className="text-sm font-medium">Pavardė<input className={`${inputClass} mt-1`} value={employeeForm.lastName} onChange={(event) => setEmployeeForm({ ...employeeForm, lastName: event.target.value })} required /></label>
