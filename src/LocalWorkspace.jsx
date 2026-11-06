@@ -7000,7 +7000,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </div>}
             </div>
             <div ref={profileMenuRef} className="relative">
-              <button type="button" aria-label={`Profilis: ${displayName ?? 'Naudotojas'}`} aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => { setNotificationsOpen(false); setProfileMenuOpen((open) => !open); }} className="flex max-w-[55vw] items-center gap-2 rounded-full py-1 pl-1 pr-2 text-left hover:bg-slate-50 sm:pr-3">
+              <button type="button" data-readonly-allowed aria-label={`Profilis: ${displayName ?? 'Naudotojas'}`} aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => { setNotificationsOpen(false); setProfileMenuOpen((open) => !open); }} className="flex max-w-[55vw] items-center gap-2 rounded-full py-1 pl-1 pr-2 text-left hover:bg-slate-50 sm:pr-3">
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{(displayName ?? 'JP').split(' ').map((part) => part[0]).join('')}</span>
                 <span className="hidden max-w-[40vw] truncate sm:inline">{displayName}</span>
                 <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
