@@ -14,6 +14,17 @@ const defaultFamiliarizationTopics = [
   'Darbuotojų supažindinimas su saugaus kopėčių, lipynių naudojimo ir patikros tvarkos aprašu;',
   'Asmeninių apsauginių priemonių naudojimas. Nelaimingi atsitikimai.',
 ];
+function toDateInputValue(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const dateParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Vilnius',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).map(({ type, value: partValue }) => [type, partValue]));
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+}
 const defaultTestTemplateLoaders = new Map([
   ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
@@ -1265,7 +1276,7 @@ const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdm
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -3686,11 +3697,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         }
       });
     }
+    const isMedicalExaminationSchedule = resource.id === 'res-medical-examination-schedule'
+      || resource.templateKind === 'medical-examination-schedule';
     const settingsDraft = {
       ...defaults,
       ...saved,
-      ...(resource.id === 'res-medical-examination-schedule' || resource.templateKind === 'medical-examination-schedule'
-        ? { date: saved.date ?? defaults.date ?? '' }
+      ...(isMedicalExaminationSchedule
+        ? {
+          date: saved.date || defaults.date || toDateInputValue(cloudUserCreatedAt),
+          directorName: saved.directorName || defaults.directorName || cloudManagerName || currentOrg?.manager || '',
+        }
         : {}),
       validityMonths: saved.validityMonths ?? defaults.validityMonths ?? resource.validityMonths ?? 12,
       requiredSigners: resource.templateKind === 'intro-dss-journal'
@@ -9740,7 +9756,8 @@ function WorkplaceDssResourceSettingsDialog({ resource, settings, onChange, onSa
           instructionTitle: 'Instruktavimo pavadinimas',
           instructorName: 'Instruktuojančiojo vardas, pavardė',
           instructorPosition: 'Instruktuojančiojo pareigos',
-        })[key] ?? key}<input className={`${inputClass} mt-1`} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>)}
+          validityMonths: 'Galiojimas (mėnesiais)',
+        })[key] ?? key}<input className={`${inputClass} mt-1`} type={key === 'validityMonths' ? 'number' : 'text'} min={key === 'validityMonths' ? '1' : undefined} max={key === 'validityMonths' ? '120' : undefined} value={value ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>)}
       </div>
       <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3">
         <legend className="px-1 text-sm font-semibold">Kas pasirašo kiekvienoje vietoje</legend>

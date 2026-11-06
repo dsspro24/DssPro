@@ -1083,11 +1083,12 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       const organizationMemberships = workspace.creatorAccounts.flatMap((account) => (account.organizations ?? [])
         .filter((membership) => membership.id === creatorPreview.organizationId)
         .map((membership) => ({ ...account, membership })));
+      const managerAccount = organizationMemberships.find((account) => account.membership.role === 'manager');
       const savedOrganization = sourceData?.organizations?.find((item) => item.id === creatorPreview.organizationId);
       const sourceOrganization = listedOrganization && {
         ...savedOrganization,
         ...listedOrganization,
-        manager: organizationMemberships.find((account) => account.membership.role === 'manager')?.fullName ?? savedOrganization?.manager ?? '',
+        manager: managerAccount?.fullName ?? savedOrganization?.manager ?? '',
         dss: organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.id),
       };
       if (sourceOrganization) {
@@ -1122,7 +1123,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
             billing_address: sourceOrganization.billingAddress,
             vat_code: sourceOrganization.vatCode,
           }}
-          cloudManagerName={workspace.managerName}
+          cloudManagerName={sourceOrganization.manager}
+          cloudUserCreatedAt={managerAccount?.createdAt ?? ''}
           subscriptionPlans={workspace.subscriptionPlans ?? []}
           onRefreshSubscription={refreshSignedInSubscription}
           cloudMode
@@ -1158,6 +1160,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       subscriptionPlans={workspace.subscriptionPlans ?? []}
       subscriptionAccess={workspace.subscriptionAccess ?? { readOnly: false, locked: false }}
       cloudManagerName={workspace.managerName}
+      cloudUserCreatedAt={session.user.created_at ?? ''}
       onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
       onRefreshWorkspace={refreshSignedInWorkspace}
       onSwitchOrganization={switchManagerOrganization}
