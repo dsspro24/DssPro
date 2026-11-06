@@ -75,7 +75,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
     setShowAddCompany(false);
   };
 
-  return <div className="space-y-4">
+  return <div className="space-y-4" data-readonly-allowed={readOnly || locked ? '' : undefined}>
     <p className="text-xs text-slate-500">
       Aktyvūs darbuotojai: {employeeCount}{typeof activeEmployeeLimit === 'number' ? ` / ${activeEmployeeLimit}` : ''}. Archyvuoti darbuotojai į plano limitą neįskaičiuojami.
     </p>
@@ -89,13 +89,16 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         {adminRestoreRequired
           ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">2 mėn. peržiūros laikotarpis baigėsi. Dėl prieigos atkūrimo kreipkitės į DSS Pro administratorių.</p>
           : (subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
+        {subscription.isInitialTrialAccess && subscription.paymentStatus !== 'Apmokėta' && (subscription.status !== 'Aktyvi' || locked) && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Pirmojo užsakymo 5 dienų prieiga jau panaudota. Naujas užsakymas prieigos nesuteiks, kol apmokėjimo nepatvirtins DSS Pro administratorius.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
           : subscription.isRenewal
             ? <>Pratęsimo užsakymas <strong>{subscription.orderCode}</strong> pateiktas pasirinkus planą „{subscription.plan}“. Dabartinis planas galioja iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'esamo laikotarpio pabaigos'}; apmokėjus laikotarpis bus pratęstas {subscription.orderMonths} mėn. Jei prenumerata baigsis iki apmokėjimo patvirtinimo, pratęsimas prasidės nuo patvirtinimo datos. Išankstinę sąskaitą apmokėkite per 5 dienas.</>
             : subscription.isReactivation
-              ? <>Užsakymas <strong>{subscription.orderCode}</strong> suteikia 5 dienų prieigą. Apmokėjus pilnas {subscription.orderMonths} mėn. laikotarpis prasidės nuo apmokėjimo patvirtinimo datos. Išankstinę sąskaitą apmokėkite per 5 dienas.</>
-              : <>Planą <strong>{subscription.orderCode}</strong> aktyvavome iškart. Atsisiųskite išankstinę sąskaitą ir apmokėkite per 5 dienas; neapmokėjus prenumerata baigsis ir automatiškai neprasitęs.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}{!subscription.isPlanChange && onCancelOrder && <button type="button" className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-rose-700 px-3 py-2 font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50" disabled={busy} onClick={() => { if (window.confirm('Atšaukti šį neapmokėtą užsakymą? Išankstinė sąskaita liks sąskaitų istorijoje.')) onCancelOrder(subscription.id); }}>Atšaukti užsakymą</button>}</div>}
+              ? <>Šiam užsakymui 5 dienų laikina prieiga netaikoma. Apmokėjus išankstinę sąskaitą, prenumerata bus aktyvuota DSS Pro administratoriui patvirtinus mokėjimą.</>
+              : subscription.isInitialTrialAccess
+                ? <>Pirmasis užsakymas <strong>{subscription.orderCode}</strong> suteikia 5 dienų prieigą. Per šį laiką apmokėkite išankstinę sąskaitą; nepatvirtinus mokėjimo prieiga bus užblokuota.</>
+                : <>Užsakymas <strong>{subscription.orderCode}</strong> pateiktas. 5 dienų laikina prieiga šiam užsakymui netaikoma. Apmokėjus išankstinę sąskaitą, prieiga bus atkurta DSS Pro administratoriui patvirtinus mokėjimą.</>}</p>{subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><Download size={15} />Atsisiųsti išankstinę sąskaitą</button>}{!subscription.isPlanChange && onCancelOrder && <button type="button" className="ml-2 inline-flex items-center gap-1.5 rounded-md border border-rose-700 px-3 py-2 font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50" disabled={busy} onClick={() => { if (window.confirm('Atšaukti šį neapmokėtą užsakymą? Išankstinė sąskaita liks sąskaitų istorijoje.')) onCancelOrder(subscription.id); }}>Atšaukti užsakymą</button>}</div>}
         {subscription.status === 'Atšaukta' && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">Šis užsakymas atšauktas. Išankstinė sąskaita palikta sąskaitų istorijoje ir apmokėti jos nereikia.</p>}
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}

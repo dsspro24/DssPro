@@ -1605,8 +1605,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       && validityCheckTime >= new Date(subscriptionAccess.periodEnd).getTime()
       && validityCheckTime < new Date(subscriptionAccess.readOnlyUntil).getTime()
   );
+  const isInitialTrialAccessExpired = subscriptionAccess.reason === 'initial-trial'
+    && subscriptionAccess.periodEnd
+    && validityCheckTime >= new Date(subscriptionAccess.periodEnd).getTime();
   const isSubscriptionLocked = cloudMode && userRole === 'vadovas' && (
     subscriptionAccess.locked
+    || isInitialTrialAccessExpired
     || subscriptionAccess.readOnlyUntil && validityCheckTime >= new Date(subscriptionAccess.readOnlyUntil).getTime()
   );
   const isAwaitingSubscriptionOrder = subscriptionAccess.reason === 'awaiting-order';
@@ -1638,7 +1642,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1673,6 +1677,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             isPlanChange: subscription.preinvoice_plan_change === 'true',
             isRenewal: subscription.preinvoice_renewal === 'true',
             isReactivation: subscription.preinvoice_reactivation === 'true',
+            isInitialTrialAccess: subscription.preinvoice_initial_trial_access === 'true',
             serviceStart: subscription.preinvoice_service_start ?? null,
             dueDate: subscription.preinvoice_due_date ?? null,
             preinvoiceNumber: subscription.preinvoice_number ?? '',
@@ -5969,6 +5974,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           orderMonths: orderedSubscription.order_months ?? 1,
           paymentStatus: 'Laukiama apmokėjimo',
           isPlanChange: preinvoice.planChange === true || preinvoice.planChange === 'true',
+          isInitialTrialAccess: preinvoice.initialTrialAccess === true || preinvoice.initialTrialAccess === 'true',
           dueDate: preinvoice.dueDate ?? null,
           preinvoiceNumber: preinvoice.invoiceNumber ?? '',
           preinvoiceDate: preinvoice.issueDate ?? orderedSubscription.ordered_at,
@@ -5996,9 +6002,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         }
       } else {
         await refreshCurrentSubscription(currentOrg.id);
+        const initialTrialAccess = orderedSubscription.preinvoice_data?.initialTrialAccess === true
+          || orderedSubscription.preinvoice_data?.initialTrialAccess === 'true';
         setNotice(currentSubscription?.status === 'Aktyvi'
           ? 'Pratęsimo užsakymas pateiktas. Dabartinis planas ir galiojimas nesikeičia, kol nepatvirtintas mokėjimas. Išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.'
-          : 'Užsakymas pateiktas. Planas aktyvus 5 dienas. Atsisiųskite išankstinę sąskaitą ir apmokėkite ją per 5 dienas.');
+          : initialTrialAccess
+            ? 'Pirmasis užsakymas pateiktas. Darbo sritis aktyvi 5 dienas; per šį laiką apmokėkite išankstinę sąskaitą, kad prenumerata būtų patvirtinta.'
+            : 'Užsakymas pateiktas. Laikina 5 dienų prieiga šiam užsakymui netaikoma. Apmokėkite išankstinę sąskaitą; prieiga bus atkurta DSS Pro administratoriui patvirtinus mokėjimą.');
       }
     } catch (error) {
       setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
@@ -6065,7 +6075,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       });
       if (error) throw error;
       await onRefreshWorkspace(organizationId, 'prenumerata');
-      setNotice('Papildoma įmonė sukurta. Planas aktyvus 5 dienas; išankstinę sąskaitą rasite prenumeratos skiltyje.');
+      setNotice('Papildoma įmonė sukurta ir užsakymas pateiktas. Darbo sritimi bus galima naudotis DSS Pro administratoriui patvirtinus apmokėjimą; išankstinę sąskaitą rasite prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Papildomos įmonės sukurti nepavyko: ${error.message}`);
     } finally {
@@ -7013,10 +7023,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
           {isSubscriptionLocked && activeTab !== 'prenumerata' && <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/70 p-4">
             <section className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h2 className="text-xl font-bold text-slate-900">{isAwaitingSubscriptionOrder ? 'Prenumerata dar neužsakyta' : 'Prenumeratos peržiūros laikotarpis baigėsi'}</h2>
+              <h2 className="text-xl font-bold text-slate-900">{isAwaitingSubscriptionOrder ? 'Prenumerata dar neužsakyta' : isInitialTrialAccessExpired || subscriptionAccess.reason === 'trial-ended-unpaid' ? '5 dienų prieiga baigėsi' : subscriptionAccess.reason === 'awaiting-payment' ? 'Laukiama apmokėjimo patvirtinimo' : 'Prenumeratos peržiūros laikotarpis baigėsi'}</h2>
               <p className="mt-2 text-sm text-slate-600">{isAwaitingSubscriptionOrder
                 ? 'Norėdami pradėti naudotis įmonės darbo sritimi, pasirinkite prenumeratos laikotarpį ir pateikite užsakymą. Kol užsakymas nepateiktas, darbo sritis neprieinama.'
-                : 'Pasibaigus prenumeratai, 2 mėn. galėjote peržiūrėti įmonės duomenis ir atsisiųsti PDF. Šis laikotarpis baigėsi. Prieigą gali atkurti DSS Pro administratorius; susisiekite su mumis.'}</p>
+                : isInitialTrialAccessExpired || subscriptionAccess.reason === 'trial-ended-unpaid'
+                  ? 'Pirmojo užsakymo 5 dienų prieiga baigėsi nepatvirtinus apmokėjimo. Kitas užsakymas laikinos prieigos nesuteiks; ji bus atkurta, kai DSS Pro administratorius patvirtins apmokėjimą.'
+                  : subscriptionAccess.reason === 'awaiting-payment'
+                    ? 'Darbo sritis bus atrakinta, kai apmokėsite išankstinę sąskaitą ir DSS Pro administratorius patvirtins mokėjimą.'
+                    : 'Pasibaigus apmokėtai prenumeratai, 2 mėn. galėjote peržiūrėti įmonės duomenis ir atsisiųsti PDF. Šis laikotarpis baigėsi. Prieigą gali atkurti DSS Pro administratorius; susisiekite su mumis.'}</p>
               <button type="button" className={`${buttonClass} mt-5`} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>{isAwaitingSubscriptionOrder ? 'Pasirinkti prenumeratą' : 'Peržiūrėti prenumeratą'}</button>
             </section>
           </div>}
@@ -7770,7 +7784,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
             <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
-            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && !isAwaitingSubscriptionOrder} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
+            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && subscriptionAccess.reason === 'grace-period-ended'} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
               <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice hideCanceledPreinvoice inputClass={inputClass} /></Suspense>

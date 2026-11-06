@@ -32,7 +32,7 @@ select set_config(
   true
 );
 
-select plan(6);
+select plan(20);
 
 select is(
   (select status from public.workspace_subscriptions
@@ -63,6 +63,109 @@ select is(
    where organization_id = current_setting('test.initial_subscription_organization_id')::uuid),
   1,
   'company creation keeps one subscription draft for the selected plan'
+);
+
+select is(
+  (public.request_workspace_subscription(
+    current_setting('test.initial_subscription_organization_id')::uuid,
+    'up_to_20',
+    1
+  )).status,
+  'active',
+  'the first order grants five-day access'
+);
+select is(
+  (select preinvoice_data ->> 'initialTrialAccess' from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid),
+  'true',
+  'the first order is marked as the one-time trial'
+);
+select ok(
+  (select ends_at > now() and ends_at <= now() + interval '5 days'
+   from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid),
+  'the one-time trial lasts no more than five days'
+);
+select ok(
+  public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'workspace data is readable during the first five-day access'
+);
+update public.workspace_subscriptions
+set starts_at = now() - interval '6 days',
+    ends_at = now() - interval '1 minute',
+    created_at = now() - interval '1 minute'
+where organization_id = current_setting('test.initial_subscription_organization_id')::uuid;
+select ok(
+  not public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'an unpaid first order does not grant read access after the five-day period'
+);
+select is(
+  (public.manager_cancel_workspace_subscription_order(
+    (select id from public.workspace_subscriptions
+     where organization_id = current_setting('test.initial_subscription_organization_id')::uuid)
+  )).status,
+  'canceled',
+  'manager can cancel the first unpaid order'
+);
+select ok(
+  not public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'canceling the first unpaid order immediately removes trial access'
+);
+select is(
+  (public.request_workspace_subscription(
+    current_setting('test.initial_subscription_organization_id')::uuid,
+    'up_to_20',
+    1
+  )).status,
+  'pending',
+  'a subsequent order does not grant another five-day access'
+);
+select is(
+  (select ends_at from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+     and preinvoice_data ->> 'initialTrialAccess' = 'false'),
+  null,
+  'a subsequent unpaid order has no temporary access period'
+);
+select is(
+  (select preinvoice_data ->> 'initialTrialAccess' from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+     and preinvoice_data ->> 'initialTrialAccess' = 'false'),
+  'false',
+  'subsequent orders are not marked as the one-time trial'
+);
+select ok(
+  not public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'workspace data remains inaccessible until an administrator confirms payment'
+);
+
+select set_config(
+  'test.initial_subscription_additional_organization_id',
+  public.create_additional_organization(
+    'Additional subscription test',
+    null,
+    'additional_workspace_20'
+  )::text,
+  true
+);
+select is(
+  (public.request_workspace_subscription(
+    current_setting('test.initial_subscription_additional_organization_id')::uuid,
+    'additional_workspace_20',
+    1
+  )).status,
+  'pending',
+  'additional companies for the same account do not get a second trial'
+);
+select is(
+  (select preinvoice_data ->> 'initialTrialAccess' from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_additional_organization_id')::uuid),
+  'false',
+  'the trial is limited across all companies owned by the account'
+);
+select ok(
+  not public.has_workspace_read_access(current_setting('test.initial_subscription_additional_organization_id')::uuid),
+  'additional company remains inaccessible until payment is confirmed'
 );
 
 update public.workspace_subscriptions
