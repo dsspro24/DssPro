@@ -7037,10 +7037,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   : subscriptionAccess.reason === 'awaiting-payment'
                     ? 'Darbo sritis bus atrakinta, kai apmokėsite išankstinę sąskaitą ir DSS Pro administratorius patvirtins mokėjimą.'
                     : 'Pasibaigus apmokėtai prenumeratai, 2 mėn. galėjote peržiūrėti įmonės duomenis ir atsisiųsti PDF. Šis laikotarpis baigėsi. Prieigą gali atkurti DSS Pro administratorius; susisiekite su mumis.'}</p>
-              <p className="mt-3 text-sm font-medium text-slate-700">Atsijungti galite bet kada.</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <button type="button" className={buttonClass} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>{isAwaitingSubscriptionOrder ? 'Pasirinkti prenumeratą' : 'Peržiūrėti prenumeratą'}</button>
-                <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onExit?.()} data-readonly-allowed><LogOut size={16} />Atsijungti</button>
               </div>
             </section>
           </div>}
