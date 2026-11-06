@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
 
-export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, busy, cloudMode, managerName = '', now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
+export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, adminRestoreRequired = false, busy, cloudMode, managerName = '', now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
   const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
   const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && isPlanSelectable(plan));
@@ -24,7 +24,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
     && Boolean(subscription.preinvoiceNumber)
     && subscription.status !== 'Atšaukta';
   const awaitingOrder = subscription?.status === 'Laukiama sąskaitos' && !subscription.orderCode;
-  const canOrder = !pendingOrder && (!subscription || subscription.status !== 'Aktyvi' || cloudMode);
+  const canOrder = !adminRestoreRequired && !pendingOrder && (!subscription || subscription.status !== 'Aktyvi' || cloudMode);
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
     : availablePlans[0]?.code ?? '';
@@ -86,7 +86,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : awaitingOrder ? 'Laukiama užsakymo' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
-        {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
+        {adminRestoreRequired
+          ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">2 mėn. peržiūros laikotarpis baigėsi. Dėl prieigos atkūrimo kreipkitės į DSS Pro administratorių.</p>
+          : (subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
           ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
           : subscription.isRenewal

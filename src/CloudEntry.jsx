@@ -262,21 +262,24 @@ function addCalendarMonths(date, months) {
 
 function getSubscriptionAccess(subscription) {
   if (!subscription || subscription.status === 'Laukiama sąskaitos') {
-    return { readOnly: false, locked: true, periodEnd: null, readOnlyUntil: null };
+    return { readOnly: false, locked: true, reason: 'awaiting-order', periodEnd: null, readOnlyUntil: null };
   }
   const endDate = subscription.endsAt ? new Date(subscription.endsAt) : null;
   if (!endDate && ['Atšaukta', 'Pasibaigusi'].includes(subscription.status)) {
-    return { readOnly: false, locked: true, periodEnd: null, readOnlyUntil: null };
+    return { readOnly: false, locked: true, reason: 'grace-period-ended', periodEnd: null, readOnlyUntil: null };
   }
   if (subscription.status === 'Aktyvi' && !endDate) {
-    return { readOnly: false, locked: false, periodEnd: null, readOnlyUntil: null };
+    return { readOnly: false, locked: false, reason: 'active', periodEnd: null, readOnlyUntil: null };
   }
   const effectiveEndDate = endDate ?? new Date();
   const readOnlyUntil = addCalendarMonths(effectiveEndDate, 2);
   const now = Date.now();
+  const readOnly = now >= effectiveEndDate.getTime() && now < readOnlyUntil.getTime();
+  const locked = now >= readOnlyUntil.getTime();
   return {
-    readOnly: now >= effectiveEndDate.getTime() && now < readOnlyUntil.getTime(),
-    locked: now >= readOnlyUntil.getTime(),
+    readOnly,
+    locked,
+    reason: locked ? 'grace-period-ended' : readOnly ? 'read-only' : 'active',
     periodEnd: effectiveEndDate.toISOString(),
     readOnlyUntil: readOnlyUntil.toISOString(),
   };

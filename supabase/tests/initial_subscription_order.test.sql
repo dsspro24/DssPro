@@ -32,7 +32,7 @@ select set_config(
   true
 );
 
-select plan(5);
+select plan(6);
 
 select is(
   (select status from public.workspace_subscriptions
@@ -63,6 +63,24 @@ select is(
    where organization_id = current_setting('test.initial_subscription_organization_id')::uuid),
   1,
   'company creation keeps one subscription draft for the selected plan'
+);
+
+update public.workspace_subscriptions
+set status = 'expired',
+    starts_at = now() - interval '4 months',
+    ends_at = now() - interval '3 months',
+    payment_status = 'paid'
+where organization_id = current_setting('test.initial_subscription_organization_id')::uuid;
+
+select throws_ok(
+  format(
+    'select public.request_workspace_subscription(%L::uuid, %L, 1)',
+    current_setting('test.initial_subscription_organization_id'),
+    'up_to_20'
+  ),
+  'P0001',
+  'Access restoration after the read-only period requires administrator assistance',
+  'manager cannot restore access after the two-month read-only period'
 );
 
 select * from finish();

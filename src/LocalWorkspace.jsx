@@ -1609,6 +1609,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     subscriptionAccess.locked
     || subscriptionAccess.readOnlyUntil && validityCheckTime >= new Date(subscriptionAccess.readOnlyUntil).getTime()
   );
+  const isAwaitingSubscriptionOrder = subscriptionAccess.reason === 'awaiting-order';
   const isWorkspaceReadOnly = isSubscriptionReadOnly || isSubscriptionLocked;
   const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
@@ -7012,9 +7013,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {notice && <div role="status" className="flex items-start justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 print:hidden">{notice}<button onClick={() => setNotice('')} aria-label="Uždaryti pranešimą"><X size={16} /></button></div>}
           {isSubscriptionLocked && activeTab !== 'prenumerata' && <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/70 p-4">
             <section className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-              <h2 className="text-xl font-bold text-slate-900">Darbo srities prieiga užblokuota</h2>
-              <p className="mt-2 text-sm text-slate-600">2 mėn. peržiūros laikotarpis baigėsi. Duomenys išsaugoti; atnaujinkite prenumeratą arba susisiekite su mumis dėl prieigos atkūrimo.</p>
-              <button type="button" className={`${buttonClass} mt-5`} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>Peržiūrėti prenumeratos užsakymą</button>
+              <h2 className="text-xl font-bold text-slate-900">{isAwaitingSubscriptionOrder ? 'Prenumerata dar neužsakyta' : 'Prenumeratos peržiūros laikotarpis baigėsi'}</h2>
+              <p className="mt-2 text-sm text-slate-600">{isAwaitingSubscriptionOrder
+                ? 'Norėdami pradėti naudotis įmonės darbo sritimi, pasirinkite prenumeratos laikotarpį ir pateikite užsakymą. Kol užsakymas nepateiktas, darbo sritis neprieinama.'
+                : 'Pasibaigus prenumeratai, 2 mėn. galėjote peržiūrėti įmonės duomenis ir atsisiųsti PDF. Šis laikotarpis baigėsi. Prieigą gali atkurti DSS Pro administratorius; susisiekite su mumis.'}</p>
+              <button type="button" className={`${buttonClass} mt-5`} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>{isAwaitingSubscriptionOrder ? 'Pasirinkti prenumeratą' : 'Peržiūrėti prenumeratą'}</button>
             </section>
           </div>}
           {commissionInvitationTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-invitation-title">
@@ -7767,7 +7770,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
             <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
-            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
+            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && !isAwaitingSubscriptionOrder} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
               <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice hideCanceledPreinvoice inputClass={inputClass} /></Suspense>
