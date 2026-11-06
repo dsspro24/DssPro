@@ -1,7 +1,3 @@
-create index if not exists auth_users_normalized_email_idx
-  on auth.users (lower(btrim(email)))
-  where email is not null;
-
 create or replace function public.lookup_registered_dss_specialist(input_email text)
 returns table (user_id uuid, full_name text, email text)
 language sql
