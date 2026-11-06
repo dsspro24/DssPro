@@ -5,12 +5,14 @@ begin;
 insert into auth.users (id, aud, role, email)
 values
   ('91000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'dss-manager-test@example.test'),
-  ('91000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'dss-specialist-test@example.test');
+  ('91000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'dss-specialist-test@example.test'),
+  ('91000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'dss-cancel-test@example.test');
 
 insert into public.profiles (id, full_name, account_type)
 values
   ('91000000-0000-4000-8000-000000000001', 'Test Manager', 'manager'),
-  ('91000000-0000-4000-8000-000000000002', 'Test Specialist', 'dss_specialist')
+  ('91000000-0000-4000-8000-000000000002', 'Test Specialist', 'dss_specialist'),
+  ('91000000-0000-4000-8000-000000000003', 'Cancel Test Specialist', 'dss_specialist')
 on conflict (id) do update
   set full_name = excluded.full_name, account_type = excluded.account_type;
 
@@ -62,9 +64,10 @@ insert into public.dss_specialist_invitations (
 )
 values
   ('91000000-0000-4000-8000-000000000101', '91000000-0000-4000-8000-000000000010', 'Accepted invitation company', '91000000-0000-4000-8000-000000000002', 'dss-specialist-test@example.test', 'Test Specialist', '91000000-0000-4000-8000-000000000001'),
-  ('91000000-0000-4000-8000-000000000102', '91000000-0000-4000-8000-000000000020', 'Declined invitation company', '91000000-0000-4000-8000-000000000002', 'dss-specialist-test@example.test', 'Test Specialist', '91000000-0000-4000-8000-000000000001');
+  ('91000000-0000-4000-8000-000000000102', '91000000-0000-4000-8000-000000000020', 'Declined invitation company', '91000000-0000-4000-8000-000000000002', 'dss-specialist-test@example.test', 'Test Specialist', '91000000-0000-4000-8000-000000000001'),
+  ('91000000-0000-4000-8000-000000000103', '91000000-0000-4000-8000-000000000020', 'Declined invitation company', '91000000-0000-4000-8000-000000000003', 'dss-cancel-test@example.test', 'Cancel Test Specialist', '91000000-0000-4000-8000-000000000001');
 
-select plan(22);
+select plan(25);
 
 select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);
 select is(
@@ -164,6 +167,24 @@ select is(
   (select count(*)::integer from auth.users where id = '91000000-0000-4000-8000-000000000002'),
   1,
   'revocation does not delete the specialist account'
+);
+
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000001', true);
+select lives_ok(
+  $$select public.cancel_pending_dss_specialist_invitation('91000000-0000-4000-8000-000000000103')$$,
+  'the organization manager can cancel a pending DSS invitation'
+);
+select is(
+  (select status from public.dss_specialist_invitations where id = '91000000-0000-4000-8000-000000000103'),
+  'revoked',
+  'cancellation marks the invitation as revoked'
+);
+select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000003', true);
+select throws_ok(
+  $$select public.respond_dss_specialist_invitation('91000000-0000-4000-8000-000000000103', true)$$,
+  'P0001',
+  'DSS invitation is no longer pending',
+  'a specialist cannot accept a cancelled invitation'
 );
 
 select set_config('request.jwt.claim.sub', '91000000-0000-4000-8000-000000000002', true);

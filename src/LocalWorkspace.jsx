@@ -1515,6 +1515,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssRequestVisibilitySaving, setDssRequestVisibilitySaving] = useState(false);
   const [dssOrganizationLeaveSubmitting, setDssOrganizationLeaveSubmitting] = useState(false);
   const [dssRevokeSubmittingId, setDssRevokeSubmittingId] = useState('');
+  const [dssInvitationCancelSubmittingId, setDssInvitationCancelSubmittingId] = useState('');
   const [dssRefreshSubmitting, setDssRefreshSubmitting] = useState(false);
   const [dssManagementAccess, setDssManagementAccess] = useState([]);
   const [dssManagementOrganizationId, setDssManagementOrganizationId] = useState('');
@@ -5134,6 +5135,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             specialist_user_id: invitation.userId,
             invited_email: invitation.email,
             invited_name: invitation.fullName,
+            status: 'pending',
             created_at: new Date().toISOString(),
           },
         ],
@@ -5309,6 +5311,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(`DSS specialisto pašalinti nepavyko: ${error.message}`);
     } finally {
       setDssRevokeSubmittingId('');
+    }
+  };
+
+  const cancelDssSpecialistInvitation = async (invitation) => {
+    if (!window.confirm(`Ar tikrai atšaukti DSS specialisto kvietimą adresu ${invitation.invited_email}?\n\nSpecialistas nebegalės priimti šio kvietimo. Jei kvietimas jau priimtas, jo atšaukti nebegalima.`)) return;
+    setDssInvitationCancelSubmittingId(invitation.id);
+    try {
+      const { error } = await supabase.rpc('cancel_pending_dss_specialist_invitation', {
+        input_invitation_id: invitation.id,
+      });
+      if (error) throw error;
+      setData((current) => ({
+        ...current,
+        dssInvitations: (current.dssInvitations ?? []).filter((item) => item.id !== invitation.id),
+      }));
+      setNotice(`Kvietimas adresu ${invitation.invited_email} atšauktas.`);
+    } catch (error) {
+      setNotice(`DSS specialisto kvietimo atšaukti nepavyko: ${error.message}`);
+    } finally {
+      setDssInvitationCancelSubmittingId('');
     }
   };
 
@@ -7331,7 +7353,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <small className="mt-1 block text-slate-600">{request.specialist_email}</small>
                   <div className="mt-3 flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={dssOrganizationRequestActionId === request.id} onClick={() => respondToDssOrganizationRequest(request, true)}>{dssOrganizationRequestActionId === request.id ? 'Vykdoma…' : 'Sutikti'} <Check size={16} /></button><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" disabled={dssOrganizationRequestActionId === request.id} onClick={() => respondToDssOrganizationRequest(request, false)}>Atmesti</button></div>
                 </div>)}
-                {userRole === 'vadovas' && (data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id).map((invitation) => <div key={invitation.id} className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}</span><small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></div>)}
+                {userRole === 'vadovas' && (data.dssInvitations ?? []).filter((invitation) => invitation.organization_id === currentOrg?.id && invitation.status === 'pending').map((invitation) => <div key={invitation.id} className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"><span>{invitation.invited_name || invitation.invited_email}<small className="block text-amber-800">Kvietimas išsiųstas · laukia specialisto sutikimo</small><small className="block text-slate-600">{invitation.invited_email}</small></span><button type="button" className="shrink-0 rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssInvitationCancelSubmittingId === invitation.id} onClick={() => cancelDssSpecialistInvitation(invitation)}>{dssInvitationCancelSubmittingId === invitation.id ? 'Atšaukiama…' : 'Atšaukti kvietimą'}</button></div>)}
                 {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
                 {userRole === 'vadovas' && cloudMode && <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={inviteDssCanManageWorkspace} onChange={(event) => setInviteDssCanManageWorkspace(event.target.checked)} /><span>Gali tvarkyti įmonės darbo sritį ir kviesti darbuotojus<small className="mt-0.5 block font-normal text-slate-500">Pažymėta pagal nutylėjimą. Teisę vėliau galėsite pakeisti prie priskirto DSS specialisto.</small></span></label>}
                 {userRole === 'vadovas' && <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą

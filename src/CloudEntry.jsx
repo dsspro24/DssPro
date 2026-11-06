@@ -588,7 +588,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   const [savedWorkspace, invitationsResult, requestsResult, organizationSettingsResult] = await Promise.all([
     loadOrganizationWorkspace(organizationId, catalogData?.data?.resources ?? []),
     supabase.from('dss_specialist_invitations')
-      .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, created_at')
+      .select('id, organization_id, organization_name, specialist_user_id, invited_email, invited_name, status, created_at')
       .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
