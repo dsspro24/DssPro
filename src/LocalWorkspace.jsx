@@ -2938,8 +2938,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const filteredSpecialists = useMemo(() => {
     const query = specialistQuery.trim().toLocaleLowerCase('lt');
     if (!query) return [];
-    return data.specialists.filter((specialist) => `${specialist.name} ${specialist.email}`.toLocaleLowerCase('lt').includes(query)).sort((left, right) => {
-      const score = (specialist) => specialist.email.toLocaleLowerCase('lt') === query ? 0 : specialist.name.toLocaleLowerCase('lt') === query ? 1 : 2;
+    return data.specialists.filter((specialist) => specialist.email.toLocaleLowerCase('lt').includes(query)).sort((left, right) => {
+      const score = (specialist) => specialist.email.toLocaleLowerCase('lt') === query ? 0 : 1;
       return score(left) - score(right);
     });
   }, [data.specialists, specialistQuery]);
@@ -7335,7 +7335,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {!cloudMode && (currentOrg?.dssInvitations ?? []).map((invite) => <div key={invite.specialistId} className="mt-2 rounded-md bg-amber-50 p-3 text-sm">{data.specialists.find((person) => person.id === invite.specialistId)?.name}<small className="block text-amber-800">Kvietimas paruoštas · laukia patvirtinimo</small></div>)}
                 {userRole === 'vadovas' && cloudMode && <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700"><input className="mt-0.5" type="checkbox" checked={inviteDssCanManageWorkspace} onChange={(event) => setInviteDssCanManageWorkspace(event.target.checked)} /><span>Gali tvarkyti įmonės darbo sritį ir kviesti darbuotojus<small className="mt-0.5 block font-normal text-slate-500">Pažymėta pagal nutylėjimą. Teisę vėliau galėsite pakeisti prie priskirto DSS specialisto.</small></span></label>}
                 {userRole === 'vadovas' && <label className="mt-4 block text-sm font-semibold">Rasti registruotą DSS specialistą
-                  <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Vardas, pavardė arba el. paštas" /></div>
+                  <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} type="email" autoComplete="email" value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Įveskite el. paštą" /></div>
                 </label>}
                 {userRole === 'vadovas' && <p className="mt-2 text-xs text-slate-500">Patikrinkite el. paštą. Kvietimas nesuteikia prieigos iš karto — specialistas turi jį priimti prisijungęs. Pašalinant specialistą bus parodytas patvirtinimo klausimas; ankstesni jo parašai liks išsaugoti.</p>}
                 {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
