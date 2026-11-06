@@ -876,7 +876,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         throw new Error('Įmonė sukurta, bet jos darbo srities duomenys dar nepasiekiami. Bandykite įkelti iš naujo.');
       }
       setInitialWorkspaceTab('prenumerata');
-      setInitialWorkspaceNotice('Įmonė sukurta. Planas aktyvus 5 dienas; atsisiųskite išankstinę sąskaitą ir apmokėkite ją per 5 dienas.');
+      setInitialWorkspaceNotice('Įmonė sukurta. Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.');
       setWorkspace(loadedWorkspace);
       setWorkspaceStatus('ready');
     } catch (error) {

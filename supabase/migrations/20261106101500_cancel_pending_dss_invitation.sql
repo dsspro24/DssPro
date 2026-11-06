@@ -38,3 +38,5 @@ $$;
 
 revoke all on function public.cancel_pending_dss_specialist_invitation(uuid) from public, anon;
 grant execute on function public.cancel_pending_dss_specialist_invitation(uuid) to authenticated;
+
+notify pgrst, 'reload schema';

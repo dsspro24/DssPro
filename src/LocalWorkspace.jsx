@@ -5997,7 +5997,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         await refreshCurrentSubscription(currentOrg.id);
         setNotice(currentSubscription?.status === 'Aktyvi'
           ? 'Pratęsimo užsakymas pateiktas. Dabartinis planas ir galiojimas nesikeičia, kol nepatvirtintas mokėjimas. Išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.'
-          : 'Užsakymas pateiktas. Prieiga suteikta 5 dienoms, išankstinę sąskaitą galite atsisiųsti prenumeratos skiltyje.');
+          : 'Užsakymas pateiktas. Planas aktyvus 5 dienas. Atsisiųskite išankstinę sąskaitą ir apmokėkite ją per 5 dienas.');
       }
     } catch (error) {
       setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);

@@ -23,6 +23,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   const pendingOrder = subscription?.paymentStatus === 'Laukiama apmokėjimo'
     && Boolean(subscription.preinvoiceNumber)
     && subscription.status !== 'Atšaukta';
+  const awaitingOrder = subscription?.status === 'Laukiama sąskaitos' && !subscription.orderCode;
   const canOrder = !pendingOrder && (!subscription || subscription.status !== 'Aktyvi' || cloudMode);
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
     ? selectedPlanCode
@@ -82,7 +83,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
       ? <>
         <p className="text-lg font-bold">{subscription.isRenewal && pendingOrder ? subscription.paidPlanName ?? subscription.plan : subscription.plan} · {formatPrice(subscription.isRenewal && pendingOrder ? subscription.paidPrice ?? subscription.price : subscription.price)} €/mėn.</p>
         <p className={`text-sm font-semibold ${subscription.status === 'Laukiama sąskaitos' ? 'text-amber-800' : 'text-slate-700'}`}>
-          Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
+          Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : awaitingOrder ? 'Laukiama užsakymo' : subscription.status === 'Laukiama sąskaitos' ? 'Laukiama apmokėjimo' : subscription.status}
           {subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}
         </p>
         {(subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
