@@ -32,7 +32,7 @@ select set_config(
   true
 );
 
-select plan(20);
+select plan(21);
 
 select is(
   (select status from public.workspace_subscriptions
@@ -108,8 +108,8 @@ select is(
   'manager can cancel the first unpaid order'
 );
 select ok(
-  not public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
-  'canceling the first unpaid order immediately removes trial access'
+  public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'canceling the first unpaid order allows read-only access during the two-month period'
 );
 select is(
   (public.request_workspace_subscription(
@@ -135,8 +135,17 @@ select is(
   'subsequent orders are not marked as the one-time trial'
 );
 select ok(
+  public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
+  'a subsequent order does not remove canceled-order read-only access'
+);
+update public.workspace_subscriptions
+set ends_at = now() - interval '3 months'
+where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+  and status = 'canceled'
+  and preinvoice_data ->> 'initialTrialAccess' = 'true';
+select ok(
   not public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
-  'workspace data remains inaccessible until an administrator confirms payment'
+  'read-only access ends two months after canceling the first order'
 );
 
 select set_config(

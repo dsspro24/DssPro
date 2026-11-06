@@ -180,6 +180,7 @@ function formatSubscription(subscription) {
   return {
     id: subscription.id,
     orgId: subscription.organization_id,
+    createdAt: subscription.created_at ?? null,
     plan: subscription.plan_name,
     planCode: subscription.plan_code,
     status: isExpired ? 'Pasibaigusi' : pendingOrderActive ? 'Aktyvi' : statusLabels[subscription.status] ?? subscription.status,
@@ -280,7 +281,37 @@ function addCalendarMonths(date, months) {
   return result;
 }
 
-function getSubscriptionAccess(subscription) {
+function getSubscriptionAccess(subscription, subscriptions = []) {
+  const canceledInitialOrder = subscriptions
+    .filter((item) => item.isInitialTrialAccess && item.status === 'Atšaukta'
+      && item.paymentStatus !== 'Apmokėta' && item.endsAt)
+    .sort((left, right) => new Date(right.endsAt).getTime() - new Date(left.endsAt).getTime())[0];
+  if (subscription?.paymentStatus !== 'Apmokėta' && canceledInitialOrder) {
+    const paidAfterCancellation = subscriptions.some((item) => item.paymentStatus === 'Apmokėta'
+      && !item.isInitialTrialAccess
+      && new Date(item.createdAt ?? 0).getTime() > new Date(canceledInitialOrder.createdAt ?? canceledInitialOrder.endsAt).getTime());
+    if (!paidAfterCancellation) {
+      const periodEnd = new Date(canceledInitialOrder.endsAt);
+      const readOnlyUntil = addCalendarMonths(periodEnd, 2);
+      const now = Date.now();
+      if (now < readOnlyUntil.getTime()) {
+        return {
+          readOnly: true,
+          locked: false,
+          reason: 'canceled-initial-order-read-only',
+          periodEnd: periodEnd.toISOString(),
+          readOnlyUntil: readOnlyUntil.toISOString(),
+        };
+      }
+      return {
+        readOnly: false,
+        locked: true,
+        reason: 'grace-period-ended',
+        periodEnd: periodEnd.toISOString(),
+        readOnlyUntil: readOnlyUntil.toISOString(),
+      };
+    }
+  }
   if (!subscription || subscription.status === 'Laukiama sąskaitos') {
     return {
       readOnly: false,
@@ -688,7 +719,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
       manager_name: item.manager_name ?? '',
     })),
     subscriptionPlans: subscriptionPlansResult.data ?? [],
-    subscriptionAccess: getSubscriptionAccess(currentSubscription),
+    subscriptionAccess: getSubscriptionAccess(currentSubscription, hydratedWorkspace?.subscriptions ?? []),
     initializeCreatorDefaults: !savedOrganization,
     managerName,
     catalog: hydratedCatalog,
@@ -978,7 +1009,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     setWorkspace((current) => current?.organization?.id === organizationId
       ? {
         ...current,
-        subscriptionAccess: getSubscriptionAccess(subscriptions[0]),
+        subscriptionAccess: getSubscriptionAccess(subscriptions[0], subscriptions),
         data: { ...current.data, subscriptions },
       }
       : current);
