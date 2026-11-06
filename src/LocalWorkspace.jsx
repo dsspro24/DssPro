@@ -7007,7 +7007,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               </button>
               {profileMenuOpen && <div role="menu" className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-slate-900 shadow-xl">
                 <div className="border-b border-slate-100 px-4 py-3"><p className="truncate text-sm font-semibold">{displayName}</p><p className="mt-0.5 text-xs font-normal text-slate-500">{roleLabels[userRole]}</p></div>
-                <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); onExit?.(); }} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"><LogOut size={16} />Atsijungti</button>
+                <button type="button" role="menuitem" data-readonly-allowed onClick={() => { setProfileMenuOpen(false); onExit?.(); }} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"><LogOut size={16} />Atsijungti</button>
               </div>}
             </div>
           </div>
@@ -7033,7 +7033,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   : subscriptionAccess.reason === 'awaiting-payment'
                     ? 'Darbo sritis bus atrakinta, kai apmokėsite išankstinę sąskaitą ir DSS Pro administratorius patvirtins mokėjimą.'
                     : 'Pasibaigus apmokėtai prenumeratai, 2 mėn. galėjote peržiūrėti įmonės duomenis ir atsisiųsti PDF. Šis laikotarpis baigėsi. Prieigą gali atkurti DSS Pro administratorius; susisiekite su mumis.'}</p>
-              <button type="button" className={`${buttonClass} mt-5`} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>{isAwaitingSubscriptionOrder ? 'Pasirinkti prenumeratą' : 'Peržiūrėti prenumeratą'}</button>
+              <p className="mt-3 text-sm font-medium text-slate-700">Atsijungti galite bet kada.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={() => setActiveTab('prenumerata')} data-readonly-allowed>{isAwaitingSubscriptionOrder ? 'Pasirinkti prenumeratą' : 'Peržiūrėti prenumeratą'}</button>
+                <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onExit?.()} data-readonly-allowed><LogOut size={16} />Atsijungti</button>
+              </div>
             </section>
           </div>}
           {commissionInvitationTarget && <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="commission-invitation-title">
