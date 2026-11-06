@@ -127,7 +127,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           </select>
         </label>
         <label className="block text-sm font-medium"><span className="block">Užsakymo laikotarpis (mėn.)</span><input className={`${inputClass} mt-2 w-16 max-w-16`} type="number" min="1" max="36" step="1" required value={orderMonths} onChange={(event) => setOrderMonths(event.target.value)} /></label>
-        <p className="text-xs text-slate-500">Aktyvūs darbuotojai: {employeeCount}. Daugiau nei 200 darbuotojų planas nenumatytas.</p>
+        <p className="text-xs text-slate-500">Aktyvūs darbuotojai: {employeeCount}.</p>
         <button type="submit" className={buttonClass} disabled={busy || !availablePlans.length}>
           <CreditCard size={16} />{busy ? 'Pateikiama…' : activeSubscription ? 'Pratęsti prenumeratą' : 'Užsakyti prenumeratą'}
         </button>
