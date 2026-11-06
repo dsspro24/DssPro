@@ -53,7 +53,7 @@ Deno.serve(async (request) => {
     userClient.rpc('is_creator'),
   ]);
   if (managerMembershipError || creatorError || (managerMembership?.role !== 'manager' && !isCreator)) {
-    return response(403, { error: 'Only an organization manager can invite DSS specialists' });
+    return response(403, { error: 'Kviesti DSS specialistą gali tik įmonės vadovas.' });
   }
 
   const { data: workspace, error: workspaceError } = await adminClient
@@ -61,12 +61,12 @@ Deno.serve(async (request) => {
     .select('data')
     .eq('organization_id', organizationId)
     .maybeSingle();
-  if (workspaceError || !workspace?.data) return response(409, { error: 'Organization workspace is not saved yet' });
+  if (workspaceError || !workspace?.data) return response(409, { error: 'Įmonės darbo srities duomenys dar neišsaugoti.' });
 
   const { data: specialistMatches, error: specialistLookupError } = await adminClient.rpc('lookup_registered_dss_specialist', {
     input_email: email,
   });
-  if (specialistLookupError) return response(500, { error: `Could not look up registered DSS specialists: ${specialistLookupError.message}` });
+  if (specialistLookupError) return response(500, { error: `Registruotų DSS specialistų rasti nepavyko: ${specialistLookupError.message}` });
   const registeredSpecialist = specialistMatches?.[0];
   if (!registeredSpecialist) {
     return response(404, { error: 'Registruotas DSS specialistas šiuo el. paštu nerastas. Patikrinkite el. paštą arba įsitikinkite, kad asmuo yra užsiregistravęs kaip DSS specialistas.' });
@@ -82,16 +82,16 @@ Deno.serve(async (request) => {
     .eq('organization_id', organizationId)
     .eq('user_id', specialistUser.id)
     .maybeSingle();
-  if (membershipLookupError) return response(500, { error: `Could not check the existing organization membership: ${membershipLookupError.message}` });
+  if (membershipLookupError) return response(500, { error: `Patikrinti specialisto priskyrimo įmonei nepavyko: ${membershipLookupError.message}` });
   if (existingMembership) {
     return response(409, { error: existingMembership.role === 'dss_specialist'
-      ? 'This DSS specialist is already assigned to this organization'
-      : 'This account already has a different role in this organization' });
+      ? 'Šis DSS specialistas jau priskirtas šiai įmonei.'
+      : 'Ši paskyra įmonėje jau turi kitą vaidmenį.' });
   }
 
   const fullName = String(registeredSpecialist.full_name ?? '');
   const organization = workspace.data.organizations?.find((item: Record<string, unknown>) => item.id === organizationId);
-  if (!organization) return response(404, { error: 'Organization workspace was not found' });
+  if (!organization) return response(404, { error: 'Įmonės darbo sritis nerasta.' });
 
   const { data: existingInvitation, error: existingInvitationError } = await adminClient
     .from('dss_specialist_invitations')
@@ -100,9 +100,9 @@ Deno.serve(async (request) => {
     .eq('specialist_user_id', specialistUser.id)
     .in('status', ['pending', 'accepted'])
     .maybeSingle();
-  if (existingInvitationError) return response(500, { error: `Could not check the existing DSS invitation: ${existingInvitationError.message}` });
+  if (existingInvitationError) return response(500, { error: `Patikrinti esamą DSS specialisto kvietimą nepavyko: ${existingInvitationError.message}` });
   if (existingInvitation) {
-    return response(409, { error: 'This DSS specialist is already invited to or assigned to this organization' });
+    return response(409, { error: 'Šis DSS specialistas jau pakviestas į šią įmonę arba jai priskirtas.' });
   }
 
   const { data: invitation, error: invitationError } = await adminClient.from('dss_specialist_invitations').insert({
@@ -115,7 +115,7 @@ Deno.serve(async (request) => {
     can_manage_workspace: canManageWorkspace,
     status: 'pending',
   }).select('id').single();
-  if (invitationError) return response(500, { error: `Could not save DSS invitation: ${invitationError.message}` });
+  if (invitationError) return response(500, { error: `Išsaugoti DSS specialisto kvietimą nepavyko: ${invitationError.message}` });
 
   return response(200, {
     invitationId: invitation.id,

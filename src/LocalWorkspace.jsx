@@ -5126,6 +5126,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           const details = await error.context.clone().json().catch(() => null);
           message = details?.error ?? message;
         }
+        const translatedErrors = {
+          'This DSS specialist is already assigned to this organization': 'Šis DSS specialistas jau priskirtas šiai įmonei.',
+          'This account already has a different role in this organization': 'Ši paskyra įmonėje jau turi kitą vaidmenį.',
+          'This DSS specialist is already invited to or assigned to this organization': 'Šis DSS specialistas jau pakviestas į šią įmonę arba jai priskirtas.',
+        };
+        message = translatedErrors[message] ?? message;
         setNotice(`DSS specialisto pakviesti nepavyko: ${message}`);
         return;
       }
