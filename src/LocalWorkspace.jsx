@@ -5117,7 +5117,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         body: {
           organizationId: currentOrg.id,
           email: specialist.email,
-          redirectTo: window.location.origin,
           canManageWorkspace: inviteDssCanManageWorkspace,
         },
       });
@@ -5148,9 +5147,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }));
       setSpecialistQuery('');
       setInviteDssCanManageWorkspace(true);
-      setNotice(invitation.invited
-        ? `Kvietimo nuoroda išsiųsta ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`
-        : `Kvietimas pateiktas ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`);
+      setNotice(`Kvietimas pateiktas ${invitation.email}. Prieiga prie įmonės bus suteikta tik specialistui sutikus.`);
       return;
     }
     if (currentOrg.dss.includes(specialist.id) || currentOrg.dssInvitations?.some((invite) => invite.specialistId === specialist.id)) {
@@ -7385,7 +7382,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <div className="relative mt-2"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} type="email" autoComplete="email" value={specialistQuery} onChange={(event) => setSpecialistQuery(event.target.value)} placeholder="Įveskite el. paštą" /></div>
                 </label>}
                 {userRole === 'vadovas' && <p className="mt-2 text-xs text-slate-500">Patikrinkite el. paštą. Kvietimas nesuteikia prieigos iš karto — specialistas turi jį priimti prisijungęs. Pašalinant specialistą bus parodytas patvirtinimo klausimas; ankstesni jo parašai liks išsaugoti.</p>}
-                {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Kviesti {specialistQuery.trim()}</button>}
+                {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Ieškoti registruoto specialisto ir kviesti</button>}
                 {userRole === 'vadovas' && filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
               <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>

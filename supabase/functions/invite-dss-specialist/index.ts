@@ -38,15 +38,8 @@ Deno.serve(async (request) => {
 
   const organizationId = String(body.organizationId ?? '');
   const email = String(body.email ?? '').trim().toLowerCase();
-  const redirectTo = String(body.redirectTo ?? '');
   const canManageWorkspace = body.canManageWorkspace === true;
-  let redirectUrl: URL;
-  try {
-    redirectUrl = new URL(redirectTo);
-  } catch {
-    return response(400, { error: 'Invalid invitation redirect URL' });
-  }
-  if (!organizationId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || redirectUrl.origin !== origin) {
+  if (!organizationId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return response(400, { error: 'DSS invitation data is invalid' });
   }
 
@@ -70,35 +63,18 @@ Deno.serve(async (request) => {
     .maybeSingle();
   if (workspaceError || !workspace?.data) return response(409, { error: 'Organization workspace is not saved yet' });
 
-  let specialistUser: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
-  let invited = false;
-  const { data: listedUsers, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listError) return response(500, { error: `Could not look up the DSS account: ${listError.message}` });
-  specialistUser = listedUsers.users.find((candidate) => candidate.email?.toLowerCase() === email) ?? null;
-
-  if (specialistUser) {
-    const { data: profile, error: profileError } = await adminClient
-      .from('profiles')
-      .select('full_name, account_type')
-      .eq('id', specialistUser.id)
-      .maybeSingle();
-    if (profileError) return response(500, { error: profileError.message });
-    if (profile?.account_type !== 'dss_specialist') {
-      return response(409, { error: 'This email already belongs to a different account type' });
-    }
-  } else {
-    const { data: invitation, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: {
-        full_name: email,
-        account_type: 'dss_specialist',
-        employee_needs_password: true,
-      },
-      redirectTo: redirectUrl.toString(),
-    });
-    if (inviteError || !invitation.user) return response(400, { error: inviteError?.message ?? 'Could not send DSS invitation' });
-    specialistUser = invitation.user;
-    invited = true;
+  const { data: specialistMatches, error: specialistLookupError } = await adminClient.rpc('lookup_registered_dss_specialist', {
+    input_email: email,
+  });
+  if (specialistLookupError) return response(500, { error: `Could not look up registered DSS specialists: ${specialistLookupError.message}` });
+  const registeredSpecialist = specialistMatches?.[0];
+  if (!registeredSpecialist) {
+    return response(404, { error: 'Registruotas DSS specialistas šiuo el. paštu nerastas. Patikrinkite el. paštą arba įsitikinkite, kad asmuo yra užsiregistravęs kaip DSS specialistas.' });
   }
+  const specialistUser = {
+    id: String(registeredSpecialist.user_id),
+    email: String(registeredSpecialist.email ?? email),
+  };
 
   const { data: existingMembership, error: membershipLookupError } = await adminClient
     .from('organization_memberships')
@@ -106,23 +82,16 @@ Deno.serve(async (request) => {
     .eq('organization_id', organizationId)
     .eq('user_id', specialistUser.id)
     .maybeSingle();
-  if (membershipLookupError) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(500, { error: `Could not check the existing organization membership: ${membershipLookupError.message}` });
-  }
+  if (membershipLookupError) return response(500, { error: `Could not check the existing organization membership: ${membershipLookupError.message}` });
   if (existingMembership) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
     return response(409, { error: existingMembership.role === 'dss_specialist'
       ? 'This DSS specialist is already assigned to this organization'
       : 'This account already has a different role in this organization' });
   }
 
-  const fullName = String(specialistUser.user_metadata?.full_name ?? email);
+  const fullName = String(registeredSpecialist.full_name ?? '');
   const organization = workspace.data.organizations?.find((item: Record<string, unknown>) => item.id === organizationId);
-  if (!organization) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(404, { error: 'Organization workspace was not found' });
-  }
+  if (!organization) return response(404, { error: 'Organization workspace was not found' });
 
   const { data: existingInvitation, error: existingInvitationError } = await adminClient
     .from('dss_specialist_invitations')
@@ -131,12 +100,8 @@ Deno.serve(async (request) => {
     .eq('specialist_user_id', specialistUser.id)
     .in('status', ['pending', 'accepted'])
     .maybeSingle();
-  if (existingInvitationError) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(500, { error: `Could not check the existing DSS invitation: ${existingInvitationError.message}` });
-  }
+  if (existingInvitationError) return response(500, { error: `Could not check the existing DSS invitation: ${existingInvitationError.message}` });
   if (existingInvitation) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
     return response(409, { error: 'This DSS specialist is already invited to or assigned to this organization' });
   }
 
@@ -150,10 +115,7 @@ Deno.serve(async (request) => {
     can_manage_workspace: canManageWorkspace,
     status: 'pending',
   }).select('id').single();
-  if (invitationError) {
-    if (invited) await adminClient.auth.admin.deleteUser(specialistUser.id);
-    return response(500, { error: `Could not save DSS invitation: ${invitationError.message}` });
-  }
+  if (invitationError) return response(500, { error: `Could not save DSS invitation: ${invitationError.message}` });
 
   return response(200, {
     invitationId: invitation.id,
@@ -162,7 +124,7 @@ Deno.serve(async (request) => {
     email,
     organizationName: String(organization.name ?? ''),
     canManageWorkspace,
-    invited,
+    invited: false,
     status: 'pending',
   });
 });
