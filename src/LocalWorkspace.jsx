@@ -6550,15 +6550,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               const invoiceNotifications = [];
               if (subscription.status !== 'Atšaukta'
                 && subscription.paymentStatus === 'Laukiama apmokėjimo'
-                && subscription.preinvoiceNumber
-                && (!subscription.dueDate || new Date(subscription.dueDate).getTime() > validityCheckTime)) {
+                && subscription.preinvoiceNumber) {
                 const id = `subscription-preinvoice-${subscription.id}-${subscription.preinvoiceNumber}`;
                 if (!readManagerSubscriptionNotificationIds.includes(id)) {
+                  const paymentOverdue = subscription.dueDate
+                    && new Date(subscription.dueDate).getTime() <= validityCheckTime;
                   invoiceNotifications.push({
                     id,
-                    title: 'Išankstinę sąskaitą reikia apmokėti',
-                    description: `${organizationName} · ${subscription.plan} · ${subscription.preinvoiceNumber}${subscription.dueDate ? ` · apmokėti iki ${new Date(subscription.dueDate).toLocaleDateString('lt-LT')}` : ''}`,
-                    actionLabel: 'Peržiūrėti / atsisiųsti išankstinę sąskaitą',
+                    title: paymentOverdue ? 'Išankstinės sąskaitos apmokėjimo terminas praėjo' : 'Išankstinę sąskaitą reikia apmokėti',
+                    description: `${organizationName} · ${subscription.plan} · ${subscription.preinvoiceNumber}${subscription.dueDate ? ` · apmokėti iki ${new Date(subscription.dueDate).toLocaleDateString('lt-LT')}` : ''}${paymentOverdue ? ' · jei jau apmokėjote, mokėjimas dar laukia administratoriaus patvirtinimo' : ''}`,
+                    actionLabel: 'Peržiūrėti prenumeratą ir apmokėjimą',
                     subscriptionInvoice: { subscriptionId: subscription.id, invoiceType: 'preinvoice' },
                   });
                 }
@@ -6907,8 +6908,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
             <a href="#pagalba" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" className="hidden size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700 sm:grid"><LifeBuoy size={18} /></a>
-            <div ref={notificationsRef} className="relative">
-              <button type="button" aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => { setProfileMenuOpen(false); setNotificationsOpen((open) => !open); }} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
+            <div ref={notificationsRef} className="relative" data-readonly-allowed>
+              <button type="button" data-readonly-allowed aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => { setProfileMenuOpen(false); setNotificationsOpen((open) => !open); }} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
                 <Bell size={18} />
                 {notifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-none text-white">{notifications.length}</span>}
               </button>
@@ -6918,9 +6919,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={async () => {
                     setNotificationsOpen(false);
                     setNotice('');
-                    if (userRole === 'vadovas' && item.subscriptionInvoice) {
+                    if (userRole === 'vadovas' && item.subscriptionInvoice?.invoiceType === 'final') {
                       setActiveTab('prenumerata');
                       await openSubscriptionInvoice(item.subscriptionInvoice.subscriptionId, item.subscriptionInvoice.invoiceType);
+                    } else if (userRole === 'vadovas' && item.subscriptionInvoice) {
+                      setActiveTab('prenumerata');
                     } else if (userRole === 'vadovas' && item.subscriptionRenewal) {
                       setActiveTab('prenumerata');
                     } else if (userRole === 'kurejas' && item.creatorSubscription) {
