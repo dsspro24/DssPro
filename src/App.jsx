@@ -101,7 +101,7 @@ function DemoApp({ cloudMode = false }) {
   }, [cloudMode]);
 
   const scrollToSignup = () => {
-    const signupSection = document.getElementById('pricing-signup');
+    const signupSection = document.getElementById('kainos');
     if (!signupSection) return;
     window.scrollTo({
       top: Math.max(0, signupSection.getBoundingClientRect().top + window.scrollY - 24),
@@ -318,13 +318,13 @@ function DemoApp({ cloudMode = false }) {
       <div className="min-h-screen bg-white font-sans text-slate-800">
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-            <a href="#top" className="flex items-center gap-2" aria-label="DSS Pro pradžia">
+            <a href="#pradzia" className="flex items-center gap-2" aria-label="DSS Pro pradžia">
               <span className="text-xl font-black tracking-tight text-[#0c4a3b]">DSS<span className="ml-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-sm font-bold text-emerald-800">Pro</span></span>
             </a>
             <nav aria-label="Pagrindinė navigacija" className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
-              <a className="transition hover:text-emerald-800" href="#how-it-works">Kaip veikia</a>
-              <a className="transition hover:text-emerald-800" href="#features">Galimybės</a>
-              <a className="transition hover:text-emerald-800" href="#pricing-signup">Kainos</a>
+              <a className="transition hover:text-emerald-800" href="#kaip-veikia">Kaip veikia</a>
+              <a className="transition hover:text-emerald-800" href="#galimybes">Galimybės</a>
+              <a className="transition hover:text-emerald-800" href="#kainos">Kainos</a>
             </nav>
             <button
               onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
@@ -335,7 +335,7 @@ function DemoApp({ cloudMode = false }) {
           </div>
         </header>
 
-        <main id="top">
+        <main id="pradzia">
           <section className="overflow-hidden bg-[#f2f8f5]">
             <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
               <div>
@@ -414,7 +414,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
           </section>
 
-          <section id="how-it-works" className="scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20">
+          <section id="kaip-veikia" className="scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20">
             <div className="mx-auto max-w-7xl">
               <div className="mx-auto max-w-2xl text-center">
                 <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">Paprasta pradėti</p>
@@ -438,7 +438,7 @@ function DemoApp({ cloudMode = false }) {
             </div>
           </section>
 
-          <section id="features" className="scroll-mt-24 bg-slate-50 px-5 py-16 sm:px-8 sm:py-20">
+          <section id="galimybes" className="scroll-mt-24 bg-slate-50 px-5 py-16 sm:px-8 sm:py-20">
             <div className="mx-auto max-w-7xl">
               <div className="max-w-2xl">
                 <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">DSS Pro galimybės</p>
@@ -478,7 +478,7 @@ function DemoApp({ cloudMode = false }) {
           </section>
 
         {/* KAINOS IR REGISTRACIJA */}
-        <section id="pricing-signup" className="mx-auto grid max-w-7xl scroll-mt-24 grid-cols-1 items-start gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-12">
+        <section id="kainos" className="mx-auto grid max-w-7xl scroll-mt-24 grid-cols-1 items-start gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-12">
           <div className="lg:col-span-6 space-y-6">
             <div>
               <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">Aiškūs planai</p>
