@@ -27,6 +27,12 @@ Viešo demo vadovo bibliotekoje rodomi tik statiniame `public/demo-content.json`
 
 Kai nustatyti `VITE_SUPABASE_URL` ir `VITE_SUPABASE_ANON_KEY`, aplikacija vietoje demo įjungia vadovo registraciją ir prisijungimą. Vadovas gali sukurti įmonę; įmonės darbo būsena saugoma Supabase ir apsaugota RLS taisyklėmis. Vieša (anon) užklausa įmonių įrašų nemato.
 
+## Tinklaraštis
+
+Viešas tinklaraštis pasiekiamas adresu `/tinklarastis`, o straipsniai – `/tinklarastis/<slug>`. Tinklaraščio puslapis ir jo administravimo skiltis įkeliami atskirai nuo įprastos darbo srities. Prisijungęs turinio kūrėjas gali kurti, redaguoti, skelbti, slėpti juodraščiuose ir ištrinti straipsnius. Viešai pasiekiami tik paskelbti įrašai; prieigą užtikrina `blog_posts` RLS taisyklės.
+
+Pradinius straipsnius ir lentelę sukuria `supabase/migrations/20261109130000_blog_posts.sql`. Pritaikykite migraciją įprasta Supabase migracijų komanda, pateikta žemiau. Vercel perrašo tinklaraščio URL į aplikaciją, kad tiesioginės straipsnių nuorodos veiktų.
+
 Lokaliam cloud bandymui nukopijuokite `.env.example` į `.env.development.local` ir įrašykite Supabase URL bei anon raktą. `service_role` rakto į `VITE_` kintamuosius ar naršyklę dėti negalima.
 
 Supabase migracijoms:

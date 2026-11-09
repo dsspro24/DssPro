@@ -23,8 +23,22 @@ import {
 } from 'lucide-react';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
+const BlogPage = lazy(() => import('./Blog.jsx'));
 
 export default function App() {
+  const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
+  if (blogRoute) {
+    const slug = blogRoute[1]
+      ? (() => {
+        try {
+          return decodeURIComponent(blogRoute[1]);
+        } catch {
+          return blogRoute[1];
+        }
+      })()
+      : '';
+    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamas tinklaraštis…</p></main>}><BlogPage slug={slug} /></Suspense>;
+  }
   return isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
 }
 
@@ -601,8 +615,9 @@ function DemoApp({ cloudMode = false }) {
         </section>
         </main>
 
-        <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-xs text-slate-500">
-          © 2026 DSS Pro. Visos teisės saugomos.
+        <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
+          <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
+          <p className="mt-2">© 2026 DSS Pro. Visos teisės saugomos.</p>
         </footer>
 
         {cloudMode && <dialog id="signup-confirmation-dialog" className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-950/60">
