@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Eye, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 
 const BLOG_PATH = '/tinklarastis';
 const SITE_URL = 'https://www.dsspro.lt';
+const BLOG_PAGE_SIZE = 20;
 const articleFields = 'id, title, slug, excerpt, category, content, seo_title, seo_description, status, published_at, updated_at';
+
+function getBlogPageFromUrl() {
+  const page = Number.parseInt(new URLSearchParams(window.location.search).get('puslapis') ?? '', 10);
+  return Number.isInteger(page) && page > 1 ? page : 1;
+}
 
 function updatePageMetadata({ title, description, canonical }) {
   const originalTitle = document.title;
@@ -105,19 +111,47 @@ function BlogHeader() {
 
 export default function BlogPage({ slug = '' }) {
   const [posts, setPosts] = useState([]);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [page, setPage] = useState(getBlogPageFromUrl);
   const [article, setArticle] = useState(null);
   const [status, setStatus] = useState(supabase ? 'loading' : 'error');
   const [error, setError] = useState(supabase ? '' : 'Supabase ryšys nesukonfigūruotas.');
   const isArticle = Boolean(slug);
+
+  const navigateToPage = (nextPage, { replace = false } = {}) => {
+    const normalizedPage = Math.max(1, nextPage);
+    const url = new URL(window.location.href);
+    if (normalizedPage === 1) url.searchParams.delete('puslapis');
+    else url.searchParams.set('puslapis', String(normalizedPage));
+    const historyMethod = replace ? 'replaceState' : 'pushState';
+    window.history[historyMethod](window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    setStatus('loading');
+    setPage(normalizedPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isArticle) return undefined;
+    const handlePopState = () => {
+      setPage(getBlogPageFromUrl());
+      setStatus('loading');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isArticle]);
 
   useEffect(() => {
     let active = true;
     if (!supabase) return () => { active = false; };
     const request = isArticle
       ? supabase.from('blog_posts').select(articleFields).eq('slug', slug).eq('status', 'published').maybeSingle()
-      : supabase.from('blog_posts').select('id, title, slug, excerpt, category, published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(50);
+      : supabase.from('blog_posts')
+        .select('id, title, slug, excerpt, category, published_at', { count: 'exact' })
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .range((page - 1) * BLOG_PAGE_SIZE, page * BLOG_PAGE_SIZE - 1);
 
-    request.then(({ data, error: requestError }) => {
+    request.then(({ data, count, error: requestError }) => {
       if (!active) return;
       if (requestError) {
         setError(requestError.message);
@@ -128,7 +162,14 @@ export default function BlogPage({ slug = '' }) {
         setArticle(data);
         setStatus(data ? 'ready' : 'not-found');
       } else {
+        const total = count ?? data?.length ?? 0;
+        const pageCount = Math.max(1, Math.ceil(total / BLOG_PAGE_SIZE));
+        if (page > pageCount) {
+          navigateToPage(pageCount, { replace: true });
+          return;
+        }
         setPosts(data ?? []);
+        setTotalPosts(total);
         setStatus('ready');
       }
     }).catch((requestError) => {
@@ -138,7 +179,7 @@ export default function BlogPage({ slug = '' }) {
     });
 
     return () => { active = false; };
-  }, [isArticle, slug]);
+  }, [isArticle, slug, page]);
 
   useEffect(() => {
     const canonical = isArticle ? `${BLOG_PATH}/${encodeURIComponent(slug)}` : BLOG_PATH;
@@ -165,14 +206,24 @@ export default function BlogPage({ slug = '' }) {
         <p className="mt-2 text-slate-600">Jis galėjo būti pašalintas arba dar nepaskelbtas.</p>
         <a href={BLOG_PATH} className="mt-5 inline-flex items-center gap-2 font-semibold text-emerald-800">Grįžti į tinklaraštį <ArrowRight size={16} /></a>
       </section>}
-      {status === 'ready' && !isArticle && (posts.length ? <div className="grid gap-5">
-        {posts.map((post) => <article key={post.id} className="rounded-2xl border border-slate-200 p-6 transition hover:border-emerald-300 hover:shadow-sm sm:p-8">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-emerald-800"><span>{post.category}</span>{post.published_at && <><span aria-hidden="true">·</span><time dateTime={post.published_at}>{formatDate(post.published_at)}</time></>}</div>
-          <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950"><a href={`${BLOG_PATH}/${encodeURIComponent(post.slug)}`} className="hover:text-emerald-800">{post.title}</a></h2>
-          <p className="mt-3 leading-7 text-slate-600">{post.excerpt}</p>
-          <a href={`${BLOG_PATH}/${encodeURIComponent(post.slug)}`} className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-800 hover:text-emerald-950">Skaityti straipsnį <ArrowRight size={16} /></a>
-        </article>)}
-      </div> : <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-600">Straipsnių kol kas nėra.</p>)}
+      {status === 'ready' && !isArticle && (posts.length ? <>
+        <div className="grid gap-5">
+          {posts.map((post) => <article key={post.id} className="rounded-2xl border border-slate-200 p-6 transition hover:border-emerald-300 hover:shadow-sm sm:p-8">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-emerald-800"><span>{post.category}</span>{post.published_at && <><span aria-hidden="true">·</span><time dateTime={post.published_at}>{formatDate(post.published_at)}</time></>}</div>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950"><a href={`${BLOG_PATH}/${encodeURIComponent(post.slug)}`} className="hover:text-emerald-800">{post.title}</a></h2>
+            <p className="mt-3 leading-7 text-slate-600">{post.excerpt}</p>
+            <a href={`${BLOG_PATH}/${encodeURIComponent(post.slug)}`} className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-800 hover:text-emerald-950">Skaityti straipsnį <ArrowRight size={16} /></a>
+          </article>)}
+        </div>
+        {totalPosts > BLOG_PAGE_SIZE && <nav aria-label="Tinklaraščio puslapiavimas" className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
+          <p className="text-sm text-slate-600">Rodoma {(page - 1) * BLOG_PAGE_SIZE + 1}–{Math.min(page * BLOG_PAGE_SIZE, totalPosts)} iš {totalPosts} straipsnių</p>
+          <div className="flex items-center gap-2">
+            <button type="button" aria-label="Ankstesnis straipsnių puslapis" className="inline-flex min-h-10 items-center gap-1 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" disabled={page <= 1} onClick={() => navigateToPage(page - 1)}><ChevronLeft size={16} />Ankstesnis</button>
+            <span aria-current="page" className="min-w-16 text-center text-sm font-semibold tabular-nums text-slate-700">{page} / {Math.ceil(totalPosts / BLOG_PAGE_SIZE)}</span>
+            <button type="button" aria-label="Kitas straipsnių puslapis" className="inline-flex min-h-10 items-center gap-1 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" disabled={page >= Math.ceil(totalPosts / BLOG_PAGE_SIZE)} onClick={() => navigateToPage(page + 1)}>Kitas<ChevronRight size={16} /></button>
+          </div>
+        </nav>}
+      </> : <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-600">Straipsnių kol kas nėra.</p>)}
       {status === 'ready' && isArticle && article && <article>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-emerald-800"><span>{article.category}</span>{article.published_at && <><span aria-hidden="true">·</span><time dateTime={article.published_at}>{formatDate(article.published_at)}</time></>}</div>
         <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl">{article.title}</h1>
