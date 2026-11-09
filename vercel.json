@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/tinklarastis", "destination": "/index.html" },
     { "source": "/tinklarastis/:path*", "destination": "/index.html" },
     { "source": "/naudojimo-salygos", "destination": "/index.html" }

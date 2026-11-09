@@ -35,6 +35,8 @@ Pradinius straipsnius ir lentelę sukuria `supabase/migrations/20261109130000_bl
 
 Pritaikykite migracijas įprasta Supabase migracijų komanda, pateikta žemiau. Vercel perrašo tinklaraščio ir sąlygų URL į aplikaciją, kad tiesioginės nuorodos veiktų.
 
+SEO techniniai failai: `/robots.txt` nurodo `/sitemap.xml`, o Vercel API funkcija `api/sitemap.js` sudaro sitemap iš pagrindinio puslapio, paskelbtų straipsnių ir tik paskelbtų naudojimo sąlygų. Funkcijai Vercel aplinkoje reikia `VITE_SUPABASE_URL` ir `VITE_SUPABASE_ANON_KEY` (arba jų serverinių `SUPABASE_URL` / `SUPABASE_ANON_KEY` atitikmenų) ir pritaikytų abiejų aukščiau nurodytų Supabase migracijų. `src/Blog.jsx` bei `src/TermsOfService.jsx` papildomai nustato puslapio metaduomenis ir struktūrinius duomenis naršyklėje; serverio HTML išankstinis renderinimas dar neįdiegtas. Po deploy sitemap pateikite „Google Search Console“ ir patikrinkite URL indeksavimą.
+
 Lokaliam cloud bandymui nukopijuokite `.env.example` į `.env.development.local` ir įrašykite Supabase URL bei anon raktą. `service_role` rakto į `VITE_` kintamuosius ar naršyklę dėti negalima.
 
 Supabase migracijoms:

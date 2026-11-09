@@ -15,6 +15,54 @@ const defaultSettings = {
   updated_at: null,
 };
 
+function updateTermsMetadata(isPublished) {
+  const originalTitle = document.title;
+  const values = [
+    { attribute: 'name', key: 'description', content: isPublished ? 'DSS Pro naudojimo sąlygos įmonėms ir profesinei veiklai.' : 'DSS Pro naudojimo sąlygų projektas. Dar neįsigaliojo.' },
+    { attribute: 'name', key: 'robots', content: isPublished ? 'index,follow' : 'noindex,nofollow' },
+    { attribute: 'property', key: 'og:locale', content: 'lt_LT' },
+    { attribute: 'property', key: 'og:site_name', content: 'DSS Pro' },
+    { attribute: 'property', key: 'og:type', content: 'website' },
+    { attribute: 'property', key: 'og:title', content: 'DSS Pro naudojimo sąlygos' },
+    { attribute: 'property', key: 'og:description', content: isPublished ? 'DSS Pro naudojimo sąlygos įmonėms ir profesinei veiklai.' : 'DSS Pro naudojimo sąlygų projektas. Dar neįsigaliojo.' },
+    { attribute: 'property', key: 'og:url', content: 'https://www.dsspro.lt/naudojimo-salygos' },
+    { attribute: 'name', key: 'twitter:card', content: 'summary' },
+  ];
+  const previousTags = values.map(({ attribute, key }) => {
+    const element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+    return { attribute, key, element, content: element?.content, existed: Boolean(element) };
+  });
+  values.forEach(({ attribute, key, content }) => {
+    let element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+    if (!element) {
+      element = document.createElement('meta');
+      element.setAttribute(attribute, key);
+      document.head.append(element);
+    }
+    element.content = content;
+  });
+  let canonical = document.head.querySelector('link[rel="canonical"]');
+  const hadCanonical = Boolean(canonical);
+  const previousCanonical = canonical?.href ?? '';
+  if (!canonical) {
+    canonical = document.createElement('link');
+    canonical.rel = 'canonical';
+    document.head.append(canonical);
+  }
+  canonical.href = 'https://www.dsspro.lt/naudojimo-salygos';
+  document.title = `Naudojimo sąlygos | DSS Pro`;
+
+  return () => {
+    document.title = originalTitle;
+    previousTags.forEach(({ attribute, key, element, content, existed }) => {
+      if (existed) element.content = content;
+      else document.head.querySelector(`meta[${attribute}="${key}"]`)?.remove();
+    });
+    if (hadCanonical) canonical.href = previousCanonical;
+    else canonical.remove();
+  };
+}
+
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -59,6 +107,8 @@ export default function TermsOfService() {
   }, []);
 
   const isPublished = settings.terms_status === 'published';
+
+  useEffect(() => updateTermsMetadata(isPublished), [isPublished]);
 
   return <div className="min-h-screen bg-white text-slate-900">
     <TermsHeader />

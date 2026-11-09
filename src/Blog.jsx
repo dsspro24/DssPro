@@ -12,10 +12,34 @@ function getBlogPageFromUrl() {
   return Number.isInteger(page) && page > 1 ? page : 1;
 }
 
-function updatePageMetadata({ title, description, canonical }) {
+function updatePageMetadata({ title, description, canonical, type = 'website', structuredData }) {
   const originalTitle = document.title;
-  const descriptionMeta = document.querySelector('meta[name="description"]');
-  const originalDescription = descriptionMeta?.content ?? '';
+  const metaTags = [
+    { attribute: 'name', key: 'description', value: description },
+    { attribute: 'name', key: 'robots', value: 'index,follow,max-image-preview:large' },
+    { attribute: 'property', key: 'og:locale', value: 'lt_LT' },
+    { attribute: 'property', key: 'og:site_name', value: 'DSS Pro' },
+    { attribute: 'property', key: 'og:type', value: type },
+    { attribute: 'property', key: 'og:title', value: title },
+    { attribute: 'property', key: 'og:description', value: description },
+    { attribute: 'property', key: 'og:url', value: `${SITE_URL}${canonical}` },
+    { attribute: 'name', key: 'twitter:card', value: 'summary' },
+    { attribute: 'name', key: 'twitter:title', value: title },
+    { attribute: 'name', key: 'twitter:description', value: description },
+  ];
+  const originalMeta = metaTags.map(({ attribute, key }) => {
+    const element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+    return { attribute, key, element, content: element?.content, existed: Boolean(element) };
+  });
+  metaTags.forEach(({ attribute, key, value }) => {
+    let element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+    if (!element) {
+      element = document.createElement('meta');
+      element.setAttribute(attribute, key);
+      document.head.append(element);
+    }
+    element.content = value;
+  });
   let canonicalLink = document.querySelector('link[rel="canonical"]');
   const createdCanonical = !canonicalLink;
   if (!canonicalLink) {
@@ -24,15 +48,29 @@ function updatePageMetadata({ title, description, canonical }) {
     document.head.append(canonicalLink);
   }
   const originalCanonical = canonicalLink.href;
+  const structuredDataElement = document.querySelector('#seo-structured-data');
+  const originalStructuredData = structuredDataElement?.textContent ?? '';
+  let jsonLd = structuredDataElement;
+  if (!jsonLd) {
+    jsonLd = document.createElement('script');
+    jsonLd.id = 'seo-structured-data';
+    jsonLd.type = 'application/ld+json';
+    document.head.append(jsonLd);
+  }
+  jsonLd.textContent = JSON.stringify(structuredData).replace(/</g, '\\u003c');
   document.title = title;
-  if (descriptionMeta) descriptionMeta.content = description;
   canonicalLink.href = `${SITE_URL}${canonical}`;
 
   return () => {
     document.title = originalTitle;
-    if (descriptionMeta) descriptionMeta.content = originalDescription;
+    originalMeta.forEach(({ attribute, key, element, content, existed }) => {
+      if (existed) element.content = content;
+      else document.head.querySelector(`meta[${attribute}="${key}"]`)?.remove();
+    });
     if (createdCanonical) canonicalLink.remove();
     else canonicalLink.href = originalCanonical;
+    if (structuredDataElement) structuredDataElement.textContent = originalStructuredData;
+    else jsonLd.remove();
   };
 }
 
@@ -183,12 +221,52 @@ export default function BlogPage({ slug = '' }) {
 
   useEffect(() => {
     const canonical = isArticle ? `${BLOG_PATH}/${encodeURIComponent(slug)}` : BLOG_PATH;
+    const listingPageCanonical = !isArticle && page > 1 ? `${BLOG_PATH}?puslapis=${page}` : canonical;
+    const title = article && isArticle
+      ? (article.seo_title || article.title)
+      : `Tinklaraštis apie darbuotojų saugą | DSS Pro${!isArticle && page > 1 ? ` · ${page} puslapis` : ''}`;
+    const description = article && isArticle
+      ? (article.seo_description || article.excerpt)
+      : 'Praktiniai patarimai įmonių vadovams ir DSS specialistams apie darbuotojų saugą, instruktavimus, rizikų valdymą ir dokumentus.';
+    const articleSchema = article && isArticle ? {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: article.title,
+      description: article.seo_description || article.excerpt,
+      datePublished: article.published_at || undefined,
+      dateModified: article.updated_at || article.published_at || undefined,
+      mainEntityOfPage: `${SITE_URL}${canonical}`,
+      url: `${SITE_URL}${canonical}`,
+      author: { '@type': 'Organization', name: 'DSS Pro', url: SITE_URL },
+      publisher: { '@type': 'Organization', name: 'DSS Pro', url: SITE_URL },
+      articleSection: article.category,
+      inLanguage: 'lt-LT',
+    } : {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: title,
+      description,
+      url: `${SITE_URL}${listingPageCanonical}`,
+      inLanguage: 'lt-LT',
+      mainEntity: {
+        '@type': 'ItemList',
+        numberOfItems: totalPosts,
+        itemListElement: posts.map((post, index) => ({
+          '@type': 'ListItem',
+          position: (page - 1) * BLOG_PAGE_SIZE + index + 1,
+          url: `${SITE_URL}${BLOG_PATH}/${encodeURIComponent(post.slug)}`,
+          name: post.title,
+        })),
+      },
+    };
     return updatePageMetadata({
-      title: article && isArticle ? (article.seo_title || article.title) : 'Tinklaraštis apie darbuotojų saugą | DSS Pro',
-      description: article && isArticle ? (article.seo_description || article.excerpt) : 'Praktiniai patarimai įmonių vadovams ir DSS specialistams apie darbuotojų saugą, instruktavimus, rizikų valdymą ir dokumentus.',
-      canonical,
+      title,
+      description,
+      canonical: listingPageCanonical,
+      type: article && isArticle ? 'article' : 'website',
+      structuredData: articleSchema,
     });
-  }, [article, isArticle, slug]);
+  }, [article, isArticle, page, posts, slug, totalPosts]);
 
   return <div className="min-h-screen bg-white text-slate-900">
     <BlogHeader />
