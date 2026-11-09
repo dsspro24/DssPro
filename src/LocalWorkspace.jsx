@@ -99,6 +99,7 @@ import {
 } from 'lucide-react';
 import TrainingMaterials from './TrainingMaterials.jsx';
 const BlogAdmin = lazy(() => import('./Blog.jsx').then(({ BlogAdmin: Component }) => ({ default: Component })));
+const TermsSettings = lazy(() => import('./TermsOfService.jsx').then(({ TermsSettings: Component }) => ({ default: Component })));
 
 function printPdfHtml(html, title) {
   const frame = document.createElement('iframe');
@@ -1128,7 +1129,7 @@ const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['mokomoji', 'Mokomoji medžiaga', GraduationCap], ['aap', 'Mano AAP', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2], ['prenumerata', 'Prenumerata', CreditCard]],
-  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['tinklarastis', 'Tinklaraštis', BookOpen], ['prenumeratos', 'Prenumeratų valdymas', CreditCard], ['kurejo-saskaitos', 'Sąskaitos', FileText]],
+  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['tinklarastis', 'Tinklaraštis', BookOpen], ['teisine-informacija', 'Teisinė informacija', FileText], ['prenumeratos', 'Prenumeratų valdymas', CreditCard], ['kurejo-saskaitos', 'Sąskaitos', FileText]],
 };
 
 function loadData() {
@@ -2612,7 +2613,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         .map(([id, label, Icon]) => [id, id === 'skydelis' ? 'Būklės pasas' : label, Icon])
       : roleNavigation.dss.filter(([id]) => id === 'skydelis' || id === 'paskyra')
     : userRole === 'kurejas' && !cloudMode
-      ? roleNavigation.kurejas.filter(([id]) => id !== 'tinklarastis')
+      ? roleNavigation.kurejas.filter(([id]) => id !== 'tinklarastis' && id !== 'teisine-informacija')
       : roleNavigation[userRole] ?? roleNavigation.darbuotojas;
   const signatureIsCurrent = (signature) => !signature.validUntil || new Date(signature.validUntil).getTime() >= validityCheckTime;
   const hasCurrentWorkerSignature = (employeeId, resourceId) => data.signatures.some((signature) => signature.employeeId === employeeId && signature.resourceId === resourceId && signature.role === 'Darbuotojas' && signatureIsCurrent(signature));
@@ -7952,6 +7953,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'paskyra' && (userRole === 'darbuotojas' || userRole === 'dss') && <section className="max-w-2xl space-y-5"><PageTitle title="Paskyra ir parašo PIN" subtitle={sandboxMode ? 'Demo PIN lieka tik dabartinio skirtuko atmintyje ir išnyksta atnaujinus puslapį.' : cloudMode ? 'PIN saugomas užšifruotai ir naudojamas dokumentų parašams patvirtinti.' : 'PIN vietiniame demo saugomas tik šios naršyklės duomenyse.'} /><Panel title={userRole === 'darbuotojas' ? currentEmployee?.name : `${currentSpecialist?.name} · nemokama DSS paskyra`}><form onSubmit={savePin} className="max-w-sm space-y-3">{cloudMode && <label className="block text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="current-password" value={workerCurrentPin} onChange={(event) => setWorkerCurrentPin(event.target.value)} required /></label>}<label className="block text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} inputMode="numeric" maxLength={4} pattern="[0-9]{4}" type="password" autoComplete="new-password" value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} required /></label><button className={buttonClass}><LockKeyhole size={16} />{cloudMode ? 'Pakeisti PIN' : 'Nustatyti PIN'}</button></form></Panel></section>}
 
           {activeTab === 'tinklarastis' && userRole === 'kurejas' && cloudMode && <Suspense fallback={<p role="status" className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">Įkeliamas tinklaraščio administravimas…</p>}><BlogAdmin /></Suspense>}
+          {activeTab === 'teisine-informacija' && userRole === 'kurejas' && cloudMode && <Suspense fallback={<p role="status" className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">Įkeliami teisinės informacijos nustatymai…</p>}><TermsSettings /></Suspense>}
           {activeTab === 'imones' && userRole === 'kurejas' && <section className="space-y-5">
             <PageTitle title="Įmonės" subtitle="Atidarykite įmonės darbo sritį peržiūrai arba vadovo funkcijoms valdyti." />
             <Panel title="Visos įmonės">

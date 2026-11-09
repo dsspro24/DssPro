@@ -24,8 +24,12 @@ import {
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 const BlogPage = lazy(() => import('./Blog.jsx'));
+const TermsOfService = lazy(() => import('./TermsOfService.jsx'));
 
 export default function App() {
+  if (/^\/naudojimo-salygos\/?$/.test(window.location.pathname)) {
+    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamos naudojimo sąlygos…</p></main>}><TermsOfService /></Suspense>;
+  }
   const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
   if (blogRoute) {
     const slug = blogRoute[1]
@@ -616,8 +620,11 @@ function DemoApp({ cloudMode = false }) {
         </main>
 
         <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
-          <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
-          <p className="mt-2">© 2026 DSS Pro. Visos teisės saugomos.</p>
+          <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+            <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
+            <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
+          </nav>
+          <p className="mt-3">© 2026 DSS Pro. Visos teisės saugomos.</p>
         </footer>
 
         {cloudMode && <dialog id="signup-confirmation-dialog" className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-950/60">

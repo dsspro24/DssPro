@@ -234,7 +234,13 @@ export default function BlogPage({ slug = '' }) {
         </div>
       </article>}
     </main>
-    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">© 2026 DSS Pro. Informaciniai straipsniai nepakeičia individualios konsultacijos.</footer>
+    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
+      <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+        <a href={BLOG_PATH} className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
+        <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
+      </nav>
+      <p className="mt-3">© 2026 DSS Pro. Informaciniai straipsniai nepakeičia individualios konsultacijos.</p>
+    </footer>
   </div>;
 }
 

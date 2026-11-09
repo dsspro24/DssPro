@@ -31,7 +31,9 @@ Kai nustatyti `VITE_SUPABASE_URL` ir `VITE_SUPABASE_ANON_KEY`, aplikacija vietoj
 
 Viešas tinklaraštis pasiekiamas adresu `/tinklarastis`, o straipsniai – `/tinklarastis/<slug>`. Tinklaraščio puslapis ir jo administravimo skiltis įkeliami atskirai nuo įprastos darbo srities. Prisijungęs turinio kūrėjas gali kurti, redaguoti, skelbti, slėpti juodraščiuose ir ištrinti straipsnius. Viešai pasiekiami tik paskelbti įrašai; prieigą užtikrina `blog_posts` RLS taisyklės.
 
-Pradinius straipsnius ir lentelę sukuria `supabase/migrations/20261109130000_blog_posts.sql`. Pritaikykite migraciją įprasta Supabase migracijų komanda, pateikta žemiau. Vercel perrašo tinklaraščio URL į aplikaciją, kad tiesioginės straipsnių nuorodos veiktų.
+Pradinius straipsnius ir lentelę sukuria `supabase/migrations/20261109130000_blog_posts.sql`. Naudojimo sąlygų puslapis yra `/naudojimo-salygos`; jų juodraščio būseną ir viešai rodomus paslaugos teikėjo rekvizitus turinio kūrėjas tvarko skiltyje „Teisinė informacija“. Rekvizitus galima išsaugoti juodraštyje, o paskelbimas leidžiamas tik užpildžius teikėjo pavadinimą, įmonės / veiklos numerį, adresą ir kontaktinį el. paštą. Sąlygų tekstą prieš paskelbiant turi peržiūrėti Lietuvos teisės specialistas. Lentelę ir saugumo taisykles sukuria `supabase/migrations/20261109140000_site_legal_settings.sql`.
+
+Pritaikykite migracijas įprasta Supabase migracijų komanda, pateikta žemiau. Vercel perrašo tinklaraščio ir sąlygų URL į aplikaciją, kad tiesioginės nuorodos veiktų.
 
 Lokaliam cloud bandymui nukopijuokite `.env.example` į `.env.development.local` ir įrašykite Supabase URL bei anon raktą. `service_role` rakto į `VITE_` kintamuosius ar naršyklę dėti negalima.
 
