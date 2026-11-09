@@ -9,6 +9,7 @@ begin
     from pg_proc as p
     join pg_namespace as n on n.oid = p.pronamespace
     where n.nspname in ('public', 'private')
+      and p.prokind = 'f'
       and position('\.png$' in p.prosrc) > 0
   loop
     routine_definition := pg_get_functiondef(routine.oid);
