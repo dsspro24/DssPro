@@ -260,13 +260,9 @@ export default async function handler(request, response) {
 
   let baseUrl;
   let requestUrl;
-  let deploymentOrigin;
   try {
     baseUrl = new URL(supabaseUrl);
     requestUrl = new URL(request.url, 'https://request.invalid');
-    deploymentOrigin = env.VERCEL_URL
-      ? new URL(`https://${env.VERCEL_URL}`)
-      : new URL(siteUrl);
   } catch {
     return respondError(response, 500, 'Blog configuration is invalid.');
   }
@@ -290,7 +286,7 @@ export default async function handler(request, response) {
       postUrl.searchParams.set('limit', '1');
       const [postResponse, shellResponse] = await Promise.all([
         fetch(postUrl, { headers }),
-        fetch(new URL('/', deploymentOrigin)),
+        fetch(siteUrl),
       ]);
       if (!postResponse.ok) {
         console.error(`Blog article query failed (${postResponse.status}): ${await postResponse.text()}`);
@@ -315,16 +311,42 @@ export default async function handler(request, response) {
 
     const currentPage = readPage(requestUrl);
     const firstItem = (currentPage - 1) * pageSize;
-    const lastItem = firstItem + pageSize - 1;
     const postsUrl = new URL('/rest/v1/blog_posts', baseUrl);
     postsUrl.searchParams.set('select', 'id,title,slug,excerpt,category,published_at,updated_at');
     postsUrl.searchParams.set('status', 'eq.published');
     postsUrl.searchParams.set('order', 'published_at.desc');
+    postsUrl.searchParams.set('limit', String(pageSize));
+    postsUrl.searchParams.set('offset', String(firstItem));
+    let knownTotal = null;
+    if (currentPage > 1) {
+      const countUrl = new URL('/rest/v1/blog_posts', baseUrl);
+      countUrl.searchParams.set('select', 'id');
+      countUrl.searchParams.set('status', 'eq.published');
+      countUrl.searchParams.set('limit', '1');
+      const countResponse = await fetch(countUrl, {
+        headers: { ...headers, Prefer: 'count=exact' },
+      });
+      if (!countResponse.ok) {
+        console.error(`Blog listing count query failed (${countResponse.status}): ${await countResponse.text()}`);
+        return respondError(response, 502, 'Blog content is temporarily unavailable.');
+      }
+      const countRange = countResponse.headers.get('content-range')?.match(/\/(\d+|\*)$/);
+      knownTotal = countRange && countRange[1] !== '*' ? Number(countRange[1]) : null;
+      if (!Number.isInteger(knownTotal)) {
+        return respondError(response, 502, 'Blog content is temporarily unavailable.');
+      }
+      const pageCount = Math.max(1, Math.ceil(knownTotal / pageSize));
+      if (currentPage > pageCount) {
+        response.setHeader('Location', pageCount === 1 ? blogPath : `${blogPath}?puslapis=${pageCount}`);
+        response.setHeader('Cache-Control', 'no-store');
+        return response.status(308).end();
+      }
+    }
     const [postsResponse, shellResponse] = await Promise.all([
       fetch(postsUrl, {
-        headers: { ...headers, Range: `${firstItem}-${lastItem}`, Prefer: 'count=exact' },
+        headers: { ...headers, Prefer: 'count=exact' },
       }),
-      fetch(new URL('/', deploymentOrigin)),
+      fetch(siteUrl),
     ]);
     if (!postsResponse.ok) {
       console.error(`Blog listing query failed (${postsResponse.status}): ${await postsResponse.text()}`);
@@ -336,13 +358,13 @@ export default async function handler(request, response) {
     }
     const posts = await postsResponse.json();
     const range = postsResponse.headers.get('content-range')?.match(/\/(\d+|\*)$/);
-    const total = range && range[1] !== '*' ? Number(range[1]) : posts.length;
+    const total = knownTotal ?? (range && range[1] !== '*' ? Number(range[1]) : posts.length);
     if (!Array.isArray(posts) || !Number.isInteger(total)) {
       return respondError(response, 502, 'Blog content is temporarily unavailable.');
     }
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
     if (currentPage > pageCount) {
-      response.setHeader('Location', currentPage === 1 ? blogPath : `${blogPath}?puslapis=${pageCount}`);
+      response.setHeader('Location', pageCount === 1 ? blogPath : `${blogPath}?puslapis=${pageCount}`);
       response.setHeader('Cache-Control', 'no-store');
       return response.status(308).end();
     }
