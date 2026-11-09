@@ -41,7 +41,8 @@ export default function App() {
         }
       })()
       : '';
-    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamas tinklaraštis…</p></main>}><BlogPage slug={slug} /></Suspense>;
+    const initialData = window.__BLOG_SSR__?.path === window.location.pathname ? window.__BLOG_SSR__ : null;
+    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamas tinklaraštis…</p></main>}><BlogPage slug={slug} initialData={initialData} /></Suspense>;
   }
   return isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
 }

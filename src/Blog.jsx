@@ -147,14 +147,16 @@ function BlogHeader() {
   </header>;
 }
 
-export default function BlogPage({ slug = '' }) {
-  const [posts, setPosts] = useState([]);
-  const [totalPosts, setTotalPosts] = useState(0);
-  const [page, setPage] = useState(getBlogPageFromUrl);
-  const [article, setArticle] = useState(null);
-  const [status, setStatus] = useState(supabase ? 'loading' : 'error');
-  const [error, setError] = useState(supabase ? '' : 'Supabase ryšys nesukonfigūruotas.');
+export default function BlogPage({ slug = '', initialData = null }) {
   const isArticle = Boolean(slug);
+  const [posts, setPosts] = useState(() => initialData && !isArticle && initialData.page === getBlogPageFromUrl() ? initialData.posts : []);
+  const [totalPosts, setTotalPosts] = useState(() => initialData && !isArticle && initialData.page === getBlogPageFromUrl() ? initialData.totalPosts : 0);
+  const [page, setPage] = useState(getBlogPageFromUrl);
+  const [article, setArticle] = useState(() => initialData && isArticle && initialData.slug === slug ? initialData.article : null);
+  const hasInitialData = initialData?.path === window.location.pathname
+    && (isArticle ? initialData.slug === slug : initialData.page === getBlogPageFromUrl());
+  const [status, setStatus] = useState(hasInitialData ? 'ready' : supabase ? 'loading' : 'error');
+  const [error, setError] = useState(supabase ? '' : 'Supabase ryšys nesukonfigūruotas.');
 
   const navigateToPage = (nextPage, { replace = false } = {}) => {
     const normalizedPage = Math.max(1, nextPage);
@@ -180,6 +182,7 @@ export default function BlogPage({ slug = '' }) {
 
   useEffect(() => {
     let active = true;
+    if (hasInitialData) return () => { active = false; };
     if (!supabase) return () => { active = false; };
     const request = isArticle
       ? supabase.from('blog_posts').select(articleFields).eq('slug', slug).eq('status', 'published').maybeSingle()
@@ -217,7 +220,7 @@ export default function BlogPage({ slug = '' }) {
     });
 
     return () => { active = false; };
-  }, [isArticle, slug, page]);
+  }, [hasInitialData, isArticle, slug, page]);
 
   useEffect(() => {
     const canonical = isArticle ? `${BLOG_PATH}/${encodeURIComponent(slug)}` : BLOG_PATH;
