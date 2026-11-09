@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
@@ -1496,6 +1496,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [protocolStatusFilter, setProtocolStatusFilter] = useState('visos');
   const [protocolPage, setProtocolPage] = useState(1);
   const [reportTestTargetId, setReportTestTargetId] = useState(null);
+  const [reportTestEmployeePage, setReportTestEmployeePage] = useState(1);
+  const [expandedReportTestEmployeeId, setExpandedReportTestEmployeeId] = useState(null);
+  const [reportTestAttemptDetails, setReportTestAttemptDetails] = useState({});
+  const reportTestAttemptRequests = useRef(new Set());
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [employeeAssignmentSaving, setEmployeeAssignmentSaving] = useState(false);
   const [employeeResourceDraft, setEmployeeResourceDraft] = useState([]);
@@ -2509,7 +2513,84 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [activeTab, reportTypeFilter, reportEmployees, data.resources, currentOrg?.resources]);
   const reportTestResources = reportTypeFilter === 'Testas' ? selectedOrgResources.filter((resource) => resource.type === 'Testas') : [];
   const reportTestTarget = reportTestResources.find((resource) => resource.id === reportTestTargetId);
-  const selectedTestResults = reportTestResults.filter(({ resource }) => resource.id === reportTestTarget?.id);
+  const reportTestEmployees = useMemo(() => reportTestTarget
+    ? reportEmployees
+      .filter((employee) => employee.resourceIds?.includes(reportTestTarget.id))
+      .sort((left, right) => left.name.localeCompare(right.name, 'lt'))
+    : [], [reportEmployees, reportTestTarget]);
+  const reportTestEmployeePageSize = 20;
+  const reportTestEmployeePageCount = Math.max(1, Math.ceil(reportTestEmployees.length / reportTestEmployeePageSize));
+  const currentReportTestEmployeePage = Math.min(reportTestEmployeePage, reportTestEmployeePageCount);
+  const paginatedReportTestEmployees = reportTestEmployees.slice(
+    (currentReportTestEmployeePage - 1) * reportTestEmployeePageSize,
+    currentReportTestEmployeePage * reportTestEmployeePageSize,
+  );
+  const getReportTestAttemptCacheKey = (employeeId) => `${currentOrg?.id ?? ''}:${reportTestTarget?.id ?? ''}:${employeeId}`;
+  const toggleReportTestEmployee = async (employee) => {
+    if (expandedReportTestEmployeeId === employee.id) {
+      setExpandedReportTestEmployeeId(null);
+      return;
+    }
+
+    setExpandedReportTestEmployeeId(employee.id);
+    const cacheKey = getReportTestAttemptCacheKey(employee.id);
+    if ((reportTestAttemptDetails[cacheKey] && reportTestAttemptDetails[cacheKey].status !== 'error')
+      || reportTestAttemptRequests.current.has(cacheKey)) return;
+
+    reportTestAttemptRequests.current.add(cacheKey);
+    setReportTestAttemptDetails((current) => ({
+      ...current,
+      [cacheKey]: { status: 'loading', attempts: [], error: '' },
+    }));
+    try {
+      let attempts;
+      const isArchivedEmployee = reportArchivedEmployees.some((record) => record.id === employee.id);
+      if (cloudMode && !isArchivedEmployee) {
+        const pageSize = 500;
+        const rows = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data: page, error } = await supabase.from('employee_test_attempts')
+            .select('attempt_id, document_id, score, passed, completed_at, metadata')
+            .eq('organization_id', currentOrg.id)
+            .eq('employee_id', employee.id)
+            .eq('document_id', reportTestTarget.id)
+            .order('completed_at', { ascending: false })
+            .order('attempt_id', { ascending: false })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          rows.push(...(page ?? []));
+          if ((page ?? []).length < pageSize) break;
+        }
+        attempts = rows.map((row) => ({
+          id: row.attempt_id,
+          resourceId: row.document_id,
+          score: row.score,
+          passed: row.passed,
+          completedAt: row.completed_at,
+          ip: row.metadata?.ip ?? '',
+        }));
+      } else {
+        attempts = (employee.testResults ?? [])
+          .filter((result) => result.resourceId === reportTestTarget.id)
+          .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
+      }
+      setReportTestAttemptDetails((current) => ({
+        ...current,
+        [cacheKey]: { status: 'ready', attempts, error: '' },
+      }));
+    } catch (error) {
+      setReportTestAttemptDetails((current) => ({
+        ...current,
+        [cacheKey]: {
+          status: 'error',
+          attempts: [],
+          error: error instanceof Error ? error.message : String(error),
+        },
+      }));
+    } finally {
+      reportTestAttemptRequests.current.delete(cacheKey);
+    }
+  };
   const employeeDetails = data.employees.find((employee) => employee.id === employeeDetailsId);
   const aapIssueEmployee = data.employees.find((employee) => employee.id === aapIssueEmployeeId);
   const aapIssueOrganization = data.organizations.find((org) => org.id === aapIssueEmployee?.orgId);
@@ -7741,13 +7822,91 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3"><PageTitle title="Ataskaitos" subtitle="Dokumentų eiga, darbuotojų testų rezultatai ir užfiksuoti parašai." /></div>
-            <ReportCategoryFilters resources={selectedOrgResources} selectedType={reportTypeFilter} onTypeChange={(type) => { setReportTypeFilter(type); setReportTestTargetId(null); }} />
+            <ReportCategoryFilters resources={selectedOrgResources} selectedType={reportTypeFilter} onTypeChange={(type) => { setReportTypeFilter(type); setReportTestTargetId(null); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }} />
             {cloudMode && reportArchiveData.organizationId !== currentOrg?.id && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Įkeliami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.loading && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Atnaujinami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Archyvuotų darbuotojų ataskaitų duomenų įkelti nepavyko: {reportArchiveData.error}</p>}
-            {reportTestTarget ? <section className="space-y-3"><button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => setReportTestTargetId(null)}><ChevronLeft size={17} />Grįžti į testus</button><Panel title={reportTestTarget.title}><DataTable headers={['Vardas', 'Pavardė', 'Rezultatas', 'Išlaikė', 'Data ir laikas', 'IP adresas']} rows={selectedTestResults.map(({ employee, result }) => { const [firstName, ...lastNameParts] = employee.name.trim().split(/\s+/); return [firstName ?? '', lastNameParts.join(' '), `${result.score}%`, result.passed ? 'Taip' : 'Ne', new Date(result.completedAt).toLocaleString('lt-LT'), result.ip ?? 'Nenurodytas']; })} empty="Darbuotojai šio testo dar nesprendė." /></Panel></section> : <>
+            {reportTestTarget ? <section className="space-y-3">
+              <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900" onClick={() => { setReportTestTargetId(null); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }}><ChevronLeft size={17} />Grįžti į testus</button>
+              <Panel title={reportTestTarget.title}>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                  <p>Darbuotojų: <strong className="text-slate-900">{reportTestEmployees.length}</strong></p>
+                  <p>Bandymų: <strong className="text-slate-900">{reportTestResults.filter(({ resource }) => resource.id === reportTestTarget.id).length}</strong></p>
+                </div>
+                {paginatedReportTestEmployees.length ? <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm">
+                      <thead><tr className="border-b border-slate-200 text-xs text-slate-500">
+                        <th className="w-10 px-2 py-2"><span className="sr-only">Išskleisti</span></th>
+                        <th className="px-2 py-2">Darbuotojas</th>
+                        <th className="px-2 py-2">Pareigos</th>
+                        <th className="px-2 py-2">Bandymų</th>
+                        <th className="px-2 py-2">Paskutinis bandymas</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {paginatedReportTestEmployees.map((employee) => {
+                          const employeeResults = (employee.testResults ?? [])
+                            .filter((result) => result.resourceId === reportTestTarget.id)
+                            .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
+                          const isExpanded = expandedReportTestEmployeeId === employee.id;
+                          const cacheKey = getReportTestAttemptCacheKey(employee.id);
+                          const attemptDetails = reportTestAttemptDetails[cacheKey];
+                          return <Fragment key={employee.id}>
+                            <tr className={isExpanded ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}>
+                              <td className="px-2 py-3">
+                                <button type="button" aria-label={`${isExpanded ? 'Suskleisti' : 'Išskleisti'} ${employee.name} bandymus`} aria-expanded={isExpanded} className="grid size-8 place-items-center rounded-md text-slate-600 hover:bg-slate-100" onClick={() => { void toggleReportTestEmployee(employee); }}>
+                                  <ChevronDown size={17} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              </td>
+                              <td className="px-2 py-3 font-semibold text-slate-900">{employee.name}</td>
+                              <td className="px-2 py-3 text-slate-600">{employee.position || 'Darbuotojas'}</td>
+                              <td className="px-2 py-3">{employeeResults.length}</td>
+                              <td className="px-2 py-3">
+                                {employeeResults[0]
+                                  ? <span className={employeeResults[0].passed ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>{employeeResults[0].passed ? 'Išlaikė' : 'Neišlaikė'} · {employeeResults[0].score}%</span>
+                                  : <span className="text-slate-500">Dar nesprendė</span>}
+                              </td>
+                            </tr>
+                            {isExpanded && <tr>
+                              <td colSpan={5} className="bg-slate-50 px-4 py-4">
+                                {attemptDetails?.status === 'loading' && <p role="status" className="text-sm text-slate-600">Įkeliami {employee.name} testo bandymai…</p>}
+                                {attemptDetails?.status === 'error' && <p role="alert" className="text-sm text-rose-700">Testo bandymų įkelti nepavyko: {attemptDetails.error}</p>}
+                                {attemptDetails?.status === 'ready' && (attemptDetails.attempts.length
+                                  ? <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[560px] text-left text-sm">
+                                      <thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-2 py-2">Bandymas</th><th className="px-2 py-2">Rezultatas</th><th className="px-2 py-2">Būsena</th><th className="px-2 py-2">Data ir laikas</th></tr></thead>
+                                      <tbody className="divide-y divide-slate-200">
+                                        {attemptDetails.attempts.map((attempt, index) => <tr key={attempt.id ?? `${attempt.completedAt}-${index}`}>
+                                          <td className="px-2 py-2">{index + 1}</td>
+                                          <td className="px-2 py-2 font-semibold">{attempt.score}%</td>
+                                          <td className={`px-2 py-2 font-semibold ${attempt.passed ? 'text-emerald-700' : 'text-amber-700'}`}>{attempt.passed ? 'Išlaikė' : 'Neišlaikė'}</td>
+                                          <td className="px-2 py-2 text-slate-600">{attempt.completedAt ? new Date(attempt.completedAt).toLocaleString('lt-LT') : 'Data nenurodyta'}</td>
+                                        </tr>)}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  : <p className="text-sm text-slate-500">Šio testo bandymų nerasta.</p>)}
+                                {!attemptDetails && <p className="text-sm text-slate-500">Atidarykite darbuotojo bandymus, kad juos įkeltumėte.</p>}
+                              </td>
+                            </tr>}
+                          </Fragment>;
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {reportTestEmployees.length > reportTestEmployeePageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <p className="text-sm text-slate-500">Rodoma {(currentReportTestEmployeePage - 1) * reportTestEmployeePageSize + 1}–{Math.min(currentReportTestEmployeePage * reportTestEmployeePageSize, reportTestEmployees.length)} iš {reportTestEmployees.length} darbuotojų</p>
+                    <nav className="flex items-center gap-2" aria-label="Testų ataskaitos darbuotojų puslapiavimas">
+                      <button type="button" aria-label="Ankstesnis darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportTestEmployeePage <= 1} onClick={() => { setReportTestEmployeePage((page) => Math.max(1, page - 1)); setExpandedReportTestEmployeeId(null); }}><ChevronLeft size={17} /></button>
+                      <span className="text-sm tabular-nums">{currentReportTestEmployeePage} / {reportTestEmployeePageCount}</span>
+                      <button type="button" aria-label="Kitas darbuotojų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentReportTestEmployeePage >= reportTestEmployeePageCount} onClick={() => { setReportTestEmployeePage((page) => Math.min(reportTestEmployeePageCount, page + 1)); setExpandedReportTestEmployeeId(null); }}><ChevronRight size={17} /></button>
+                    </nav>
+                  </div>}
+                </> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Šis testas darbuotojams dar nepriskirtas.</p>}
+              </Panel>
+            </section> : <>
               {reportTypeFilter === 'Žurnalas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
-              {reportTestResources.length > 0 && <section className="space-y-3"><div><h2 className="font-bold">Testai</h2><p className="mt-1 text-sm text-slate-500">Pasirinkite testą ir peržiūrėkite darbuotojų rezultatus.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{reportTestResources.map((resource) => { const attempts = reportTestResults.filter((entry) => entry.resource.id === resource.id); return <ReportTestCard key={resource.id} resource={resource} attemptCount={attempts.length} passedCount={attempts.filter(({ result }) => result.passed).length} onSelect={() => setReportTestTargetId(resource.id)} />; })}</div></section>}
+              {reportTestResources.length > 0 && <section className="space-y-3"><div><h2 className="font-bold">Testai</h2><p className="mt-1 text-sm text-slate-500">Pasirinkite testą ir peržiūrėkite darbuotojų bandymus. Bandymų duomenys įkeliami tik išskleidus darbuotoją.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{reportTestResources.map((resource) => { const attempts = reportTestResults.filter((entry) => entry.resource.id === resource.id); return <ReportTestCard key={resource.id} resource={resource} attemptCount={attempts.length} passedCount={attempts.filter(({ result }) => result.passed).length} onSelect={() => { setReportTestTargetId(resource.id); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }} />; })}</div></section>}
               {reportTypeFilter === 'Testas' && reportTestResources.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Įmonė testų dar nepriskyrė.</p>}
               {reportTypeFilter === 'Kortelė' && <div className="space-y-6">{reportCardGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
               {reportTypeFilter === 'Kortelė' && reportAapResource && <section className="space-y-3"><div><h2 className="font-bold">Asmeninės apsaugos priemonės</h2><p className="mt-1 text-sm text-slate-500">Kiekvieno darbuotojo AAP PDF apima pasirašytą pirminę kortelę ir visus patvirtintus papildomų išdavimų lapus.</p></div><Panel title="AAP pagal darbuotoją">
