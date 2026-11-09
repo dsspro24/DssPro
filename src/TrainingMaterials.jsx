@@ -10,7 +10,7 @@ const lessons = [
       {
         title: '1. Pažinkite medžiagą prieš pradėdami',
         paragraphs: [
-          'Cheminės medžiagos gali būti degios, ėsdinančios, nuodingos, dirginančios ar kitaip pavojingos. Rizika priklauso ne vien nuo medžiagos pavadinimo, bet ir nuo jos kiekio, koncentracijos, naudojimo būdo bei darbo aplinkos.',
+          'Cheminės medžiagos gali būti sprogiosios, oksiduojančios, ypač degios, labai degios, degios arba nedegios, taip pat ėsdinančios, nuodingos ar dirginančios. Rizika priklauso ne vien nuo medžiagos pavadinimo, bet ir nuo jos kiekio, koncentracijos, naudojimo būdo bei darbo aplinkos.',
           'Prieš darbą perskaitykite pakuotės etiketę ir saugos duomenų lapą. Etiketėje ieškokite pavojingumo piktogramų, įspėjamojo žodžio ir nurodymų. Saugos duomenų lape pateikiama informacija apie rizikas, apsaugos priemones, laikymą, pirmąją pagalbą ir veiksmus avarijos atveju.',
         ],
         bullets: [
@@ -24,27 +24,29 @@ const lessons = [
         title: '2. Saugus naudojimas ir laikymas',
         paragraphs: [
           'Dirbkite pagal darbo vietos instrukciją ir saugos duomenų lape nurodytas sąlygas. Užtikrinkite reikiamą vėdinimą, naudokite konkrečiam darbui parinktas asmenines apsaugos priemones ir saugokite, kad medžiaga nepatektų ant odos, į akis ar į aplinką.',
-          'Medžiagas laikykite tam skirtoje, tvarkingoje vietoje, sandariai uždarytas ir originaliose arba tinkamai paženklintose talpyklose. Laikymo sąlygos ir atskyrimas priklauso nuo produkto savybių – vadovaukitės etikete, saugos duomenų lapu ir įmonės tvarka.',
+          'Pagal šiame mokymo teste nurodytą tvarką cheminės medžiagos laikomos gerai vėdinamoje, užrakinamoje patalpoje, jų etiketės atsuktos į praėjimo pusę. Nuo šildymo įrenginių laikykite bent 1 m atstumu. Šie skaičiai nepakeičia konkretaus produkto saugos duomenų lapo ar įmonės patvirtintos laikymo schemos – jei joje nustatytas griežtesnis reikalavimas, vadovaukitės juo.',
         ],
         bullets: [
           'Nenaudokite maisto ar gėrimų taros chemikalams laikyti.',
-          'Nelaikykite medžiagų praėjimuose ar prie šilumos šaltinių, jei tai draudžia nurodymai.',
+          'Dezinfekavimo priemonių atsargas laikykite tik sandarioje, nepažeistoje taroje.',
+          'Perkeldami pakuotę jos nevilkite ir nemėtykite – saugokite, kad ji neįtrūktų ir etiketė nenusitrintų.',
           'Pastebėję nesandarumą, pažeistą pakuotę ar netinkamą ženklinimą, sustabdykite darbą ir praneškite atsakingam asmeniui.',
         ],
-        takeaway: 'Apsaugos priemonės ir laikymo sąlygos parenkamos pagal konkrečią medžiagą.',
+        takeaway: 'Laikykite užrakintoje, vėdinamoje vietoje, etikete į praėjimą, bent 1 m nuo šildymo įrenginių; visada patikrinkite konkretaus produkto nurodymus.',
       },
       {
         title: '3. Išsiliejimas, kontaktas ir pagalba',
         paragraphs: [
-          'Išsiliejus ar išsiskyrus medžiagai, perspėkite šalia esančius ir laikykitės įmonės avarinės tvarkos. Nevalykite išsiliejimo, jei nesate apmokyti, nežinote medžiagos arba neturite tinkamų priemonių. Esant pavojui pasitraukite į saugią vietą ir kvieskite pagalbą.',
-          'Medžiagai patekus ant odos ar į akis, vadovaukitės saugos duomenų lapo pirmosios pagalbos nurodymais ir nedelsdami praneškite atsakingam asmeniui. Sunkaus sužalojimo, apsinuodijimo ar tiesioginio pavojaus atveju skambinkite 112. Įvykį užregistruokite pagal įmonės tvarką.',
+          'Medžiagai patekus ant odos, nutraukite kontaktą, atsargiai nusivilkite užterštus drabužius ir plaukite odą vandeniu bei muilu, jei tai nurodo saugos duomenų lapas. Patekus į akis, nedelsdami pradėkite plauti švariu tekančiu vandeniu; šiame teste nurodytas maždaug 10 minučių plovimas ir kreipimasis į gydytoją. Konkretus plovimo laikas bei tolesni veiksmai priklauso nuo medžiagos, todėl vadovaukitės jos saugos duomenų lapu ir skubios pagalbos specialistų nurodymais.',
+          'Prarijus medžiagos, nutraukite tolesnį jos patekimą, nesukelkite vėmimo ir skubiai kvieskite medicinos pagalbą; turėkite produkto pakuotę arba saugos duomenų lapą. Išsiliejus medžiagai perspėkite šalia esančius. Degius ar sprogius likučius pilkite tik į tam skirtas, paženklintas atliekų talpas – niekada į kanalizaciją ar gruntą. Nevalykite išsiliejimo, jei nesate apmokyti arba neturite tinkamų priemonių.',
         ],
         bullets: [
-          'Neleiskite medžiagai patekti į kanalizaciją ar aplinką.',
-          'Neimprovizuokite neutralizavimo ar valymo būdų.',
-          'Atliekas tvarkykite pagal produkto nurodymus ir įmonės tvarką.',
+          'Su cheminėmis medžiagomis dirba tik apmokyti ir instruktuoti darbuotojai.',
+          'Darbo drabužius laikykite atskirai nuo kasdienių; po darbo nusiplaukite.',
+          'Valgykite, gerkite ir rūkykite tik tam specialiai įrengtose, darbo zonai skirtose vietose.',
+          'Žinokite, kur yra pirmosios pagalbos priemonės ir pirminės gaisro gesinimo priemonės, bei kaip jomis naudotis.',
         ],
-        takeaway: 'Pirmiausia apsaugokite žmones, tada veikite pagal instrukcijas ir kvieskite pagalbą.',
+        takeaway: 'Oda – nuplauti; akys – iškart plauti ir kreiptis pagalbos; prarijus – nesukelti vėmimo, skubiai kviesti pagalbą.',
       },
     ],
   },
@@ -56,41 +58,44 @@ const lessons = [
       {
         title: '1. Suplanuokite darbą ir įvertinkite pavojus',
         paragraphs: [
-          'Kritimas iš aukščio gali sukelti sunkius sužalojimus net ir dirbant palyginti nedideliame aukštyje. Prieš pradėdami įvertinkite darbo vietą, paviršiaus būklę, oro sąlygas, darbo trukmę, įrankius ir galimybę saugiai patekti bei pasitraukti.',
-          'Darbus turi atlikti apmokyti ir tam paskirti darbuotojai, laikydamiesi įmonės instrukcijų. Kur įmanoma, rinkitės kolektyvines apsaugos priemones, pavyzdžiui, aptvarus ar tinkamai įrengtą darbo platformą. Pavojingą zoną apačioje pažymėkite ir neleiskite į ją patekti pašaliniams.',
+          'Šiame mokymo teste darbais aukštyje laikomi darbai nuo 1,1 m, o aukštalipių darbais – nuo 5 m. Teste taip pat tikrinama, kad dirbant 5 m aukštyje ir aukščiau reikalinga galiojanti medicininė pažyma. Šiuos mokomosios programos slenksčius būtina sieti su darbų pobūdžiu ir galiojančiais įmonės dokumentais – prieš konkretų darbą patikrinkite darbų vadovo nurodymus ir profesinės rizikos vertinimą.',
+          'Kritimas iš aukščio gali sukelti sunkius sužalojimus net ir dirbant mažesniame aukštyje. Įvertinkite darbo vietą, paviršiaus būklę, oro sąlygas, darbo trukmę, įrankius ir galimybę saugiai patekti bei pasitraukti. Kur įmanoma, rinkitės kolektyvines apsaugos priemones, pavyzdžiui, aptvarus ar tinkamai įrengtą platformą, ir pažymėkite pavojingą zoną apačioje.',
         ],
         bullets: [
           'Patikrinkite, ar darbą galima atlikti nuo žemės arba saugesnės platformos.',
-          'Numatykite, kaip bus keliami įrankiai ir medžiagos.',
+          'Dirbant aukštyje naudokite darbui tinkamą apsauginį šalmą; apsaugos nuo kritimo sistemą rinkitės pagal rizikos vertinimą.',
+          'Numatykite, kaip bus keliami įrankiai ir medžiagos bei kaip apsaugosite kitus nuo krintančių daiktų.',
           'Atidėkite darbą, jei sąlygos nesaugios arba neaiškios.',
         ],
-        takeaway: 'Saugus darbas prasideda nuo tinkamo planavimo, o ne nuo lipimo.',
+        takeaway: 'Mokymo teste ribos yra 1,1 m darbams aukštyje ir 5 m aukštalipių darbams bei medicininei pažymai; darbo vietoje tikrinkite galiojančius nurodymus.',
       },
       {
         title: '2. Kopėčios, pastoliai ir platformos',
         paragraphs: [
-          'Prieš naudodami kopėčias, pastolius ar platformą, apžiūrėkite, ar jie nepažeisti, stabilūs ir tinkamai pastatyti. Naudokite tik konkrečiam darbui skirtą ir patikrintą įrangą. Savadarbės paaukštinimo priemonės, tokios kaip dėžės ar kėdės, nėra saugus pakaitalas.',
-          'Ant pastolių dirbkite tik tada, kai jie sumontuoti ir naudojami pagal nustatytą tvarką. Nešalinkite aptvarų ar kitų apsaugos elementų. Kopėčias statykite ant tvirto, lygaus pagrindo ir naudokite taip, kad išlaikytumėte pusiausvyrą; nebandykite pasiekti per toli persisverdami.',
+          'Prieš naudodami kopėčias, lipynes, pastolius ar paklotus, apžiūrėkite, ar jie nepažeisti, stabilūs ir tinkamai pastatyti. Dėžės ir kėdės nėra paaukštinimo priemonės. Kopėčias statykite ant tvirto pagrindo; nesiekite per toli ir nenaudokite jų užduotims, kai reikia tempti laidus, prilaikyti sunkias detales, virinti ar dirbti šalia neapsaugotų judančių mašinų dalių.',
+          'Šiame teste nurodyta, kad 2 m ir didesniame aukštyje dirbant naudojamas apsauginis diržas. Naudokite tik nepažeistą diržą su atliktos patikros / bandymo žyma ir prijunkite prie numatyto tvirtinimo taško. Ant pastolių nedirbkite arti veikiančių elektros tiekimo linijų, jei nėra užtikrinta sauga.',
         ],
         bullets: [
           'Nenaudokite apgadintos, nestabilios ar nepatikrintos įrangos.',
-          'Neperkraukite platformų ir neužstatykite priėjimo.',
+          'Neperkraukite platformų ir neužstatykite priėjimo; krovinių padavimo angas apsaugokite iš visų keturių pusių.',
           'Pastebėję trūkumą, pažymėkite įrangą kaip netinkamą ir praneškite atsakingam asmeniui.',
         ],
-        takeaway: 'Jei įranga nestabili arba pažeista, ant jos nedirbkite.',
+        takeaway: 'Nuo 2 m naudokite patikrintą diržą pagal testo mokymo programą; niekada nekeiskite kopėčių ar pastolių savadarbėmis priemonėmis.',
       },
       {
         title: '3. Apsauga nuo kritimo ir veiksmai pavojaus atveju',
         paragraphs: [
-          'Kai kolektyvinės apsaugos nepakanka, naudokite darbui tinkamai parinktą ir patikrintą asmeninę apsaugos nuo kritimo sistemą. Diržai ir jungtys turi būti nepažeisti, tinkamai užsegti ir prijungti prie numatyto tvirtinimo taško. Vadovaukitės mokymuose ir darbo vietos instrukcijoje pateiktais reikalavimais.',
-          'Prieš darbą sutarkite, kaip bus iškviesta pagalba ir išgelbėtas kabantis darbuotojas. Pastebėję apsaugos trūkumą, pavojingas oro sąlygas ar pasikeitusią darbo vietą, sustokite, saugiai pasitraukite ir informuokite vadovą. Nesiimkite gelbėjimo veiksmų, kuriems nesate paruošti.',
+          'Esant vėjo greičiui 12–15 m/s, taip pat smarkiai lyjant, sningant, esant plikledžiui ar blogam matomumui, darbus aukštyje nutraukite, kaip nurodyta testo medžiagoje ir darbų saugos tvarkoje. Vertinkite ne vien vėjo greitį, bet ir gūsius, darbo pobūdį, platformos gamintojo apribojimus bei vadovo nurodymus.',
+          'Pastolius išmontuokite aukštais iš viršaus į apačią. Išmontuotus elementus atsargiai nuleiskite virvėmis ar kėlimo mechanizmu – nemeskite žemyn ir nepalikite darbo vietoje. Prieš darbą sutarkite, kaip bus iškviesta pagalba ir išgelbėtas kabantis darbuotojas.',
         ],
         bullets: [
           'Nenaudokite priemonių, kurių patikros būklė ar tinkamumas nežinomi.',
           'Nedirbkite vieni, jei pagal darbo pobūdį būtina užtikrinti stebėjimą ar pagalbą.',
+          'Įvykus nelaimei pakeliui į darbą ar iš jo, apie ją praneškite patys arba paprašykite tai padaryti kitą asmenį.',
+          'Po smūgio į galvą galvos skausmas ar vėmimas yra priežastis skubiai kreiptis medicininės pagalbos; įtariant lūžį galūnę raminkite ir nebandykite jos atstatyti.',
           'Apie incidentą ar vos neįvykusį nelaimingą atsitikimą praneškite nedelsdami.',
         ],
-        takeaway: 'Apsaugos priemonė veikia tik tada, kai tinkamai parinkta, patikrinta ir naudojama.',
+        takeaway: 'Kai vėjas pasiekia 12–15 m/s arba sąlygos pavojingos, darbus sustabdykite; pastolius ardykite nuo viršaus, elementus nuleiskite saugiai.',
       },
     ],
   },
@@ -102,21 +107,23 @@ const lessons = [
       {
         title: '1. Kaip mažinti gaisro riziką',
         paragraphs: [
-          'Gaisrą dažnai sukelia neatsargus darbas su atvira liepsna, netvarkinga elektros įranga, netinkamas šildymas arba degių medžiagų laikymas. Darbo vietoje laikykitės gaisrinės saugos instrukcijų ir konkrečiai zonai nustatytų apribojimų.',
-          'Evakuacijos keliai, išėjimai ir priėjimai prie gesinimo priemonių turi būti neužstatyti. Nenaudokite pažeistų elektros laidų, nepalikite be priežiūros pavojingų įrenginių, o pastebėję gedimą praneškite atsakingam asmeniui.',
+          'Gaisrų klasė C reiškia dujų gaisrus. Gaisro klasė svarbi renkantis gesinimo priemonę: putų gesintuvu negalima gesinti įtampą turinčių elektros prietaisų, žmogaus veido ar šarminių metalų. Gesintuvo etiketėje visada patikrinkite, kokiems gaisrams jis tinka.',
+          'Pagal šiame teste tikrinamas bendrąsias taisykles evakuacijos kelio plotis turi būti bent 1,2 m, o praėjimo aukštis – bent 2 m. Tai nėra leidimas susiaurinti konkretaus pastato kelią: jei evakuacijos plane ar pastato reikalavimuose nustatyta daugiau, vadovaukitės griežtesniu reikalavimu. Bendrosios gaisrinės saugos taisyklės taikomos pastatus ir įrenginius eksploatuojant, statant, rekonstruojant ar techniškai pertvarkant. Evakuaciniai išėjimai turi būti aiškiai pažymėti ir laisvi.',
         ],
         bullets: [
           'Žinokite artimiausią evakuacijos išėjimą ir susirinkimo vietą.',
           'Susipažinkite su gaisro pavojaus signalu ir įmonės perspėjimo tvarka.',
-          'Laikykite degias medžiagas tik joms skirtose vietose.',
+          'Laidai ir kabeliai su pažeista izoliacija nenaudojami; šildymui rinkitės tik leidžiamus, uždaro tipo pramoninius prietaisus.',
+          'Tarp elektros šviestuvų ir sandėliuojamų degių medžiagų palikite bent 0,5 m; lengvuosius automobilius aikštelėje statykite palikdami bent 0,6 m tarpą.',
         ],
-        takeaway: 'Tvarkinga darbo vieta ir neužstatyti išėjimai padeda išvengti gaisro bei greičiau evakuotis.',
+        takeaway: 'Žinokite gaisro klasę ir gesintuvo paskirtį; evakuacijos praėjimuose turi likti bent 1,2 m pločio ir 2 m aukščio laisvas kelias.',
       },
       {
         title: '2. Ką daryti pastebėjus gaisrą',
         paragraphs: [
-          'Pastebėję gaisrą ar dūmus, nedelsdami perspėkite aplinkinius ir įjunkite pavojaus signalą pagal įmonės tvarką. Skambindami 112 aiškiai nurodykite adresą, kas dega, ar yra nukentėjusiųjų ir kaip su jumis susisiekti. Neužlaikykite evakuacijos bandydami gelbėti daiktus.',
-          'Evakuokitės artimiausiu saugiu keliu, vadovaukitės ženklais ir atsakingų asmenų nurodymais. Jei įmanoma tai padaryti nerizikuojant, uždarykite duris už savęs. Pasiekę susirinkimo vietą praneškite, ar matėte likusių žmonių, ir negrįžkite į pastatą, kol to neleis atsakingi asmenys.',
+          'Pastebėję gaisrą ar dūmus, perspėkite aplinkinius, aktyvuokite signalą ir skambinkite 112. Pagal šiame teste mokomą seką pirmiausia kviečiami ugniagesiai, tuomet evakuojami žmonės, o gesinti bandoma tik jei tai saugu. Jei kyla tiesioginis pavojus, nedelskite evakuacijos – laikykitės vietos plano ir skubiosios pagalbos operatoriaus nurodymų.',
+          'Evakuacinių durų atidarymo kryptis ir išimtys priklauso nuo patalpos bei žmonių skaičiaus. Teste minima išimtis patalpoms, kuriose nuolat būna ne daugiau kaip 15 žmonių; konkrečiame pastate vadovaukitės patvirtintu evakuacijos planu. Visuomeninės paskirties pastate, kai aukštų daugiau kaip du, teste nurodyta ne mažiau kaip du evakuaciniai išėjimai; išėjimų skaičius ir išdėstymas vis tiek turi atitikti konkrečiam pastatui taikomus reikalavimus. Degių medžiagų ant rampų nepalikite ne darbo metu.',
+          'Krypties ir informacijos ženklai turi būti gerai matomi iš bet kurios patalpos vietos. Masinio žmonių buvimo patalpa teste apibrėžta kaip patalpa, kurioje vienu metu gali būti daugiau kaip 50 žmonių. Žinokite, ar jūsų darbo vieta tokia yra, nes žmonių skaičius svarbus planuojant evakuaciją.',
         ],
         bullets: [
           'Nenaudokite lifto, jei evakuacijos plane nenurodyta kitaip.',
@@ -128,15 +135,16 @@ const lessons = [
       {
         title: '3. Gesintuvai ir saugus elgesys',
         paragraphs: [
-          'Gesintuvą naudokite tik tada, jei gaisras nedidelis, žinote, kaip elgtis, turite tinkamą gesinimo priemonę ir už savęs išsaugote laisvą pasitraukimo kelią. Vadovaukitės gesintuvo ženklinimu ir mokymuose išmokta tvarka.',
-          'Jei ugnis plinta, patalpa prisipildo dūmų arba nesate tikri, kad galite veikti saugiai, pasitraukite ir palikite gesinimą ugniagesiams. Netinkama gesinimo priemonė gali padidinti pavojų, todėl neimprovizuokite ir nebandykite gesinti elektros ar kitų specifinių gaisrų priemone, kuri tam neskirta.',
+          'Šiuolaikiniuose gesintuvuose naudojamos putos, dujos arba milteliai – priemonę rinkite pagal gaisro klasę ir įrenginio ženklinimą. Pirminėms gaisro gesinimo priemonėms taip pat priskiriami gesintuvai, smėlis ir nedegus audeklas. Jomis naudokitės tik apmokyti ir tik tada, kai gaisras nedidelis, turite laisvą pasitraukimo kelią ir gesinimas nekelia pavojaus.',
+          'Teste minimas bent 0,6 m tarpas tarp aikštelėje statomų lengvųjų automobilių. Ant rampų degių medžiagų nepalikite ne darbo metu, neužstatykite privažiavimo ugniagesiams. Gaisro ir sprogimo pavojingumo kategorijos pagal testą žymimos Asg, Bsg, Cg, Dg ir Eg; konkrečios darbo vietos kategoriją nustato atsakingi asmenys, o darbuotojas privalo žinoti jam taikomus apribojimus.',
         ],
         bullets: [
           'Gesinimas neturi trukdyti evakuacijai ir pagalbos iškvietimui.',
           'Dūmai yra pavojingi – neikite į uždūmintą patalpą gelbėti turto.',
+          'Sunkiai degios medžiagos, veikiamos uždegimo šaltinio, gali degti, smilkti ar anglėti, bet pašalinus šaltinį šie procesai savaime nutrūksta.',
           'Po įvykio informuokite atsakingą asmenį net ir tada, kai gaisras užgesintas.',
         ],
-        takeaway: 'Gesintuvą naudokite tik saugiomis sąlygomis; kitu atveju evakuokitės.',
+        takeaway: 'Skambinkite 112, saugiai organizuokite evakuaciją ir gesinkite tik turėdami tinkamą priemonę bei saugų pasitraukimo kelią.',
       },
     ],
   },
@@ -148,41 +156,41 @@ const lessons = [
       {
         title: '1. Pasiruoškite kasimo darbams',
         paragraphs: [
-          'Prieš kasant būtina žinoti darbo ribas, grunto sąlygas ir galimų požeminių tinklų vietas. Darbų vadovas turi organizuoti darbą pagal projektą, leidimus ir įmonėje nustatytą tvarką. Nepradėkite kasimo, jei nėra aišku, kur gali būti kabeliai, vamzdynai ar kitos komunikacijos.',
-          'Aptikę nežymėtą kabelį, vamzdį, įtartiną objektą ar sprogmenį primenantį daiktą, sustabdykite darbus, jo nelieskite ir neleiskite artintis kitiems. Informuokite vadovą ir veikite pagal nustatytą pranešimo bei avarinę tvarką.',
+          'Kasimo darbams prieš pradžią būtinas išduotas leidimas, o darbo vietą turi patikrinti atsakingas darbų vadovas. Patikrinkite brėžinius ir požeminių kabelių bei vamzdynų vietas. Sušalusį gruntą virš kabelio atkaskite tik rankiniu kastuvu; nenaudokite laužtuvo ir nešildykite atvira liepsna. Radę schemoje nepažymėtą kabelį ar vamzdį, nedelsdami nutraukite darbus, nieko nejudinkite ir kvieskite darbų vadovą.',
+          'Pagal tvirtinimo būdą tranšėjos būna ramstomos ir neramstomos. Šiame teste nurodyta, kad atraminės konstrukcijos būtinos gilesnėse nei 1,25 m iškasose. Tai nėra pagrindas savarankiškai spręsti, kad seklesnė iškasa saugi: grunto tipas, vanduo, vibracija, šlaitai ir kitos aplinkybės gali reikalauti papildomo tvirtinimo. Vadovaukitės projektu, leidimu ir darbų vadovo nurodymais.',
         ],
         bullets: [
           'Patikrinkite darbo vietos aptvėrimą, ženklus ir saugų priėjimą.',
-          'Įsitikinkite, kad darbuotojai žino darbų planą ir pavojingas zonas.',
-          'Sustokite, jei reali situacija neatitinka turimų brėžinių ar nurodymų.',
+          'Radę sprogmenį primenantį daiktą jo nelieskite, pasitraukite ir skambinkite 112; informuokite vadovą bei policiją.',
+          'Nepradėkite kasimo, kol nėra leidimo ir atsakingo asmens patikros.',
         ],
-        takeaway: 'Neaiškios požeminės komunikacijos – priežastis sustabdyti kasimą ir išsiaiškinti.',
+        takeaway: 'Kasimui būtinas leidimas; 1,25 m gilesnėse iškasose numatykite atramines konstrukcijas, o aptikę nežinomą kabelį – nedelsdami sustokite.',
       },
       {
         title: '2. Apsauga nuo grunto griūties',
         paragraphs: [
-          'Iškasos sienos gali griūti dėl grunto savybių, vibracijos, vandens, oro sąlygų ar netinkamos apkrovos prie krašto. Apsaugos būdą – šlaitavimą, tvirtinimą ar kitą sprendimą – turi nustatyti atsakingi specialistai pagal konkrečias sąlygas. Niekada neįeikite į iškasą, kuri neapsaugota taip, kaip reikalaujama.',
-          'Iškastą gruntą, medžiagas ir techniką laikykite nuo krašto taip, kaip nurodyta darbo plane. Apsaugokite kraštus nuo žmonių ar transporto priemonių įkritimo. Naudokite numatytus saugius įėjimo ir išėjimo būdus, o ne lipkite nestabiliomis sienomis.',
+          'Pagal testą iškastą gruntą nuo iškasos briaunos kraukite ne arčiau kaip 1,5 m. Taip sumažinama papildoma apkrova prie krašto ir rizika, kad gruntas nuslinks atgal į iškasą. Technikai, medžiagoms ir transportui taip pat reikia saugaus atstumo pagal darbų planą – nepriartinkite jų savarankiškai.',
+          'Iškasos sienos gali griūti dėl grunto savybių, vibracijos, vandens, oro sąlygų ar apkrovos prie krašto. Apsaugos būdą – šlaitavimą, tvirtinimą ar kitą sprendimą – nustato atsakingi specialistai pagal konkrečias sąlygas. Naudokite tik numatytus saugius įėjimo ir išėjimo būdus. Jei šlaitas pradeda slinkti, nedelsdami perspėkite kitus ir pasitraukite iš iškasos; tik saugioje vietoje kvieskite darbų vadovą. Negrįžkite tvirtinti šlaito, kol neįvertintas pavojus.',
         ],
         bullets: [
           'Nekeiskite tvirtinimo konstrukcijų ir nešalinkite jų be leidimo.',
           'Neikite po pakabintu kroviniu ir nestovėkite ekskavatoriaus veikimo zonoje.',
-          'Pastebėję įtrūkimus, grunto slinkimą ar vandens kaupimąsi, pasitraukite ir perspėkite kitus.',
+          'Laikykite iškastą gruntą bent 1,5 m nuo briaunos ir stebėkite, ar neatsiranda įtrūkimų ar grunto slinkimo.',
         ],
-        takeaway: 'Jei iškasa atrodo nestabili, visi darbuotojai turi pasitraukti į saugią vietą.',
+        takeaway: 'Gruntą kraukite bent 1,5 m nuo krašto; pastebėję slinkimą, iškart išeikite ir perspėkite kitus.',
       },
       {
         title: '3. Patikra, ryšys ir avariniai veiksmai',
         paragraphs: [
-          'Darbo vietą turi tikrinti už tai atsakingas asmuo prieš pradedant darbus ir pasikeitus sąlygoms, pavyzdžiui, po stipraus lietaus, vibracijos ar grunto pokyčių. Darbuotojai turi žinoti, kam pranešti ir kaip iškviesti pagalbą. Dirbant giliose ar riboto matomumo vietose svarbu laikytis nustatytos stebėjimo ir ryšio tvarkos.',
-          'Pajutę grunto judėjimą, išgirdę neįprastą garsą ar pastebėję konstrukcijos gedimą, nedelsdami perspėkite kitus ir pasitraukite numatytu keliu. Griūties atveju neikite į nestabilią iškasą gelbėti žmogaus, jei nesate tam parengti – kvieskite 112 ir vykdykite gelbėtojų nurodymus.',
+          'Gilioje iškasoje darbuotojai neturi dirbti be numatyto ryšio ir stebėjimo. Dirbant dviese, vienas gali iškviesti pagalbą ir padėti organizuoti gelbėjimą, jei kitas susižalotų; tai nereiškia, kad reikia lįsti į griūvančią iškasą. Darbo vietą atsakingas vadovas tikrina prieš kasimą ir pasikeitus sąlygoms.',
+          'Rankos sužalojimo atveju, jei kraujuoja, uždėkite spaudžiamąjį tvarstį ir praneškite vadovui; esant stipriam kraujavimui ar rimtam sužalojimui kvieskite 112. Kilus kibirkščiavimui ar ugniai šalia iškasos, perspėkite kitus, skambinkite 112, o gesintuvą naudokite tik jei tai saugu ir turite tinkamą gesintuvą. Pajutę grunto judėjimą ar pastebėję konstrukcijos gedimą, pasitraukite numatytu keliu ir negrįžkite, kol vieta nepatikrinta.',
         ],
         bullets: [
           'Negrįžkite į pavojingą zoną, kol jos saugumas nepatvirtintas.',
           'Apie incidentą ir vos neįvykusią griūtį praneškite atsakingam vadovui.',
-          'Pirmąją pagalbą teikite tik tiek, kiek saugu jums ir nukentėjusiajam.',
+          'Esant pavojui ar sprogmeniui kvieskite 112 ir policiją; nespręskite grėsmės savarankiškai.',
         ],
-        takeaway: 'Įtarus griūtį – perspėkite, pasitraukite ir kvieskite profesionalią pagalbą.',
+        takeaway: 'Patikra – darbų vadovo atsakomybė; dirbant gilioje iškasoje antras žmogus padeda iškviesti pagalbą, bet neina į griūties zoną.',
       },
     ],
   },
@@ -194,41 +202,42 @@ const lessons = [
       {
         title: '1. Įvertinkite krovinį ir pasirinkite būdą',
         paragraphs: [
-          'Prieš keldami įvertinkite krovinio svorį, dydį, formą, stabilumą ir suėmimo vietas. Patikrinkite, ar krovinys nepažeistas ir ar jo turinys nepavojingas. Įvertinkite savo savijautą, kelią, atstumą ir vietą, kurioje krovinį padėsite.',
-          'Jei krovinys sunkus, nepatogus ar kelia abejonių, rinkitės vežimėlį, kėlimo mechanizmą arba paprašykite pagalbos. Leistina apkrova priklauso nuo darbo sąlygų ir rizikos vertinimo, todėl nesivadovaukite vien universaliu kilogramų skaičiumi.',
+          'Šiame teste krovinių kėlimo rankomis riba pateikiama kaip 5–25 kg. Tai mokymo testo diapazonas, o ne garantija, kad kiekvienas darbuotojas gali saugiai kelti 25 kg: saugi apkrova priklauso nuo darbuotojo, krovinio, padėties, dažnio ir rizikos vertinimo. Prieš keldami įvertinkite svorį, dydį, formą, stabilumą, suėmimo vietas ir savo galimybes. Darbuotojas turi gauti tikslią informaciją apie krovinio svorį ir turinį.',
+          'Jei krovinys sunkesnis kaip 25 kg ir jį reikia kelti aukščiau kaip 3 m, pagal testo medžiagą naudokite kėlimo mechanizmą, o ne kelkite rankomis. Darbui su mechanizmu būtinas atitinkamas pasirengimas / pažymėjimas; vien vadovo leidimo ar skubos nepakanka. Jei krovinys nepatogus arba kyla abejonių, rinkitės mechaninę pagalbą ir vadovaukitės darbo vietos rizikos vertinimu.',
         ],
         bullets: [
-          'Pašalinkite kliūtis, slidžias vietas ir užtikrinkite pakankamą apšvietimą.',
-          'Iš anksto suplanuokite maršrutą ir krovinio padėjimo vietą.',
-          'Nekelkite krovinio, jei negalite jo saugiai suimti ar matyti kelio.',
+          'Krovinys turi būti stabilus, tinkamai įpakuotas ir parengtas kėlimui.',
+          'Smulkiems kroviniams perkelti naudokite tam tinkamus kėlimo ar transportavimo mechanizmus, o ne atsitiktinius vamzdžius ar metalo gabalus.',
+          'Krovinių pernešimo maršrutas turi būti gerai apšviestas, stabilus, neslidus ir neužkrautas atliekomis.',
+          'Krovinius kraukite vadovo nurodytoje, iš anksto numatytoje sandėliavimo vietoje; palikite bent 0,8 m tarp krovinio ir sienos.',
         ],
-        takeaway: 'Mechaninė pagalba ar darbas dviese dažnai saugesnis už kėlimą vienam.',
+        takeaway: 'Teste: 5–25 kg rankinio kėlimo diapazonas; sunkesniam nei 25 kg kroviniui, keliamam aukščiau nei 3 m, numatytas kėlimo mechanizmas; sandėlyje palikite 0,8 m nuo sienos.',
       },
       {
         title: '2. Kelkite ir nuleiskite valdydami judesį',
         paragraphs: [
-          'Atsistokite stabiliai, prisiartinkite prie krovinio ir tvirtai jį suimkite. Kelkite tolygiai, laikydami krovinį kuo arčiau kūno. Judėkite kojomis ir visu kūnu, o ne staigiai sukdami liemenį su svoriu rankose. Nuleiskite krovinį kontroliuojamai.',
-          'Neskubėkite ir netraukite krovinio staigiu judesiu. Jei keliant atsiranda skausmas, prarandate pusiausvyrą ar krovinys pasislenka, saugiai jį padėkite ir kreipkitės pagalbos. Naudokite darbo pobūdžiui tinkamas pirštines ir kitus nurodytus apsauginius drabužius.',
+          'Atsistokite stabiliai, prisiartinkite prie krovinio ir tvirtai jį suimkite. Teste saugus kėlimo būdas apibūdinamas kaip kėlimas tiesia nugara, sulenktais keliais, laikant krovinį kuo arčiau kūno ir jį nuleidžiant tolygiai. Venkite staigaus liemens sukimo su svoriu rankose.',
+          'Krovinius ant pečių nešantys darbuotojai turi išlaikyti saugų atstumą vienas nuo kito ir judėti suderintai. Stumkite vežimėlį taip, kad matytumėte kelią, valdytumėte krovinį ir galėtumėte sustoti; testo medžiagoje nurodyta jį stumti iš šono arba galo, ne stovint priešais judėjimo kryptį.',
         ],
         bullets: [
-          'Laikykite pėdas stabiliai ir venkite pasilenkimo bei persisukimo vienu metu.',
-          'Neuždenkite kroviniu savo matymo lauko.',
-          'Nepalikite krovinio nestabilioje ar nepažymėtoje vietoje.',
+          'Krovikams parūpinkite pirštines ir apsauginę avalynę pagal darbo riziką.',
+          'Naudokite tik inventoriaus kopėčias su tinkamais neslystančiais antgaliais – ne dėžes, ne kėdes ir ne pažeistas kopėčias.',
+          'Pastebėję skausmą, nestabilumą ar kliūtį, sustokite ir paprašykite pagalbos.',
         ],
-        takeaway: 'Valdomas, artimas ir tolygus judesys mažina nugaros bei sąnarių apkrovą.',
+        takeaway: 'Kelkite kontroliuojamai, tiesia nugara ir sulenktais keliais; krovinį laikykite prie kūno ir nuleiskite tolygiai.',
       },
       {
         title: '3. Perkelkite ir sandėliuokite saugiai',
         paragraphs: [
-          'Nešdami krovinį eikite laisvu, lygiu maršrutu ir žiūrėkite, kur statote kojas. Jei krovinys nepatogus, didelis ar ilgas, susitarkite dėl bendrų veiksmų ir komandų su pagalbininku. Neperduokite krovinio kitam žmogui neįspėję.',
-          'Kraukite krovinius tik į numatytas vietas, stabiliai ir taip, kad jie negalėtų nuslysti ar apvirsti. Neužstatykite praėjimų, išėjimų ar gesinimo priemonių. Naudokite tik tinkamus vežimėlius ir kėlimo įrenginius; darbą su jais atlikite tik turėdami reikiamą pasirengimą ir leidimą.',
+          'Judant automašinai nestovėkite jos parkavimosi zonoje ir nelipkite į ją ar iš jos. Krovinio pakrovimą ar iškrovimą derinkite su vairuotoju ir atsakingu vadovu, kad transporto priemonė būtų saugiai sustabdyta.',
+          'Nesaugiai sukrautą krovinį taisykite tik sustabdę darbą ir įvertinę, kaip saugiai jį stabilizuoti; nestovėkite po nestabiliu kroviniu. Krovinius dėkite į vadovo nurodytą, iš anksto numatytą vietą. Po įvykio ar susižalojimo praneškite vadovui, net jei sužalojimas atrodo nedidelis.',
         ],
         bullets: [
           'Neikite po keliamu ar nestabiliai sukrautu kroviniu.',
-          'Nedelsdami praneškite apie pavojingą krovinį, netvarkingą įrangą ar patirtą skausmą.',
-          'Po nelaimingo atsitikimo informuokite vadovą pagal įmonės tvarką.',
+          'Kėlimo mechanizmus valdykite tik turėdami reikiamą pažymėjimą ir įgaliojimą.',
+          'Pakeliui į darbą ar iš jo įvykus nelaimei, apie ją praneškite patys arba paprašykite kito asmens tai padaryti.',
         ],
-        takeaway: 'Saugus kėlimas apima visą procesą – nuo krovinio įvertinimo iki jo stabilaus padėjimo.',
+        takeaway: 'Saugus krovinių darbas apima tinkamą maršrutą, AAP, autorizuotą mechanizmų naudojimą ir pranešimą apie nelaimes.',
       },
     ],
   },
@@ -240,39 +249,40 @@ const lessons = [
       {
         title: '1. Atpažinkite netinkamą elgesį',
         paragraphs: [
-          'Psichologinis smurtas gali pasireikšti žeminimu, bauginimu, grasinimais, apkalbomis, izoliavimu ar nuolatiniu nepagrįstu profesinių gebėjimų menkinimu. Pasikartojantis ir į darbuotoją nukreiptas elgesys gali rodyti sisteminį spaudimą, tačiau situacijos vertinamos pagal visus faktus ir aplinkybes.',
-          'Priekabiavimas – tai nepageidaujamas elgesys, kuris žemina žmogaus orumą arba kuria bauginančią, priešišką ar įžeidžiančią aplinką. Netinkamas elgesys gali būti žodinis, fizinis ar vykstantis elektroninėmis priemonėmis. Vien tai, kad įvykis nutiko vieną kartą, savaime nereiškia, jog jį galima ignoruoti.',
+          'Psichologinis smurtas darbe gali būti tikslinis, sistemingas, ilgesnį laiką pasikartojantis elgesys, kuriuo darbuotojas bauginamas ar žeminamas, jo gebėjimai menkinami arba jis atskiriamas kolektyvo. Pavyzdžiai: grasinimai, šmeižtas, pasikartojantis sarkazmas, viešas žeminimas, sąmoningas ignoravimas ir izoliavimas. Vienkartinis įvykis savaime nebūtinai atitinka sistemingo mobingo apibrėžimą, tačiau tai nereiškia, kad jis priimtinas ar apie jį negalima pranešti.',
+          'Priekabiavimas – nepriimtinas elgesys arba jo grėsmė, galinti sukelti fizinį, psichologinį, seksualinį ar ekonominį poveikį, sukurti įžeidžiančią aplinką ar padaryti žalą. Jis gali pasireikšti žodžiais, veiksmais, fiziniu elgesiu ar elektroninėmis žinutėmis. Vertinamas konkretus elgesys ir jo aplinkybės, o ne vien tai, ar asmuo teigia „juokavęs“.',
         ],
         bullets: [
-          'Dalykinė pastaba apie konkretų darbo rezultatą nėra tas pats, kas asmens žeminimas.',
-          'Vertinkite elgesio turinį, pasikartojimą, poveikį ir aplinkybes.',
-          'Jei abejojate, pasitarkite su įmonėje atsakingu asmeniu.',
+          'Pagrįsta, dalykiška pastaba apie darbo rezultatą ir skirtinga nuomonė savaime nėra smurtas.',
+          'Pagrįsti ir vienodai taikomi aprangos, AAP ar saugos taisyklių reikalavimai nėra diskriminacija vien dėl to, kad jie primenami.',
+          'Informacijos ar etiketo stoka gali paaiškinti netinkamą bendravimą, bet nepadaro nuolatinio bauginimo ar žeminimo priimtinu.',
         ],
-        takeaway: 'Nenuvertinkite patirto elgesio – apie rūpestį galima pranešti ir paprašyti įvertinti situaciją.',
+        takeaway: 'Mobingui būdingas pasikartojantis sistemingas elgesys; priekabiavimas ar kitas netinkamas elgesys vertinamas ir pagal konkretaus įvykio aplinkybes.',
       },
       {
         title: '2. Lygybė ir pagarbus bendravimas',
         paragraphs: [
-          'Diskriminacija – nepalankus ar nevienodas elgesys, susijęs su teisės aktuose saugomu asmens požymiu, pavyzdžiui, lytimi, amžiumi, negalia, kilme, tautybe, kalba, įsitikinimais ar kitais pagrindais. Tikslūs teisiniai pagrindai ir išimtys nustatomi teisės aktuose.',
-          'Užduotys, darbo vertinimas ir atlygis turi būti grindžiami objektyviais, su darbu susijusiais kriterijais. Vienodos ir pagrįstos darbo saugos taisyklės taikomos visiems. Tačiau diskriminacijos ar priekabiavimo negalima atmesti vien todėl, kad elgesys pavadintas juoku, pastaba ar vadovavimu – svarbu vertinti aplinkybes ir poveikį.',
+          'Diskriminacija – nepalankus ar nevienodas elgesys dėl saugomo asmens požymio, pavyzdžiui, amžiaus, lyties, negalios, rasės, įsitikinimų ar pažiūrų, tautybės, pilietybės, kilmės, kalbos ar tikėjimo. Tikslūs pagrindai ir išimtys nustatomi teisės aktuose. Darbo užduotys, krūvis, atlygis ir premijos turi būti skirstomi pagal aiškius, objektyvius su darbu susijusius kriterijus, o ne asmenines savybes.',
+          'Neadekvatus, nepagrįstas krūvis vienam darbuotojui arba atlygio ir priedų skirstymas ne pagal darbo rezultatus gali būti požymiai, kuriuos verta ištirti. Vien darbo rezultatų vertinimas ar pagrįsta, visiems taikoma pastaba dėl netvarkingos aprangos arba AAP nenaudojimo savaime dar neįrodo diskriminacijos. Svarbu, ar reikalavimas pagrįstas, taikomas nuosekliai ir nėra pretekstas persekioti konkretų žmogų.',
         ],
         bullets: [
-          'Kritiką išsakykite pagarbiai, konkrečiai ir apie darbą, ne apie asmens vertę.',
-          'Neskleiskite įžeidžiančių komentarų, vaizdų ar žinučių apie kolegas.',
-          'Pastebėję neteisingą ar žeminantį elgesį, neplatinkite jo toliau ir ieškokite pagalbos.',
+          'Vadovai turėtų paaiškinti darbo krūvio, atlygio ir priedų skirstymo kriterijus.',
+          'Pagrįstą pastabą pateikite konkrečiai ir pagarbiai, aptardami darbo reikalavimą, o ne menkindami asmenį.',
+          'Saugos reikalavimus ir AAP naudokite pagal instrukciją – jų vienodas taikymas visiems yra svarbus.',
         ],
         takeaway: 'Pagarbus bendravimas ir vienodi, su darbu susiję kriterijai padeda kurti saugią aplinką.',
       },
       {
         title: '3. Pranešimas, pagalba ir tyrimas',
         paragraphs: [
-          'Patyrę ar pastebėję smurtą, priekabiavimą ar diskriminaciją, užsirašykite datą, vietą, kas įvyko, kas dalyvavo ir kas galėjo matyti. Išsaugokite susijusias žinutes ar laiškus. Rinkite ir dalykitės duomenimis atsakingai, nepažeisdami kitų asmenų privatumo ar įmonės tvarkos.',
-          'Kreipkitės į įmonėje nurodytą atsakingą asmenį, tiesioginį vadovą arba naudokite nustatytą pranešimo kanalą. Jei vadovas susijęs su situacija, rinkitės kitą įmonės tvarkoje numatytą kanalą. Pranešimas turi būti nagrinėjamas konfidencialiai ir nešališkai, o su juo susiję asmenys neturi patirti keršto už sąžiningą kreipimąsi.',
+          'Patyrę ar pastebėję smurtą, priekabiavimą ar diskriminaciją, užsirašykite datą, laiką, vietą, kas įvyko, kas dalyvavo ir kas galėjo matyti ar girdėti. Išsaugokite SMS žinutes, el. laiškus ir kitą tiesiogiai su situacija susijusią informaciją. Liudininkai taip pat gali patvirtinti, ką patys matė ar girdėjo. Nerenkite įrodymų pažeisdami įstatymus ar kitų asmenų privatumą.',
+          'Praneškite įmonėje nurodytam atsakingam asmeniui arba tiesioginiam vadovui ir pateikite rašytinį pranešimą pagal įmonės tvarką. Jei vadovas susijęs su situacija, rinkitės kitą nurodytą kanalą. Pranešimą nagrinėjant būtini konfidencialumas ir nešališkumas: duomenimis dalijamasi tik tiek, kiek tyrimui reikia, ir išvados neturi remtis vien vadovo asmenine nuomone.',
         ],
         bullets: [
           'Esant tiesioginiam fiziniam pavojui, pirmiausia pasitraukite į saugią vietą ir kvieskite 112.',
-          'Pateikite turimą informaciją ir liudininkų duomenis; galutinį aplinkybių vertinimą atlieka tyrimą vykdantys asmenys.',
-          'Sužinokite, kur įmonėje galima gauti pagalbą ir kokia yra pranešimo nagrinėjimo tvarka.',
+          'Skundas išorės institucijai ar medicininiai dokumentai gali būti svarbūs aplinkybių kontekste, tačiau jie nebūtinai tiesiogiai parodo konkretų elgesį; tyrimą atliekantys asmenys vertina visą turimą informaciją.',
+          'Įmonėje riziką mažina aiškios elgesio taisyklės, reguliarūs mokymai ir saugus, konfidencialus pranešimo kanalas.',
+          'Konstruktyvus nesutarimas ar vienkartinė pagrįsta darbo pastaba nėra savaime mobingas, bet grasinimus, žeminimą ar kitą netinkamą elgesį vis tiek verta aptarti ir pranešti.',
         ],
         takeaway: 'Praneškite saugiu kanalu kuo anksčiau – nereikia pačiam atlikti tyrimo ar įrodyti visų aplinkybių.',
       },
@@ -385,6 +395,7 @@ export default function TrainingMaterials({ reviewedLessonIds = [], assignedTest
         })}
       </div>
       <p className="text-xs leading-5 text-slate-500">Perskaitymo žymėjimas nėra privalomas, o testas lieka pasiekiamas iš užduočių ir čia, jei jis jums priskirtas. Esant tiesioginiam pavojui, pirmiausia vadovaukitės darbo vietos avarine tvarka.</p>
+      <p className="text-xs leading-5 text-slate-500">Skaitinės ribos pateiktos pagal šiuo metu sistemoje esantį testą. Prieš naudojant mokymuose, jas turi patvirtinti atsakingas DSS specialistas pagal galiojančius teisės aktus, darbo vietos rizikos vertinimą ir įmonės instrukcijas.</p>
     </section>
   );
 }
