@@ -82,8 +82,8 @@ import {
   ImagePlus,
   KeyRound,
   LayoutDashboard,
-  LifeBuoy,
   LockKeyhole,
+  LifeBuoy,
   LogOut,
   Menu,
   Pencil,
@@ -1427,6 +1427,30 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [protocolAccessPopup, setProtocolAccessPopup] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
+  const [helpTourTab, setHelpTourTab] = useState(null);
+  const [HelpGuide, setHelpGuide] = useState(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpLoading, setHelpLoading] = useState(false);
+  const [helpLoadError, setHelpLoadError] = useState('');
+  useEffect(() => setHelpTourTab(null), [userRole]);
+  const openWorkspaceHelp = async () => {
+    setHelpLoadError('');
+    if (HelpGuide) {
+      setHelpOpen(true);
+      return;
+    }
+    if (helpLoading) return;
+    setHelpLoading(true);
+    try {
+      const { default: Help } = await import('./WorkspaceHelp.jsx');
+      setHelpGuide(() => Help);
+      setHelpOpen(true);
+    } catch (error) {
+      setHelpLoadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setHelpLoading(false);
+    }
+  };
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
   const managerSubscriptionNotificationsStorageKey = `dsspro-manager-subscription-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
@@ -6922,7 +6946,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
-      <aside className="sticky top-0 z-40 flex w-full shrink-0 flex-col bg-emerald-950 px-3 py-2 text-white shadow-lg sm:px-4 sm:py-3 lg:static lg:z-auto lg:w-64 lg:px-4 lg:py-5 lg:shadow-none print:hidden">
+      <aside className={`sticky top-0 ${helpTourTab ? 'z-[75] lg:z-[75]' : 'z-40 lg:z-auto'} flex w-full shrink-0 flex-col bg-emerald-950 px-3 py-2 text-white shadow-lg sm:px-4 sm:py-3 lg:static lg:w-64 lg:px-4 lg:py-5 lg:shadow-none print:hidden`}>
         <div className="flex items-center justify-between lg:contents">
           <button onClick={() => { setActiveTab(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis'); setMobileMenuOpen(false); }} className="mb-0 flex items-center gap-2 px-2 text-left text-lg font-black lg:mb-6">Dss <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-xs text-emerald-300">Pro</span></button>
           <button type="button" aria-label={mobileMenuOpen ? 'Uždaryti meniu' : 'Atidaryti meniu'} aria-expanded={mobileMenuOpen} aria-controls="workspace-mobile-menu" className="grid size-10 place-items-center rounded-md border border-white/20 text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)}><Menu size={20} /></button>
@@ -6979,7 +7003,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         )}
         <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1">
           {activeNavigation.map(([id, label, Icon]) => (
-            <button key={id} onClick={() => { setActiveTab(id); setNotice(''); setMobileMenuOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium lg:min-h-0 ${activeTab === id ? 'bg-white/15 text-white' : 'text-emerald-100/75 hover:bg-white/10 hover:text-white'}`}>
+            <button key={id} data-help-target={id} onClick={() => { setActiveTab(id); setNotice(''); setMobileMenuOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium lg:min-h-0 ${helpTourTab === id ? 'relative z-[76] bg-amber-300 text-emerald-950 ring-4 ring-amber-300 shadow-lg' : activeTab === id ? 'bg-white/15 text-white' : 'text-emerald-100/75 hover:bg-white/10 hover:text-white'}`}>
               <Icon size={17} />{label}
             </button>
           ))}
@@ -6997,7 +7021,20 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
-            <a href="#pagalba" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" className="hidden size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700 sm:grid"><LifeBuoy size={18} /></a>
+            <button type="button" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" aria-busy={helpLoading} onClick={openWorkspaceHelp} className="grid size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700">
+              <LifeBuoy size={18} className={helpLoading ? 'animate-pulse' : ''} />
+            </button>
+            {helpLoadError && <span role="alert" className="text-xs font-medium text-rose-700">Pagalbos įkelti nepavyko. <button type="button" className="underline" onClick={openWorkspaceHelp}>Bandyti dar kartą</button></span>}
+            {HelpGuide && <HelpGuide
+              key={`${cloudUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
+              open={helpOpen}
+              role={userRole}
+              navigation={activeNavigation}
+              storageKey={`dsspro-help-dismissed:${cloudUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
+              onNavigate={(tab) => { setActiveTab(tab); setNotice(''); setMobileMenuOpen(true); }}
+              onHighlightTab={setHelpTourTab}
+              onClose={() => setHelpOpen(false)}
+            />}
             <div ref={notificationsRef} className="relative" data-readonly-allowed>
               <button type="button" data-readonly-allowed aria-label={`Pranešimai: ${notifications.length}`} aria-expanded={notificationsOpen} onClick={() => { setProfileMenuOpen(false); setNotificationsOpen((open) => !open); }} className="relative grid size-9 place-items-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50">
                 <Bell size={18} />
