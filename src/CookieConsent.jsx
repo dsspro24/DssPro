@@ -79,7 +79,7 @@ export default function CookieConsent() {
   useEffect(() => {
     if (!preferences?.id || !userId || !supabase) return;
     let active = true;
-    supabase.from('privacy_consent_records').upsert({
+    supabase.from('privacy_consent_records').insert({
       id: preferences.id,
       user_id: userId,
       consent_type: 'cookies',
@@ -87,9 +87,9 @@ export default function CookieConsent() {
       accepted: true,
       analytics: preferences.analytics,
       source: 'cookie_banner',
-    }, { onConflict: 'id', ignoreDuplicates: true }).then(({ error }) => {
+    }).then(({ error }) => {
       if (!active) return;
-      if (error) {
+      if (error && error.code !== '23505') {
         setSyncError(`Slapukų pasirinkimo užregistruoti nepavyko: ${error.message}`);
         return;
       }
