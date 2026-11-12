@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useEffect, useState } from 'react';
 import CloudEntry from './CloudEntry.jsx';
+import CookieConsent from './CookieConsent.jsx';
 import { isSupabaseConfigured, supabase } from './lib/supabase.js';
 import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
 import { 
@@ -27,7 +28,6 @@ const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 const BlogPage = lazy(() => import('./Blog.jsx'));
 const TermsOfService = lazy(() => import('./TermsOfService.jsx'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy.jsx'));
-const CookieConsent = lazy(() => import('./CookieConsent.jsx'));
 
 export default function App() {
   let page;
@@ -51,7 +51,7 @@ export default function App() {
   } else {
     page = isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
   }
-  return <>{page}<CookieConsentBoundary><Suspense fallback={null}><CookieConsent /></Suspense></CookieConsentBoundary></>;
+  return <>{page}<CookieConsentBoundary><CookieConsent /></CookieConsentBoundary></>;
 }
 
 class CookieConsentBoundary extends Component {
