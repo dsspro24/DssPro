@@ -42,6 +42,7 @@ as $$
     where subscription.status = 'active'
       and (
         subscription.payment_status = 'paid'
+        or subscription.manual_access_override
         or subscription.preinvoice_data ->> 'initialTrialAccess' = 'true'
       )
       and subscription.ends_at >= now() + interval '72 hours'

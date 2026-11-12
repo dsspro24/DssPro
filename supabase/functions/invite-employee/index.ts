@@ -63,15 +63,18 @@ Deno.serve(async (request) => {
 
   const { data: subscriptions, error: subscriptionError } = await adminClient
     .from('workspace_subscriptions')
-    .select('status, payment_status, ends_at, preinvoice_data')
+    .select('status, payment_status, starts_at, ends_at, preinvoice_data, manual_access_override')
     .eq('organization_id', organizationId);
   if (subscriptionError) return response(500, { error: `Could not check organization subscription: ${subscriptionError.message}` });
   const now = Date.now();
   const hasEmployeeAccess = (subscriptions ?? []).some((subscription) => {
+    const startTime = subscription.starts_at ? new Date(subscription.starts_at).getTime() : null;
     const endTime = subscription.ends_at ? new Date(subscription.ends_at).getTime() : null;
+    const periodHasStarted = startTime === null || (Number.isFinite(startTime) && startTime <= now);
     const periodIsActive = endTime === null || (Number.isFinite(endTime) && endTime > now);
-    if (subscription.status !== 'active' || !periodIsActive) return false;
-    return subscription.payment_status === 'paid'
+    if (subscription.status !== 'active' || !periodHasStarted || !periodIsActive) return false;
+    return subscription.manual_access_override === true
+      || subscription.payment_status === 'paid'
       || subscription.preinvoice_data?.initialTrialAccess === 'true'
       || subscription.preinvoice_data?.reactivation === 'true';
   });

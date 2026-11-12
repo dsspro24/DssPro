@@ -6412,6 +6412,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       startsAt: updatedSubscription.starts_at,
       endsAt: updatedSubscription.ends_at,
       cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
+      manualAccessOverride: updatedSubscription.manual_access_override === true,
       isAddon: updatedSubscription.is_addon,
       orderCode: updatedSubscription.order_code,
       orderedAt: updatedSubscription.ordered_at,
