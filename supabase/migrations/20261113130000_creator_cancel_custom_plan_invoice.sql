@@ -79,6 +79,32 @@ $$;
 revoke all on function public.creator_cancel_workspace_subscription_order(uuid) from public, anon;
 grant execute on function public.creator_cancel_workspace_subscription_order(uuid) to authenticated;
 
+create or replace function public.clear_prior_manual_access_for_individual_plan()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.preinvoice_data ->> 'individualPlan' = 'true'
+    and new.payment_status = 'pending' then
+    update public.workspace_subscriptions
+    set manual_access_override = false,
+        updated_at = now()
+    where organization_id = new.organization_id
+      and manual_access_override;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.clear_prior_manual_access_for_individual_plan() from public, anon, authenticated;
+
+drop trigger if exists clear_prior_manual_access_for_individual_plan on public.workspace_subscriptions;
+create trigger clear_prior_manual_access_for_individual_plan
+  before insert on public.workspace_subscriptions
+  for each row execute function public.clear_prior_manual_access_for_individual_plan();
+
 drop policy if exists "Users can read applicable active subscription plans"
   on public.subscription_plans;
 create policy "Users can read applicable active subscription plans"

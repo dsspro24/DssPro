@@ -280,8 +280,14 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         cancelAtPeriodEnd: false,
       }, true);
       setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
-      setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
-      setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
+      if (isIndividualPlanOrder) {
+        setPlanCode(companyCustomPlanOption);
+        setStartsAt(formatDateTimeLocal(Date.now()));
+        setEndsAt(formatDateTimeLocal(subscription.endsAt));
+      } else {
+        setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
+        setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
+      }
       setEndsAtChanged(false);
       setCancelAtPeriodEnd(saved.cancelAtPeriodEnd === true);
     } catch (saveError) {
