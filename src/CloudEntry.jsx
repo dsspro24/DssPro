@@ -228,6 +228,12 @@ function formatSubscription(subscription) {
 }
 
 function prioritizeEffectiveSubscription(subscriptions) {
+  const manualAccessIndex = subscriptions.findIndex((subscription) => subscription.manualAccessOverride);
+  if (manualAccessIndex > 0) {
+    return [subscriptions[manualAccessIndex], ...subscriptions.slice(0, manualAccessIndex), ...subscriptions.slice(manualAccessIndex + 1)];
+  }
+  if (manualAccessIndex === 0) return subscriptions;
+
   const pendingRenewalIndex = subscriptions.findIndex((subscription) => (
     subscription.isRenewal
     && subscription.paymentStatus === 'Laukiama apmokėjimo'

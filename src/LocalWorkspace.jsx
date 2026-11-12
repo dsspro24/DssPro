@@ -2113,6 +2113,39 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const employeePlanLimitReached = currentSubscriptionPlan
     && currentActiveEmployeeCount >= currentSubscriptionPlan.employee_limit;
   useEffect(() => {
+    if (!cloudMode || userRole !== 'vadovas' || !currentOrg?.id) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshSubscription = async () => {
+      if (requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const subscriptions = await onRefreshSubscription(currentOrg.id);
+        if (active && subscriptions) {
+          setData((current) => ({
+            ...current,
+            subscriptions: [
+              ...current.subscriptions.filter((subscription) => subscription.orgId !== currentOrg.id),
+              ...subscriptions,
+            ],
+          }));
+        }
+      } catch (error) {
+        if (active) setNotice(`Prenumeratos būsenos atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    const intervalId = window.setInterval(refreshSubscription, 30_000);
+    document.addEventListener('visibilitychange', refreshSubscription);
+    refreshSubscription();
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshSubscription);
+    };
+  }, [cloudMode, userRole, currentOrg?.id, onRefreshSubscription]);
+  useEffect(() => {
     if (!cloudMode || userRole !== 'vadovas' || isSubscriptionReadOnly || isSubscriptionLocked || !currentOrg?.id) return undefined;
     let active = true;
     let requestInFlight = false;
