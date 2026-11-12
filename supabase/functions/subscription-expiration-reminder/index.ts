@@ -62,12 +62,43 @@ Deno.serve(async (request) => {
     }).format(endDate);
     const organizationName = firstReminder.organization_name;
     const subject = `Priminimas: „${organizationName}“ prenumerata baigsis po 3 dienų`;
-    const html = `<p>Sveiki, ${escapeHtml(firstReminder.manager_name || 'įmonės vadove')},</p>
-      <p>Primename, kad įmonės <strong>${escapeHtml(organizationName)}</strong> DSS Pro prenumerata baigsis <strong>${escapeHtml(formattedEndDate)}</strong>, po 3 dienų.</p>
-      <p>Jei norite toliau naudotis visomis sistemos funkcijomis, prisijunkite prie DSS Pro ir atnaujinkite prenumeratą.</p>
-      <p><a href="https://www.dsspro.lt/">Prisijungti prie DSS Pro</a></p>
-      <p>Pasibaigus prenumeratai darbo sritis pereis į peržiūros režimą.</p>
-      <p>DSS Pro komanda</p>`;
+    const html = `<!doctype html>
+      <html lang="lt">
+        <body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0fdf4;">
+            <tr>
+              <td align="center" style="padding:40px 16px;">
+                <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:520px;background-color:#ffffff;border:1px solid #dcfce7;border-radius:16px;overflow:hidden;">
+                  <tr>
+                    <td style="background-color:#064e3b;padding:28px 32px;">
+                      <span style="font-size:24px;font-weight:800;color:#ffffff;">Dss</span>
+                      <span style="display:inline-block;margin-left:4px;padding:2px 8px;border-radius:12px;background-color:#10b981;color:#ffffff;font-size:13px;font-weight:700;">Pro</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:32px;font-size:15px;line-height:1.6;">
+                      <p style="margin:0 0 16px;">Sveiki, ${escapeHtml(firstReminder.manager_name || 'įmonės vadove')},</p>
+                      <p style="margin:0 0 16px;">Primename, kad įmonės <strong>${escapeHtml(organizationName)}</strong> DSS Pro prenumerata baigsis <strong>${escapeHtml(formattedEndDate)}</strong>, po 3 dienų.</p>
+                      <p style="margin:0 0 20px;">Jei norite toliau naudotis visomis sistemos funkcijomis, prisijunkite prie DSS Pro ir atnaujinkite prenumeratą.</p>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+                        <tr>
+                          <td bgcolor="#10b981" style="border-radius:9999px;">
+                            <a href="https://www.dsspro.lt/" style="display:inline-block;padding:12px 26px;border-radius:9999px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;">Prisijungti prie DSS Pro</a>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="margin:0;padding:12px 16px;border-left:4px solid #10b981;background-color:#f0fdf4;">Pasibaigus prenumeratai darbo sritis pereis į peržiūros režimą.</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #f1f5f9;color:#64748b;font-size:12px;">DSS Pro komanda</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>`;
     const text = `Sveiki, ${firstReminder.manager_name || 'įmonės vadove'},\n\n`
       + `Primename, kad įmonės „${organizationName}“ DSS Pro prenumerata baigsis ${formattedEndDate}, po 3 dienų.\n\n`
       + 'Jei norite toliau naudotis visomis sistemos funkcijomis, prisijunkite prie DSS Pro ir atnaujinkite prenumeratą: https://www.dsspro.lt/\n\n'
