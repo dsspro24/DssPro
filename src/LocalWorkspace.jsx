@@ -213,7 +213,11 @@ function renderSubscriptionInvoiceHtml(invoice) {
     .replace(/^Papildoma įmonė\s*[·-]\s*/i, '')
     .trim()
     .replace(/^./u, (character) => character.toLocaleLowerCase('lt-LT'));
-  const serviceDescription = `DSS Pro prenumerata (${planLabel}) – ${invoice.months} mėn.`;
+  const invoiceMonths = Number(invoice.months);
+  const serviceMonths = Number.isFinite(invoiceMonths)
+    ? new Intl.NumberFormat('lt-LT', { maximumFractionDigits: 2 }).format(invoiceMonths)
+    : String(invoice.months ?? '');
+  const serviceDescription = `DSS Pro prenumerata (${planLabel}) – ${serviceMonths} mėn.`;
   return `<!doctype html><html lang="lt"><head><meta charset="utf-8"><title>${escapeInvoiceHtml(invoice.invoiceNumber ?? invoice.orderCode)}</title><style>
     @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:13px Arial,sans-serif;color:#14251f;margin:0}
     header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #009b70;padding-bottom:18px}
@@ -238,7 +242,7 @@ function renderSubscriptionInvoiceHtml(invoice) {
         ${recipient.vatCode ? `<p>PVM mokėtojo kodas: ${escapeInvoiceHtml(recipient.vatCode)}</p>` : ''}
         ${recipient.address ? `<p>Adresas: ${escapeInvoiceHtml(recipient.address)}</p>` : ''}</section></div>
     <table><thead><tr><th>Paslauga</th><th>Kiekis</th><th>Vieneto kaina</th><th>Suma</th></tr></thead><tbody>
-      <tr><td>${escapeInvoiceHtml(serviceDescription)}</td><td>${escapeInvoiceHtml(invoice.months)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
+      <tr><td>${escapeInvoiceHtml(serviceDescription)}</td><td>${escapeInvoiceHtml(serviceMonths)}</td><td>${amount(invoice.unitPriceCents)}</td><td>${amount(invoice.vatIncluded ? invoice.totalAmountCents : invoice.netAmountCents)}</td></tr>
     </tbody></table>
     <div class="totals"><div><span>Suma be PVM</span><strong>${amount(invoice.netAmountCents)}</strong></div>
       ${invoice.vatRegistered ? `<div><span>${vatLabel}</span><strong>${amount(invoice.vatAmountCents)}</strong></div>` : '<div><span>PVM (netaikomas)</span><strong>0,00 €</strong></div>'}
@@ -6538,22 +6542,36 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       values.endsAt,
       values.endsAtChanged === true,
     );
-    let planCode = values.planCode;
-    if (!cancelOrder && values.isCustomPlan) {
-      const { data: customPlan, error: customPlanError } = await supabase.rpc('creator_upsert_company_custom_plan', {
-        input_organization_id: values.organizationId,
+    let updatedSubscription;
+    let error;
+    let customInvoiceIssued = false;
+    if (cancelOrder) {
+      ({ data: updatedSubscription, error } = await supabase.rpc('creator_cancel_workspace_subscription_order', {
         input_subscription_id: subscriptionId,
+      }));
+    } else if (values.isCustomPlan && subscriptionStatus === 'active') {
+      ({ data: updatedSubscription, error } = await supabase.rpc('creator_issue_company_custom_plan_invoice', {
+        input_subscription_id: subscriptionId,
+        input_organization_id: values.organizationId,
         input_amount_cents: values.amountCents,
         input_employee_limit: values.employeeLimit,
-      });
-      if (customPlanError) throw customPlanError;
-      planCode = customPlan.code;
-    }
-    const { data: updatedSubscription, error } = cancelOrder
-      ? await supabase.rpc('creator_cancel_workspace_subscription_order', {
-        input_subscription_id: subscriptionId,
-      })
-      : await supabase.rpc('creator_update_workspace_subscription', {
+        input_starts_at: values.startsAt || null,
+        input_ends_at: values.endsAt || null,
+      }));
+      customInvoiceIssued = true;
+    } else {
+      let planCode = values.planCode;
+      if (values.isCustomPlan) {
+        const { data: customPlan, error: customPlanError } = await supabase.rpc('creator_upsert_company_custom_plan', {
+          input_organization_id: values.organizationId,
+          input_subscription_id: subscriptionId,
+          input_amount_cents: values.amountCents,
+          input_employee_limit: values.employeeLimit,
+        });
+        if (customPlanError) throw customPlanError;
+        planCode = customPlan.code;
+      }
+      ({ data: updatedSubscription, error } = await supabase.rpc('creator_update_workspace_subscription', {
         input_subscription_id: subscriptionId,
         input_status: subscriptionStatus,
         input_plan_code: planCode,
@@ -6561,11 +6579,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         input_starts_at: values.startsAt || null,
         input_ends_at: values.endsAt || null,
         input_cancel_at_period_end: values.cancelAtPeriodEnd,
-      });
+      }));
+    }
     if (error) throw error;
     const statusLabels = { pending: 'Laukiama sąskaitos', active: 'Aktyvi', canceled: 'Atšaukta', expired: 'Pasibaigusi' };
-    const refreshedWorkspace = await onCreatorWorkspaceChanged();
-    const refreshedSubscription = refreshedWorkspace?.data?.subscriptions?.find((item) => item.id === subscriptionId) ?? {
+    const updatedSubscriptionId = updatedSubscription.id;
+    const fallbackSubscription = {
       id: updatedSubscription.id,
       orgId: updatedSubscription.organization_id,
       plan: updatedSubscription.plan_name,
@@ -6585,19 +6604,45 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : updatedSubscription.payment_status === 'canceled'
           ? 'Atšaukta'
           : updatedSubscription.order_code ? 'Laukiama apmokėjimo' : '',
+      isPlanChange: updatedSubscription.preinvoice_data?.planChange === true
+        || updatedSubscription.preinvoice_data?.planChange === 'true',
+      dueDate: updatedSubscription.preinvoice_data?.dueDate ?? null,
       preinvoiceNumber: updatedSubscription.preinvoice_data?.invoiceNumber ?? '',
       preinvoiceDate: updatedSubscription.preinvoice_data?.issueDate ?? updatedSubscription.ordered_at ?? null,
       preinvoiceTotalAmountCents: Number(updatedSubscription.preinvoice_data?.totalAmountCents) || null,
+      isRenewal: updatedSubscription.preinvoice_data?.renewal === true
+        || updatedSubscription.preinvoice_data?.renewal === 'true',
+      isReactivation: updatedSubscription.preinvoice_data?.reactivation === true
+        || updatedSubscription.preinvoice_data?.reactivation === 'true',
+      isInitialTrialAccess: updatedSubscription.preinvoice_data?.initialTrialAccess === true
+        || updatedSubscription.preinvoice_data?.initialTrialAccess === 'true',
+      serviceStart: updatedSubscription.preinvoice_data?.serviceStart ?? null,
       finalInvoiceNumber: updatedSubscription.final_invoice_number ?? '',
       finalInvoiceDate: updatedSubscription.final_invoice_data?.issueDate ?? updatedSubscription.paid_at ?? null,
       paidAt: updatedSubscription.paid_at ?? null,
     };
-    setData((current) => ({
-      ...current,
-      subscriptions: current.subscriptions.map((item) => item.id === subscriptionId ? refreshedSubscription : item),
-    }));
-    setCreatorSubscriptions((current) => current.map((item) => item.id === subscriptionId ? refreshedSubscription : item));
-    setNotice('Prenumeratos duomenys atnaujinti.');
+    const refreshedWorkspace = await onCreatorWorkspaceChanged();
+    const refreshedSubscription = refreshedWorkspace?.data?.subscriptions?.find((item) => item.id === updatedSubscriptionId)
+      ?? fallbackSubscription;
+    if (refreshedWorkspace?.data?.subscriptions) {
+      setData((current) => ({ ...current, subscriptions: refreshedWorkspace.data.subscriptions }));
+      setCreatorSubscriptions(refreshedWorkspace.data.subscriptions);
+    } else if (customInvoiceIssued) {
+      setData((current) => ({
+        ...current,
+        subscriptions: [refreshedSubscription, ...current.subscriptions.filter((item) => item.id !== updatedSubscriptionId)],
+      }));
+      setCreatorSubscriptions((current) => [refreshedSubscription, ...current.filter((item) => item.id !== updatedSubscriptionId)]);
+    } else {
+      setData((current) => ({
+        ...current,
+        subscriptions: current.subscriptions.map((item) => item.id === updatedSubscriptionId ? refreshedSubscription : item),
+      }));
+      setCreatorSubscriptions((current) => current.map((item) => item.id === updatedSubscriptionId ? refreshedSubscription : item));
+    }
+    setNotice(customInvoiceIssued
+      ? `Individualus planas įsigaliojo. Vadovas gali atsisiųsti išankstinę sąskaitą ${updatedSubscription.order_code}.`
+      : 'Prenumeratos duomenys atnaujinti.');
     return refreshedSubscription;
   };
 

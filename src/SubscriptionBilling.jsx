@@ -91,7 +91,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           : (subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
         {subscription.isInitialTrialAccess && subscription.paymentStatus !== 'Apmokėta' && (subscription.status !== 'Aktyvi' || locked) && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Pirmojo užsakymo 5 dienų prieiga jau panaudota. Naujas užsakymas prieigos nesuteiks, kol apmokėjimo nepatvirtins DSS Pro administratorius.</p>}
         {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
-          ? <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
+          ? subscription.plan?.startsWith('Individualus planas')
+            ? <>Individualus planas įsigaliojo iškart. Išankstinės sąskaitos suma apskaičiuota pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį. Apmokėkite per 5 dienas; kitu atveju grįš ankstesnis planas.</>
+            : <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
           : subscription.isRenewal
             ? <>Pratęsimo užsakymas <strong>{subscription.orderCode}</strong> pateiktas pasirinkus planą „{subscription.plan}“. Dabartinis planas galioja iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'esamo laikotarpio pabaigos'}; apmokėjus laikotarpis bus pratęstas {subscription.orderMonths} mėn. Jei prenumerata baigsis iki apmokėjimo patvirtinimo, pratęsimas prasidės nuo patvirtinimo datos. Išankstinę sąskaitą apmokėkite per 5 dienas.</>
             : subscription.isReactivation

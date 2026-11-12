@@ -511,7 +511,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
           if ((page ?? []).length < 1000) return { data: subscriptions, error: null };
         }
       })(),
-      supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active, organization_id').order('employee_limit'),
+      supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active, organization_id, created_at').order('employee_limit'),
       supabase.from('creator_billing_settings').select('issuer_details, vat_registered, vat_rate, vat_included, invoice_note').eq('id', true).maybeSingle(),
     ]);
     if (organizationsResult.error) throw organizationsResult.error;
@@ -717,7 +717,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
     supabase.from('creator_workspace_data').select('data').eq('id', true).maybeSingle(),
     loadOrganizationRecords(managerMemberships.map((membership) => membership.organization_id)),
-    supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active, organization_id').order('employee_limit'),
+    supabase.from('subscription_plans').select('code, name, amount_cents, employee_limit, active, organization_id, created_at').order('employee_limit'),
   ]);
   const { data: catalogData, error: catalogError } = catalogResult;
   if (catalogError) throw catalogError;
