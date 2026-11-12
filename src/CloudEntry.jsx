@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
+import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
@@ -182,6 +183,7 @@ function formatSubscription(subscription) {
     && hasUnpaidOrder
     && subscription.preinvoice_initial_trial_access === 'true'
     && new Date(preinvoiceDueDate).getTime() > Date.now();
+  const manualAccessOverride = subscription.manual_access_override === true;
   const isExpired = (
     subscription.status === 'active'
     && subscription.ends_at
@@ -200,9 +202,10 @@ function formatSubscription(subscription) {
     status: isExpired ? 'Pasibaigusi' : pendingOrderActive ? 'Aktyvi' : statusLabels[subscription.status] ?? subscription.status,
     price: subscription.amount_cents / 100,
     startsAt: subscription.starts_at,
-    endsAt: subscription.ends_at ?? (hasUnpaidOrder && subscription.preinvoice_renewal !== 'true' ? preinvoiceDueDate : null),
+    endsAt: subscription.ends_at ?? (!manualAccessOverride && subscription.status !== 'active'
+      && hasUnpaidOrder && subscription.preinvoice_renewal !== 'true' ? preinvoiceDueDate : null),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    manualAccessOverride: subscription.manual_access_override === true,
+    manualAccessOverride,
     isAddon: subscription.is_addon,
     orderCode: subscription.order_code ?? '',
     orderedAt: subscription.ordered_at ?? null,
@@ -308,15 +311,20 @@ function getSubscriptionAccess(subscription, subscriptions = []) {
     const startDate = subscription.startsAt ? new Date(subscription.startsAt) : null;
     const endDate = subscription.endsAt ? new Date(subscription.endsAt) : null;
     const notStarted = Boolean(startDate && startDate.getTime() > now);
-    const active = subscription.status === 'Aktyvi'
-      && !notStarted
-      && (!endDate || endDate.getTime() > now);
-    const readOnlyUntil = endDate ? addCalendarMonths(endDate, 2) : null;
+    const invalidPeriod = Boolean(
+      startDate && !Number.isFinite(startDate.getTime())
+      || endDate && !Number.isFinite(endDate.getTime()),
+    );
+    const active = isSubscriptionActiveForEmployeeAccess(subscription, now);
+    const readOnlyUntil = endDate && Number.isFinite(endDate.getTime()) ? addCalendarMonths(endDate, 2) : null;
+    const periodEnded = Boolean(endDate && Number.isFinite(endDate.getTime()) && endDate.getTime() <= now);
+    const readOnly = !active && !invalidPeriod && !notStarted
+      && periodEnded && now < readOnlyUntil.getTime();
     return {
-      readOnly: !active && Boolean(endDate && endDate.getTime() <= now && now < readOnlyUntil.getTime()),
-      locked: notStarted || !active && (!endDate || now >= readOnlyUntil.getTime()),
-      reason: active ? 'active' : notStarted ? 'awaiting-order' : endDate && now < readOnlyUntil.getTime() ? 'read-only' : 'grace-period-ended',
-      periodEnd: endDate?.toISOString() ?? null,
+      readOnly,
+      locked: !active && !readOnly,
+      reason: active ? 'active' : notStarted ? 'awaiting-order' : readOnly ? 'read-only' : 'grace-period-ended',
+      periodEnd: endDate && Number.isFinite(endDate.getTime()) ? endDate.toISOString() : null,
       readOnlyUntil: readOnlyUntil?.toISOString() ?? null,
     };
   }

@@ -1,6 +1,7 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
+import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
 const defaultFamiliarizationTopics = [
@@ -1632,7 +1633,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssHistoryView, setDssHistoryView] = useState('specialist');
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
-  const isSubscriptionReadOnly = cloudMode && userRole === 'vadovas' && (
+  const hasActiveEmployeeSubscription = data.subscriptions.some((subscription) => (
+    subscription.orgId === selectedOrgId
+    && isSubscriptionActiveForEmployeeAccess(subscription, validityCheckTime)
+  ));
+  const isSubscriptionReadOnly = cloudMode && userRole === 'vadovas' && !hasActiveEmployeeSubscription && (
     subscriptionAccess.readOnly
     || subscriptionAccess.periodEnd && subscriptionAccess.readOnlyUntil
       && validityCheckTime >= new Date(subscriptionAccess.periodEnd).getTime()
@@ -1641,7 +1646,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const isInitialTrialAccessExpired = subscriptionAccess.reason === 'initial-trial'
     && subscriptionAccess.periodEnd
     && validityCheckTime >= new Date(subscriptionAccess.periodEnd).getTime();
-  const isSubscriptionLocked = cloudMode && userRole === 'vadovas' && (
+  const isSubscriptionLocked = cloudMode && userRole === 'vadovas' && !hasActiveEmployeeSubscription && (
     subscriptionAccess.locked
     || isInitialTrialAccessExpired
     || subscriptionAccess.readOnlyUntil && validityCheckTime >= new Date(subscriptionAccess.readOnlyUntil).getTime()
@@ -1661,7 +1666,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     || dssSubscriptionAccess.readOnlyUntil
       && validityCheckTime >= new Date(dssSubscriptionAccess.readOnlyUntil).getTime()
   );
-  const isEmployeeAdditionBlocked = isWorkspaceReadOnly || isDssSubscriptionInactive;
+  const isEmployeeAdditionBlocked = cloudMode && userRole === 'vadovas'
+    ? !hasActiveEmployeeSubscription
+    : isDssSubscriptionInactive;
   const inactiveDssSubscriptionNotice = 'Įmonės prenumerata neaktyvi. Darbuotojus bus galima pridėti, kai įmonės vadovas atnaujins prenumeratą.';
   const isWithinSubscriptionReadOnlyPeriod = Boolean(
     subscriptionAccess.periodEnd
@@ -1699,7 +1706,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1722,6 +1729,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             endsAt: subscription.ends_at,
             createdAt: subscription.created_at,
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            manualAccessOverride: subscription.manual_access_override === true,
             isAddon: subscription.is_addon,
             orderCode: subscription.order_code ?? '',
             orderedAt: subscription.ordered_at ?? null,
@@ -2102,7 +2110,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
-  const currentSubscription = data.subscriptions.find((subscription) => subscription.orgId === currentOrg?.id);
+  const organizationSubscriptions = data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id);
+  const currentSubscription = organizationSubscriptions.find((subscription) =>
+    isSubscriptionActiveForEmployeeAccess(subscription, validityCheckTime))
+    ?? organizationSubscriptions[0];
   const currentSubscriptionPlan = subscriptionPlans.find((plan) => plan.code === (
     currentSubscription?.isRenewal && currentSubscription.paymentStatus === 'Laukiama apmokėjimo'
       ? currentSubscription.paidPlanCode
@@ -4886,8 +4897,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(inactiveDssSubscriptionNotice);
       return;
     }
-    if (isWorkspaceReadOnly) {
-      setNotice('Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.');
+    if (isEmployeeAdditionBlocked) {
+      setNotice(isWorkspaceReadOnly
+        ? 'Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.'
+        : 'Įmonės prenumerata neaktyvi. Darbuotojus bus galima pridėti, kai įmonės vadovas ją atnaujins.');
       return;
     }
     if (cloudMode && currentSubscription && !currentSubscriptionPlan) {
@@ -4909,7 +4922,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       event.currentTarget?.closest('dialog')?.close();
       setNotice(isDssSubscriptionInactive
         ? inactiveDssSubscriptionNotice
-        : 'Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.');
+        : isWorkspaceReadOnly
+          ? 'Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.'
+          : 'Įmonės prenumerata neaktyvi. Darbuotojus bus galima pridėti, kai įmonės vadovas ją atnaujins.');
       return;
     }
     if (sandboxMode) {
