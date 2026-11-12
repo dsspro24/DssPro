@@ -1883,6 +1883,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         commissionAssignments: organizationData.commissionAssignments ?? [],
         protocolCommissionSignatures: organizationData.protocolCommissionSignatures ?? [],
         signatures: organizationData.signatures ?? [],
+        subscriptions: organizationData.subscriptions ?? current.subscriptions,
         resources: organizationData.resources ?? current.resources,
       }));
       setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'ready', error: '' });

@@ -1283,6 +1283,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         commissionAssignments: hydratedAssignments,
         protocolCommissionSignatures: hydratedProtocolSignatures,
         signatures: hydratedWorkspace.signatures ?? [],
+        subscriptions: hydratedWorkspace.subscriptions ?? [],
         resources: [...resourcesById.values()],
       },
     };
