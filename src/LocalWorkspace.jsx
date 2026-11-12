@@ -1413,6 +1413,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     : initialCloudData?.organizations?.[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
   const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
   const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
+  const [dssSubscriptionAccess, setDssSubscriptionAccess] = useState(null);
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees?.[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(sandboxMode
@@ -1647,6 +1648,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   );
   const isAwaitingSubscriptionOrder = subscriptionAccess.reason === 'awaiting-order';
   const isWorkspaceReadOnly = isSubscriptionReadOnly || isSubscriptionLocked;
+  const isDssSubscriptionInactive = cloudMode && userRole === 'dss' && dssOrganizationIsOpen && (
+    !dssSubscriptionAccess
+    || dssSubscriptionAccess.readOnly
+    || dssSubscriptionAccess.locked
+    || dssSubscriptionAccess.periodEnd && dssSubscriptionAccess.readOnlyUntil
+      && validityCheckTime >= new Date(dssSubscriptionAccess.periodEnd).getTime()
+      && validityCheckTime < new Date(dssSubscriptionAccess.readOnlyUntil).getTime()
+    || dssSubscriptionAccess.reason === 'initial-trial'
+      && dssSubscriptionAccess.periodEnd
+      && validityCheckTime >= new Date(dssSubscriptionAccess.periodEnd).getTime()
+    || dssSubscriptionAccess.readOnlyUntil
+      && validityCheckTime >= new Date(dssSubscriptionAccess.readOnlyUntil).getTime()
+  );
+  const isEmployeeAdditionBlocked = isWorkspaceReadOnly || isDssSubscriptionInactive;
+  const inactiveDssSubscriptionNotice = 'Įmonės prenumerata neaktyvi. Darbuotojus bus galima pridėti, kai įmonės vadovas atnaujins prenumeratą.';
   const isWithinSubscriptionReadOnlyPeriod = Boolean(
     subscriptionAccess.periodEnd
     && subscriptionAccess.readOnlyUntil
@@ -1668,10 +1684,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setActiveTabState(tab);
   }, [activeTab, userRole, canViewCompanyArchive]);
   useEffect(() => {
-    if (!cloudMode || userRole !== 'vadovas' || !subscriptionAccess.periodEnd) return undefined;
+    const periodEnd = userRole === 'dss' ? dssSubscriptionAccess?.periodEnd : subscriptionAccess.periodEnd;
+    if (!cloudMode || !periodEnd || !['vadovas', 'dss'].includes(userRole)) return undefined;
     const intervalId = window.setInterval(() => setValidityCheckTime(Date.now()), 60_000);
     return () => window.clearInterval(intervalId);
-  }, [cloudMode, userRole, subscriptionAccess.periodEnd]);
+  }, [cloudMode, userRole, subscriptionAccess.periodEnd, dssSubscriptionAccess?.periodEnd]);
   useEffect(() => {
     if (!cloudMode || userRole !== 'kurejas') return undefined;
     let active = true;
@@ -1851,8 +1868,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   useEffect(() => {
     if (!cloudMode || userRole !== 'dss' || !onLoadDssOrganization || !dssOrganizationIsOpen || !selectedOrgId) return undefined;
     let active = true;
-    onLoadDssOrganization(selectedOrgId).then(({ organization, data: organizationData }) => {
+    onLoadDssOrganization(selectedOrgId).then(({ organization, data: organizationData, subscriptionAccess: organizationSubscriptionAccess }) => {
       if (!active) return;
+      setDssSubscriptionAccess(organizationSubscriptionAccess ?? { readOnly: false, locked: true });
       setData((current) => ({
         ...current,
         organizations: current.organizations.map((item) => item.id === selectedOrgId ? organization : item),
@@ -4817,6 +4835,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const openEmployeeInviteDialog = () => {
+    if (isDssSubscriptionInactive) {
+      setNotice(inactiveDssSubscriptionNotice);
+      return;
+    }
+    if (isWorkspaceReadOnly) {
+      setNotice('Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.');
+      return;
+    }
     if (cloudMode && currentSubscription && !currentSubscriptionPlan) {
       setActiveTab('prenumerata');
       setNotice('Nepavyko nustatyti aktyvaus prenumeratos plano darbuotojų limito. Atnaujinkite prenumeratos duomenis ir bandykite dar kartą.');
@@ -4832,6 +4858,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const inviteEmployee = async (event) => {
     event.preventDefault();
+    if (isEmployeeAdditionBlocked) {
+      event.currentTarget?.closest('dialog')?.close();
+      setNotice(isDssSubscriptionInactive
+        ? inactiveDssSubscriptionNotice
+        : 'Prenumerata pasibaigė. Darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.');
+      return;
+    }
     if (sandboxMode) {
       setNotice('Darbuotojų kvietimai el. paštu išjungti izoliuotame demo režime.');
       return;
@@ -5488,6 +5521,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setMobileMenuOpen(false);
     if (cloudMode) {
       setDssWorkspaceLoadState({ organizationId: organization.id, status: 'loading', error: '' });
+      setDssSubscriptionAccess(null);
     }
   };
 
@@ -7306,7 +7340,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <label className="relative block w-full sm:max-w-xs"><span className="sr-only">Ieškoti darbuotojų</span><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input type="search" className={`${inputClass} pl-9`} value={employeeSearch} onChange={(event) => { setEmployeeSearch(event.target.value); setEmployeePage(1); }} placeholder="Ieškoti..." /></label>
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                     <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => { setAssignmentPresetDraft({ id: '', name: '', resourceIds: [] }); document.getElementById('assignment-presets-dialog')?.showModal(); }}><Settings2 size={16} />Ruošiniai ({currentOrg?.employeeAssignmentPresets?.length ?? 0})</button>
-                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={isWorkspaceReadOnly} title={isWorkspaceReadOnly ? 'Prenumerata pasibaigė: darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.' : undefined} onClick={openEmployeeInviteDialog}><Plus size={16} />Pridėti darbuotoją</button>
+                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={isEmployeeAdditionBlocked} title={isDssSubscriptionInactive ? inactiveDssSubscriptionNotice : isWorkspaceReadOnly ? 'Prenumerata pasibaigė: darbuotojų pridėti negalima duomenų peržiūros laikotarpiu.' : undefined} onClick={openEmployeeInviteDialog}><Plus size={16} />Pridėti darbuotoją</button>
                   </div>
                 </div>
                 <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Rasta darbuotojų: <span className="font-semibold text-slate-800">{filteredOrgEmployees.length}</span></span></div>

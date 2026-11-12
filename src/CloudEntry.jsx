@@ -1135,6 +1135,10 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
 
     return {
       organization,
+      subscriptionAccess: getSubscriptionAccess(
+        hydratedWorkspace.subscriptions?.[0],
+        hydratedWorkspace.subscriptions ?? [],
+      ),
       data: {
         employees: hydratedWorkspace.employees ?? [],
         archivedEmployees: [],

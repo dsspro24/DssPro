@@ -61,6 +61,24 @@ Deno.serve(async (request) => {
   if (permissionError) return response(500, { error: `Could not check organization management access: ${permissionError.message}` });
   if (!canManageOrganization) return response(403, { error: 'Organization management access is required to invite employees' });
 
+  const { data: subscriptions, error: subscriptionError } = await adminClient
+    .from('workspace_subscriptions')
+    .select('status, payment_status, ends_at, preinvoice_data')
+    .eq('organization_id', organizationId);
+  if (subscriptionError) return response(500, { error: `Could not check organization subscription: ${subscriptionError.message}` });
+  const now = Date.now();
+  const hasEmployeeAccess = (subscriptions ?? []).some((subscription) => {
+    const endTime = subscription.ends_at ? new Date(subscription.ends_at).getTime() : null;
+    const periodIsActive = endTime === null || (Number.isFinite(endTime) && endTime > now);
+    if (subscription.status !== 'active' || !periodIsActive) return false;
+    return subscription.payment_status === 'paid'
+      || subscription.preinvoice_data?.initialTrialAccess === 'true'
+      || subscription.preinvoice_data?.reactivation === 'true';
+  });
+  if (!hasEmployeeAccess) {
+    return response(403, { error: 'Įmonės prenumerata neaktyvi. Darbuotojus bus galima pridėti, kai įmonės vadovas ją atnaujins.' });
+  }
+
   const { data: workspace, error: workspaceReadError } = await adminClient
     .from('organization_data')
     .select('data, updated_by')
