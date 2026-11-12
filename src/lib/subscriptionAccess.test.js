@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSubscriptionActiveForEmployeeAccess } from './subscriptionAccess.js';
+import {
+  getSubscriptionStatusAfterManualExtension,
+  isSubscriptionActiveForEmployeeAccess,
+} from './subscriptionAccess.js';
 
 const now = Date.parse('2026-11-12T10:00:00.000Z');
 
@@ -45,4 +48,22 @@ test('frontend subscription labels use the same period check', () => {
     startsAt: '2026-11-01T00:00:00.000Z',
     endsAt: '2026-12-01T00:00:00.000Z',
   }, now), true);
+});
+
+test('extending an expired subscription into the future activates it', () => {
+  assert.equal(getSubscriptionStatusAfterManualExtension(
+    'expired',
+    '2026-12-01T00:00:00.000Z',
+    now,
+  ), 'active');
+  assert.equal(getSubscriptionStatusAfterManualExtension(
+    'expired',
+    '2026-11-01T00:00:00.000Z',
+    now,
+  ), 'expired');
+  assert.equal(getSubscriptionStatusAfterManualExtension(
+    'canceled',
+    '2026-12-01T00:00:00.000Z',
+    now,
+  ), 'canceled');
 });

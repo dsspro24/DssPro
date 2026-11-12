@@ -10,3 +10,10 @@ export function isSubscriptionActiveForEmployeeAccess(subscription, now = Date.n
 
   return periodHasStarted && periodIsActive;
 }
+
+export function getSubscriptionStatusAfterManualExtension(status, endsAt, now = Date.now()) {
+  if (status !== 'expired' || !endsAt) return status;
+
+  const endTime = new Date(endsAt).getTime();
+  return Number.isFinite(endTime) && endTime > now ? 'active' : status;
+}

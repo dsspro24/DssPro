@@ -1,7 +1,7 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
-import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
+import { getSubscriptionStatusAfterManualExtension, isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
 const defaultFamiliarizationTopics = [
@@ -6495,13 +6495,14 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const saveCreatorSubscription = async (subscriptionId, values, cancelOrder = false) => {
+    const subscriptionStatus = getSubscriptionStatusAfterManualExtension(values.status, values.endsAt);
     const { data: updatedSubscription, error } = cancelOrder
       ? await supabase.rpc('creator_cancel_workspace_subscription_order', {
         input_subscription_id: subscriptionId,
       })
       : await supabase.rpc('creator_update_workspace_subscription', {
         input_subscription_id: subscriptionId,
-        input_status: values.status,
+        input_status: subscriptionStatus,
         input_plan_code: values.planCode,
         input_amount_cents: values.amountCents,
         input_starts_at: values.startsAt || null,
@@ -6521,6 +6522,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       startsAt: updatedSubscription.starts_at,
       endsAt: updatedSubscription.ends_at,
       cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
+      manualAccessOverride: updatedSubscription.manual_access_override === true,
       isAddon: updatedSubscription.is_addon,
       orderCode: updatedSubscription.order_code ?? '',
       orderedAt: updatedSubscription.ordered_at ?? null,
