@@ -227,6 +227,8 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   const customPlanSelected = !subscription.isAddon
     && (planCode === companyCustomPlanOption || selectedPlan?.organization_id === subscription.orgId);
   const customInvoiceWillIssue = customPlanSelected && status === 'active';
+  const isIndividualPlanOrder = subscription.isIndividualPlan || subscription.planCode?.startsWith('individual_');
+  const canCancelOrder = !subscription.isPlanChange || isIndividualPlanOrder;
   const hasRemainingActivePeriod = subscription.status === 'Aktyvi'
     && subscription.endsAt
     && new Date(subscription.endsAt).getTime() > now;
@@ -262,7 +264,8 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   };
 
   const closeCanceledOrder = async () => {
-    if (!window.confirm(`Pažymėti užsakymą ${subscription.orderCode} kaip atšauktą? Mokėjimas nebebus laukiamas.`)) return;
+    const orderDescription = isIndividualPlanOrder ? 'individualaus plano išankstinę sąskaitą' : `užsakymą ${subscription.orderCode}`;
+    if (!window.confirm(`Atšaukti ${orderDescription}? Mokėjimas nebebus laukiamas.`)) return;
     setSaving(true);
     setError('');
     try {
@@ -367,7 +370,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
             : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
       {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
       <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
-      {!subscription.isPlanChange && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Uždaroma…' : 'Pažymėti atšauktu'}</button>}
+      {canCancelOrder && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Atšaukiama…' : isIndividualPlanOrder ? 'Atšaukti sąskaitą' : 'Pažymėti atšauktu'}</button>}
     </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
       {customInvoiceWillIssue && <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-950">Išsaugojus individualus planas įsigalios iškart, o vadovas galės atsisiųsti išankstinę sąskaitą prenumeratos skiltyje. {hasRemainingActivePeriod ? 'Sąskaita bus apskaičiuota už likusias dienas iki dabartinės prenumeratos pabaigos; vėlesnis pratęsimas kainuos visą mėnesio kainą.' : 'Suma apskaičiuojama pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį.'} Jei sąskaita neapmokama per 5 dienas, grįžta ankstesnis planas.</p>}

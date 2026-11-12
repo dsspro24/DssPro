@@ -6640,9 +6640,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }));
       setCreatorSubscriptions((current) => current.map((item) => item.id === updatedSubscriptionId ? refreshedSubscription : item));
     }
-    setNotice(customInvoiceIssued
-      ? `Individualus planas įsigaliojo. Vadovas gali atsisiųsti išankstinę sąskaitą ${updatedSubscription.order_code}.`
-      : 'Prenumeratos duomenys atnaujinti.');
+    setNotice(cancelOrder
+      ? `Išankstinė sąskaita ${updatedSubscription.order_code} atšaukta.`
+      : customInvoiceIssued
+        ? `Individualus planas įsigaliojo. Vadovas gali atsisiųsti išankstinę sąskaitą ${updatedSubscription.order_code}.`
+        : 'Prenumeratos duomenys atnaujinti.');
     return refreshedSubscription;
   };
 
