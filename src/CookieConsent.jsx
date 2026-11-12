@@ -121,7 +121,7 @@ export default function CookieConsent() {
   };
 
   return <>
-    <button type="button" className="fixed bottom-3 right-3 z-[80] inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg hover:bg-slate-50" onClick={openSettings}>
+    <button type="button" className="fixed bottom-3 right-36 z-[80] inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg hover:bg-slate-50" onClick={openSettings}>
       Slapukų nustatymai
     </button>
     {(settingsOpen || !preferences) && <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-slate-950/60 p-4" role="presentation">
