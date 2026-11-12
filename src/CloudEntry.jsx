@@ -1117,28 +1117,99 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           : null;
         throw new Error(`Nepavyko paruošti įmonės failų: ${details?.error ?? assetMigrationError.message}`);
       }
-      const [
-        { data: savedWorkspace, error },
-        { data: subscriptionRows, error: subscriptionError },
-      ] = await Promise.all([
-        supabase
-          .from('organization_data')
-          .select('data')
-          .eq('organization_id', organizationId)
-          .maybeSingle(),
-        supabase.from('workspace_subscriptions')
-          .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false }),
-      ]);
-      if (error) throw error;
-      if (subscriptionError) throw subscriptionError;
-      const hydratedData = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
-      const data = {
-        ...(hydratedData ?? {}),
-        subscriptions: prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription)),
-      };
-      setCreatorPreview({ organizationId, role, data });
+      if (role === 'dss') {
+        const [
+          savedWorkspace,
+          { data: assignments, error: assignmentsError },
+          { data: protocolSignatures, error: protocolSignaturesError },
+          { data: resourceAccess, error: resourceAccessError },
+        ] = await Promise.all([
+          loadOrganizationWorkspace(organizationId, workspace?.data.resources ?? []),
+          supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
+          supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
+          supabase.from('organization_resource_access')
+            .select('document_id, settings')
+            .eq('organization_id', organizationId),
+        ]);
+        if (assignmentsError) throw assignmentsError;
+        if (protocolSignaturesError) throw protocolSignaturesError;
+        if (resourceAccessError) throw resourceAccessError;
+        if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
+
+        const organizationMemberships = (workspace.creatorAccounts ?? []).flatMap((account) => (account.organizations ?? [])
+          .filter((membership) => membership.id === organizationId)
+          .map((membership) => ({ ...account, membership })));
+        const dssMembership = organizationMemberships.find((account) => account.membership.role === 'dss_specialist');
+        const specialistId = dssMembership?.id ?? `creator-preview-${organizationId}`;
+        const listedOrganization = workspace.data.organizations.find((item) => item.id === organizationId);
+        if (!listedOrganization) throw new Error('Įmonė nerasta.');
+
+        const hydratedWorkspace = await hydrateWorkspaceAssets(savedWorkspace);
+        const savedOrganization = hydratedWorkspace.organizations?.find((item) => item.id === organizationId);
+        const organization = buildDssOrganization({
+          summary: {
+            ...listedOrganization,
+            dss: organizationMemberships
+              .filter((account) => account.membership.role === 'dss_specialist')
+              .map((account) => account.id),
+          },
+          savedOrganization,
+          resourceAccess: resourceAccess ?? [],
+          specialistId,
+          canManageWorkspace: dssMembership?.membership.canManageWorkspace,
+        });
+        const specialist = hydratedWorkspace.specialists?.find((item) => item.id === specialistId)
+          ?? {
+            id: specialistId,
+            name: dssMembership?.fullName ?? 'DSS specialistas (peržiūra)',
+            email: dssMembership?.email ?? '',
+            status: 'Peržiūra',
+          };
+        const data = {
+          ...hydratedWorkspace,
+          organizations: [organization],
+          employees: (hydratedWorkspace.employees ?? []).filter((employee) => employee.orgId === organizationId),
+          archivedEmployees: [],
+          protocolBatches: (hydratedWorkspace.protocolBatches ?? []).filter((batch) => batch.orgId === organizationId),
+          commissionAssignments: (assignments ?? []).map((assignment) => ({
+            ...assignment,
+            signaturePath: assignment.consentSignaturePath,
+          })),
+          protocolCommissionSignatures: protocolSignatures ?? [],
+          signatures: (hydratedWorkspace.signatures ?? []).filter((signature) => signature.orgId === organizationId),
+          specialists: [specialist],
+          subscriptions: (hydratedWorkspace.subscriptions ?? []).filter((subscription) => subscription.orgId === organizationId),
+        };
+        setCreatorPreview({
+          organizationId,
+          role,
+          data,
+          subscriptionAccess: getSubscriptionAccess(data.subscriptions[0], data.subscriptions),
+        });
+      } else {
+        const [
+          { data: savedWorkspace, error },
+          { data: subscriptionRows, error: subscriptionError },
+        ] = await Promise.all([
+          supabase
+            .from('organization_data')
+            .select('data')
+            .eq('organization_id', organizationId)
+            .maybeSingle(),
+          supabase.from('workspace_subscriptions')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+            .eq('organization_id', organizationId)
+            .order('created_at', { ascending: false }),
+        ]);
+        if (error) throw error;
+        if (subscriptionError) throw subscriptionError;
+        const hydratedData = await hydrateWorkspaceAssets(savedWorkspace?.data ?? null);
+        const data = {
+          ...(hydratedData ?? {}),
+          subscriptions: prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription)),
+        };
+        setCreatorPreview({ organizationId, role, data });
+      }
     } catch (error) {
       setErrorMessage(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
       window.alert(`Įmonės darbo vietos įkelti nepavyko: ${error.message}`);
@@ -1285,6 +1356,8 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}
           onCreatorAccountDeleted={() => refreshCreatorWorkspace()}
+          initialOpenedDssOrganizationId={creatorPreview.role === 'dss' ? creatorPreview.organizationId : ''}
+          initialDssSubscriptionAccess={creatorPreview.subscriptionAccess ?? null}
         /></Suspense></WorkspaceRenderBoundary>;
       }
     }

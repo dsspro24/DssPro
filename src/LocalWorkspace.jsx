@@ -1282,7 +1282,7 @@ const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdm
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
@@ -1413,9 +1413,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     : cloudMode && userRole === 'vadovas'
     ? cloudOrganization?.id ?? initialCloudData?.organizations?.[0]?.id ?? ''
     : initialCloudData?.organizations?.[0]?.id ?? cloudOrganization?.id ?? (cloudMode ? '' : 'org-statybu'));
-  const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState('');
-  const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState({ organizationId: '', status: 'idle', error: '' });
-  const [dssSubscriptionAccess, setDssSubscriptionAccess] = useState(null);
+  const [openedDssOrganizationId, setOpenedDssOrganizationId] = useState(initialOpenedDssOrganizationId);
+  const [dssWorkspaceLoadState, setDssWorkspaceLoadState] = useState(() => initialOpenedDssOrganizationId
+    ? { organizationId: initialOpenedDssOrganizationId, status: 'ready', error: '' }
+    : { organizationId: '', status: 'idle', error: '' });
+  const [dssSubscriptionAccess, setDssSubscriptionAccess] = useState(initialDssSubscriptionAccess);
   const [dssWorkspaceLoadAttempt, setDssWorkspaceLoadAttempt] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialCloudData?.employees?.[0]?.id ?? (cloudMode ? '' : 'emp-jonas'));
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(sandboxMode
@@ -5484,6 +5486,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const leaveDssOrganization = async () => {
+    if (creatorManagementContext) {
+      setNotice('Administratoriaus peržiūroje DSS narystė nekeičiama.');
+      return;
+    }
     if (!currentOrg || !window.confirm(`Ar tikrai nebenorite būti įmonės „${currentOrg.name}“ DSS specialistu?\n\nJūsų prieiga prie įmonės bus panaikinta. Jau pasirašyti dokumentai ir parašų istorija liks išsaugoti.`)) return;
     setDssOrganizationLeaveSubmitting(true);
     try {
@@ -5583,8 +5589,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setActiveTab('skydelis');
     setMobileMenuOpen(false);
     if (cloudMode) {
-      setDssWorkspaceLoadState({ organizationId: organization.id, status: 'loading', error: '' });
-      setDssSubscriptionAccess(null);
+      if (creatorManagementContext) {
+        setDssWorkspaceLoadState({ organizationId: organization.id, status: 'ready', error: '' });
+      } else {
+        setDssWorkspaceLoadState({ organizationId: organization.id, status: 'loading', error: '' });
+        setDssSubscriptionAccess(null);
+      }
     }
   };
 
