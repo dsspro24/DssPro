@@ -189,7 +189,7 @@ export function CompanyBillingDetailsEditor({ initialAddress, initialVatCode, on
   </form>;
 }
 
-export function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', hidePaidPreinvoice = false, hideCanceledPreinvoice = false, inputClass }) {
+export function SubscriptionInvoiceArchive({ subscriptions, organizationName, onOpenInvoice, onDeleteInvoice, deletingInvoiceId = '', hidePaidPreinvoice = false, inputClass }) {
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const [page, setPage] = useState(1);
   const [loadingInvoice, setLoadingInvoice] = useState('');
@@ -252,16 +252,22 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
       <label className="text-sm font-medium">Metai<select className={`${inputClass} mt-1 min-w-28`} value={effectiveYear} onChange={(event) => { setSelectedYear(event.target.value); setPage(1); }}>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
     </div>
     {visibleInvoices.length > 0 && <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-      {visibleInvoices.map((invoice) => <div key={invoice.key} className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold">{invoice.number} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${invoice.type === 'final' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-700'}`}>{invoice.title}</span>{invoice.type === 'preinvoice' && invoice.subscription.status === 'Atšaukta' && <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-900">Atšaukta · nemokėti</span>}</p>
-          <p className="mt-1 text-xs text-slate-500">{new Date(invoice.date).toLocaleDateString('lt-LT')} · {invoice.subscription.plan}{invoice.subscription.orderMonths > 1 ? ` · ${invoice.subscription.orderMonths} mėn.` : ''}</p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {!(hideCanceledPreinvoice && invoice.type === 'preinvoice' && invoice.subscription.status === 'Atšaukta') && <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 disabled:opacity-50" disabled={loadingInvoice === invoice.key} onClick={() => openInvoice(invoice)}><Download size={15} />{loadingInvoice === invoice.key ? 'Atidaroma…' : 'Peržiūrėti / atsisiųsti'}</button>}
-          {onDeleteInvoice && <button type="button" aria-label={`Ištrinti sąskaitą ${invoice.number}`} title={invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo' ? 'Negalima ištrinti, kol laukiama apmokėjimo.' : undefined} className="grid size-10 place-items-center rounded-md border border-rose-300 text-rose-800 hover:bg-rose-50 disabled:opacity-40" disabled={deletingInvoiceId === invoice.subscriptionId || invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo'} onClick={() => deleteInvoice(invoice)}><Trash2 size={15} /></button>}
-        </div>
-      </div>)}
+      {visibleInvoices.map((invoice) => {
+        const canceledPreinvoice = invoice.type === 'preinvoice'
+          && (invoice.subscription.status === 'Atšaukta' || invoice.subscription.paymentStatus === 'Atšaukta');
+        return <div key={invoice.key} className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3">
+          <div className="min-w-0 flex-1">
+            {canceledPreinvoice
+              ? <p className="font-semibold text-rose-800">Atšaukta</p>
+              : <p className="font-semibold">{invoice.number} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${invoice.type === 'final' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-700'}`}>{invoice.title}</span></p>}
+            {!canceledPreinvoice && <p className="mt-1 text-xs text-slate-500">{new Date(invoice.date).toLocaleDateString('lt-LT')} · {invoice.subscription.plan}{invoice.subscription.orderMonths > 1 ? ` · ${invoice.subscription.orderMonths} mėn.` : ''}</p>}
+          </div>
+          {!canceledPreinvoice && <div className="flex shrink-0 gap-2">
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 disabled:opacity-50" disabled={loadingInvoice === invoice.key} onClick={() => openInvoice(invoice)}><Download size={15} />{loadingInvoice === invoice.key ? 'Atidaroma…' : 'Peržiūrėti / atsisiųsti'}</button>
+            {onDeleteInvoice && <button type="button" aria-label={`Ištrinti sąskaitą ${invoice.number}`} title={invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo' ? 'Negalima ištrinti, kol laukiama apmokėjimo.' : undefined} className="grid size-10 place-items-center rounded-md border border-rose-300 text-rose-800 hover:bg-rose-50 disabled:opacity-40" disabled={deletingInvoiceId === invoice.subscriptionId || invoice.type === 'preinvoice' && invoice.subscription.paymentStatus === 'Laukiama apmokėjimo'} onClick={() => deleteInvoice(invoice)}><Trash2 size={15} /></button>}
+          </div>}
+        </div>;
+      })}
     </div>}
     {invoices.length > 0 && yearInvoices.length === 0 && <p className="rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Šiais metais sąskaitų nėra.</p>}
     {yearInvoices.length > pageSize && <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">Rodoma {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, yearInvoices.length)} iš {yearInvoices.length}</span><nav className="flex items-center gap-2" aria-label="Sąskaitų puslapiavimas"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Atgal</button><span>{page} / {pageCount}</span><button type="button" className="rounded-md border border-slate-300 px-3 py-2 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Toliau</button></nav></div>}
