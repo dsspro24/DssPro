@@ -4,6 +4,12 @@ import dssProLogo from './assets/dss-pro-logo.webp';
 
 const companyCustomPlanOption = '__company_custom_plan__';
 
+function formatDateTimeLocal(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 const issuerFields = [
   ['businessName', 'Pavadinimas'],
   ['name', 'Vardas, pavardė'],
@@ -203,8 +209,8 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     ?? plans.filter((plan) => plan.organization_id === subscription.orgId)
       .sort((left, right) => new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime())[0];
   const [employeeLimit, setEmployeeLimit] = useState(String(companyCustomPlan?.employee_limit ?? ''));
-  const [startsAt, setStartsAt] = useState(subscription.startsAt ? new Date(subscription.startsAt).toISOString().slice(0, 16) : '');
-  const [endsAt, setEndsAt] = useState(subscription.endsAt ? new Date(subscription.endsAt).toISOString().slice(0, 16) : '');
+  const [startsAt, setStartsAt] = useState(formatDateTimeLocal(subscription.startsAt));
+  const [endsAt, setEndsAt] = useState(formatDateTimeLocal(subscription.endsAt));
   const [endsAtChanged, setEndsAtChanged] = useState(false);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(subscription.cancelAtPeriodEnd === true);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -221,6 +227,9 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   const customPlanSelected = !subscription.isAddon
     && (planCode === companyCustomPlanOption || selectedPlan?.organization_id === subscription.orgId);
   const customInvoiceWillIssue = customPlanSelected && status === 'active';
+  const hasRemainingActivePeriod = subscription.status === 'Aktyvi'
+    && subscription.endsAt
+    && new Date(subscription.endsAt).getTime() > now;
   const price = Number(amount.replace(',', '.'));
   const remainingDays = subscription.endsAt ? Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000) : null;
   const paymentEndDateMinimum = subscription.isRenewal
@@ -335,7 +344,10 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       </div>
       <div className="flex shrink-0 gap-2">
         <button type="button" aria-label={`${detailsOpen ? 'Slėpti' : 'Peržiūrėti'} prenumeratos informaciją: ${organizationName}`} aria-expanded={detailsOpen} className="grid size-9 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" onClick={() => setDetailsOpen((open) => !open)}><Eye size={16} /></button>
-        <button type="button" aria-label={`Koreguoti prenumeratą: ${organizationName}`} aria-pressed={editing} className={`grid size-9 place-items-center rounded-md border ${editing ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`} onClick={() => setEditing((open) => !open)}><Pencil size={16} /></button>
+        <button type="button" aria-label={`Koreguoti prenumeratą: ${organizationName}`} aria-pressed={editing} className={`grid size-9 place-items-center rounded-md border ${editing ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`} onClick={() => {
+          if (!editing && customPlanSelected && status === 'active' && hasRemainingActivePeriod) setStartsAt(formatDateTimeLocal(now));
+          setEditing((open) => !open);
+        }}><Pencil size={16} /></button>
       </div>
     </div>
     {detailsOpen && <dl className="grid gap-2 rounded-md bg-slate-50 p-3 text-xs sm:grid-cols-2">
@@ -358,12 +370,20 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       {!subscription.isPlanChange && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Uždaroma…' : 'Pažymėti atšauktu'}</button>}
     </div>}
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
-      {customInvoiceWillIssue && <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-950">Išsaugojus individualus planas įsigalios iškart, o vadovas galės atsisiųsti išankstinę sąskaitą prenumeratos skiltyje. Suma apskaičiuojama pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį. Jei sąskaita neapmokama per 5 dienas, grįžta ankstesnis planas.</p>}
+      {customInvoiceWillIssue && <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-950">Išsaugojus individualus planas įsigalios iškart, o vadovas galės atsisiųsti išankstinę sąskaitą prenumeratos skiltyje. {hasRemainingActivePeriod ? 'Sąskaita bus apskaičiuota už likusias dienas iki dabartinės prenumeratos pabaigos; vėlesnis pratęsimas kainuos visą mėnesio kainą.' : 'Suma apskaičiuojama pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį.'} Jei sąskaita neapmokama per 5 dienas, grįžta ankstesnis planas.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="pending">Laukia sąskaitos</option><option value="active">Aktyvi</option><option value="canceled">Atšaukta</option><option value="expired">Pasibaigusi</option></select></label>
         <label className="text-sm font-medium">Planas<select className={`${inputClass} mt-1`} value={planCode} onChange={(event) => {
           const selected = availablePlans.find((plan) => plan.code === event.target.value);
           setPlanCode(event.target.value);
+          if ((event.target.value === companyCustomPlanOption || selected?.organization_id === subscription.orgId)
+            && subscription.status === 'Aktyvi'
+            && subscription.endsAt
+            && new Date(subscription.endsAt).getTime() > now) {
+            setStartsAt(formatDateTimeLocal(now));
+          } else if (selected?.organization_id == null) {
+            setStartsAt(formatDateTimeLocal(subscription.startsAt));
+          }
           if (selected) {
             setAmount((selected.amount_cents / 100).toFixed(2));
             if (selected.organization_id === subscription.orgId) setEmployeeLimit(String(selected.employee_limit));
