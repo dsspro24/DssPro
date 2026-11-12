@@ -54,6 +54,26 @@ Vercel projekte Supabase URL ir anon raktas nustatyti `production`, `preview` ir
 Cloud režime veikia vadovo ir DSS specialisto registracija bei bendras prisijungimas. Registruojantis DSS specialistui įmonės duomenų nereikia: patvirtinęs el. paštą jis patenka į savo darbo sritį, kur gali naudotis paskyros ir bendromis sistemos funkcijomis, kol neturi prižiūrimų įmonių. Vadovas gali pakviesti DSS specialistą el. paštu; kvietimas nesuteikia prieigos, kol specialistas neprisijungęs jo nepriima. Specialistas gali kvietimo atsisakyti. Vadovas gali patvirtinęs pašalinti specialistą iš įmonės; panaikinama tik jo prieiga prie tos įmonės, o jo paskyra ir ankstesni parašai išsaugomi.
 
 Cloud prenumeratos užsakomos rankiniu būdu: iki 20 aktyvių darbuotojų – 29,99 €/mėn., iki 50 – 49,99 €/mėn., iki 75 – 59,99 €/mėn., iki 200 – 129,99 €/mėn. Papildoma įmonė turi atskirą workspace ir kainuoja pagal darbuotojų ribą: iki 20 – 19,99 €, iki 50 – 34,99 €, iki 75 – 44,99 €, iki 200 – 89,99 €/mėn. Vadovas pasirenka planą ir laikotarpį, gauna unikalų pavedimo kodą bei išankstinę sąskaitą ir iškart 5 dienoms – pilną prieigą. Įmonės nustatymuose vadovas gali nurodyti sąskaitos adresą ir PVM mokėtojo kodą; šie duomenys įrašomi į išankstinės bei galutinės sąskaitų momentines kopijas. Gavęs apmokėjimą kūrėjas patvirtina užsakymą; galiojimas ir galutinė sąskaita skaičiuojami nuo išankstinės sąskaitos datos. Jei per 5 dienas neapmokama, darbo sritis tampa tik skaitoma; dar 2 mėn. galima peržiūrėti duomenis ir atsisiųsti PDF. Stripe integracija neprijungta. Sąskaitų rekvizitai ir PVM nustatymai tvarkomi kūrėjo skiltyje „Prenumeratos“; PVM režimas išjungtas pagal nutylėjimą. Sąskaitų duomenys saugomi kaip JSON, o PDF sugeneruojamas naršyklėje atsisiuntimo metu ir failas nelaikomas saugykloje. Kūrėjo skiltyje papildomos įmonės rodomos prie pagrindinės įmonės, užsakymai turi peržiūros ir redagavimo veiksmus, kainas ir galiojimo datas galima koreguoti. Atšaukus apmokėtą prenumeratą, prieiga lieka iki jos pabaigos. Vėliau prieiga užblokuojama, o duomenys paliekami sistemoje.
+Aktyviai prenumeratai likus maždaug 3 dienoms iki pabaigos įmonės vadovui siunčiamas vienkartinis el. pašto priminimas per Resend. Siuntimą vykdo Supabase Edge Function kas valandą; laiškas siunčiamas tik pasibaigsiančioms aktyvioms prenumeratoms (įskaitant pradinę 5 dienų bandomąją prieigą), o siuntimo būsena registruojama prenumeratos įraše.
+
+Priminimų įdiegimas:
+
+1. Sugeneruokite stiprią atsitiktinę reikšmę, Supabase SQL Editor lange įrašykite ją į Vault ir naudokite tik serverio aplinkoje:
+
+   ```sql
+   select vault.create_secret('SUGENERUOTA_CRON_PASLAPTIS', 'subscription_expiration_reminder_cron_secret');
+   ```
+
+2. Nustatykite Resend API raktą, patvirtintą siuntėjo adresą ir tą pačią cron paslaptį Supabase Function aplinkoje. `SUPABASE_URL` ir `SUPABASE_SERVICE_ROLE_KEY` Supabase Edge Functions aplinkoje pateikiami automatiškai:
+
+   ```powershell
+   npx supabase secrets set RESEND_API_KEY="RESEND_API_RAKTAS" RESEND_FROM_EMAIL="DSS Pro <siuntejas@jusu-patvirtintas-domenas.lt>" SUBSCRIPTION_REMINDER_CRON_SECRET="SUGENERUOTA_CRON_PASLAPTIS" --project-ref wickbchyltkpmudopnwc
+   ```
+
+3. Prieš pritaikydami priminimo migraciją įdiekite Function: `npx supabase functions deploy subscription-expiration-reminder --project-ref wickbchyltkpmudopnwc`.
+4. Pritaikykite `supabase/migrations/20261112110000_subscription_expiration_email_reminders.sql` įprasta Supabase migracijų komanda. Ji užregistruoja valandinį `pg_cron` darbą ir kviečia Edge Function, naudodama Vault saugomą cron paslaptį.
+
+Function konfigūracijos paslaptis ir Vault reikšmė turi sutapti. Nepavykę laiškai žymimi kaip nesiųsti ir gali būti bandomi iš naujo; Resend idempotency raktas apsaugo nuo dubliuotų laiškų pakartotinio bandymo metu.
 Sąskaitų archyvas vadovui rodo pasirinktos įmonės sąskaitas, o kūrėjui — tik atidarytos įmonės sąskaitas. Sąrašai filtruojami pagal metus, naujausios sąskaitos rodomos pirmiausia, o puslapiuose pateikiama iki 20 įrašų. Sąskaitos JSON užkraunamas tik atidarius konkretaus dokumento PDF veiksmą; sąrašai skaito tik sąskaitos numerį ir datą. Metų pasirinkimas pagal nutylėjimą nustatomas į einamuosius metus.
 
 Kūrėjo prenumeratų valdymas grupuoja papildomas įmones prie pagrindinės, sąrašą galima ieškoti ir filtruoti pagal būseną; įmonių grupės puslapiuojamos po 20 ir iš pradžių sutrauktos. Aktyvios, per 5 dienas besibaigiančios, pasibaigusios ir apmokėjimo laukiančios prenumeratos pažymimos spalvomis. Kūrėjas gali atskirai ištrinti išankstinį arba galutinį sąskaitos dokumentą, patvirtinęs veiksmą; prenumerata ir apmokėjimo istorija lieka nepakeistos. Išankstinės sąskaitos negalima ištrinti, kol užsakymas laukia apmokėjimo, kad liktų galimybė sugeneruoti galutinę sąskaitą.
