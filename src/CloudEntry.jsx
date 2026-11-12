@@ -1367,5 +1367,6 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       {errorMessage && workspaceStatus !== 'error' && <p role="alert" className="mt-4 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{errorMessage}</p>}
       {session && workspaceStatus !== 'error' && <button type="button" className="mt-4 inline-flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={signOut}><LogOut size={15} />Atsijungti</button>}
     </section>
+    <p className="mt-5 text-center text-xs text-slate-500"><button type="button" className="font-semibold text-emerald-800 underline" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button></p>
   </main>;
 }

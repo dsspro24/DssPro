@@ -7134,6 +7134,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           ))}
         </nav>
         {userRole !== 'darbuotojas' && <div className="mt-auto border-t border-white/15 pt-4 text-xs text-emerald-100/70">{roleLabels[userRole]}</div>}
+        <button type="button" className="mt-3 text-left text-xs font-semibold text-emerald-100/75 hover:text-white" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button>
         </div>
       </aside>
 

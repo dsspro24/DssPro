@@ -661,6 +661,7 @@ function DemoApp({ cloudMode = false }) {
             <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
             <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
             <a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a>
+            <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button>
           </nav>
           <p className="mt-3">© 2026 DSS Pro. Visos teisės saugomos.</p>
         </footer>

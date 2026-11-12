@@ -216,7 +216,7 @@ export default function TermsOfService() {
         </section>
       </article>
     </main>
-    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500"><nav className="flex justify-center gap-5"><a href={TERMS_PATH} className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a><a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a></nav><p className="mt-2">© 2026 DSS Pro</p></footer>
+    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500"><nav className="flex flex-wrap justify-center gap-5"><a href={TERMS_PATH} className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a><a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a><button type="button" className="font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button></nav><p className="mt-2">© 2026 DSS Pro</p></footer>
   </div>;
 }
 
