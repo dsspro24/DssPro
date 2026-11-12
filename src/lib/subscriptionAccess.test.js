@@ -54,16 +54,25 @@ test('extending an expired subscription into the future activates it', () => {
   assert.equal(getSubscriptionStatusAfterManualExtension(
     'expired',
     '2026-12-01T00:00:00.000Z',
+    true,
     now,
   ), 'active');
   assert.equal(getSubscriptionStatusAfterManualExtension(
     'expired',
     '2026-11-01T00:00:00.000Z',
+    true,
     now,
   ), 'expired');
   assert.equal(getSubscriptionStatusAfterManualExtension(
     'canceled',
     '2026-12-01T00:00:00.000Z',
+    true,
+    now,
+  ), 'active');
+  assert.equal(getSubscriptionStatusAfterManualExtension(
+    'canceled',
+    '2026-12-01T00:00:00.000Z',
+    false,
     now,
   ), 'canceled');
 });

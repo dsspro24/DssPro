@@ -6495,7 +6495,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const saveCreatorSubscription = async (subscriptionId, values, cancelOrder = false) => {
-    const subscriptionStatus = getSubscriptionStatusAfterManualExtension(values.status, values.endsAt);
+    const subscriptionStatus = getSubscriptionStatusAfterManualExtension(
+      values.status,
+      values.endsAt,
+      values.endsAtChanged === true,
+    );
     const { data: updatedSubscription, error } = cancelOrder
       ? await supabase.rpc('creator_cancel_workspace_subscription_order', {
         input_subscription_id: subscriptionId,

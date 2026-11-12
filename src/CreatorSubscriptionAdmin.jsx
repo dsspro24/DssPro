@@ -161,6 +161,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
   const [startsAt, setStartsAt] = useState(subscription.startsAt ? new Date(subscription.startsAt).toISOString().slice(0, 16) : '');
   const [endsAt, setEndsAt] = useState(subscription.endsAt ? new Date(subscription.endsAt).toISOString().slice(0, 16) : '');
+  const [endsAtChanged, setEndsAtChanged] = useState(false);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(subscription.cancelAtPeriodEnd === true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -219,6 +220,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
       setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
       setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
+      setEndsAtChanged(false);
       setCancelAtPeriodEnd(saved.cancelAtPeriodEnd === true);
     } catch (saveError) {
       setError(saveError.message || 'Užsakymo atšaukti nepavyko.');
@@ -246,11 +248,13 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         amountCents: Math.round(price * 100),
         startsAt: startsAt ? new Date(startsAt).toISOString() : '',
         endsAt: endsAt ? new Date(endsAt).toISOString() : '',
+        endsAtChanged,
         cancelAtPeriodEnd,
       });
       setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
       setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
       setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
+      setEndsAtChanged(false);
       setEditing(false);
     } catch (saveError) {
       setError(saveError.message || 'Prenumeratos išsaugoti nepavyko.');
@@ -301,7 +305,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         }}>{availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</select></label>
         <label className="text-sm font-medium">Kaina €/mėn.<input className={`${inputClass} mt-1`} type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
         <label className="text-sm font-medium">Galioja nuo<input className={`${inputClass} mt-1`} type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label>
-        <label className="text-sm font-medium">Galioja iki<input className={`${inputClass} mt-1`} type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label>
+        <label className="text-sm font-medium">Galioja iki<input className={`${inputClass} mt-1`} type="datetime-local" value={endsAt} onChange={(event) => { setEndsAt(event.target.value); setEndsAtChanged(true); }} /></label>
         <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={cancelAtPeriodEnd} onChange={(event) => setCancelAtPeriodEnd(event.target.checked)} />Atšaukti laikotarpio pabaigoje</label>
       </div>
       <div className="flex flex-wrap gap-2"><button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : 'Išsaugoti prenumeratą'}</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setEditing(false)}>Atšaukti</button></div>
