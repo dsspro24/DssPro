@@ -5207,7 +5207,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setNotice(unsupportedSignerRoles.length
           ? `${employeeBeingEdited.name} pareigos ir priskyrimai išsaugoti. Nepalaikomi pasirašančiųjų vaidmenys pašalinti: ${unsupportedSignerRoles.join(', ')}.`
           : previousAutosaveError
-          ? `Darbuotojo priskyrimai išsaugoti, tačiau ankstesnis bendras įmonės išsaugojimas nepavyko: ${previousAutosaveError.message}`
+          ? `Darbuotojo priskyrimai išsaugoti, tačiau ankstesnis bendras įmonės išsaugojimas nepavyko: ${getWorkspaceErrorMessage(previousAutosaveError)}`
           : `${employeeBeingEdited.name} pareigos, dokumentų ir pasirašančiųjų priskyrimai išsaugoti. Ankstesni parašai išsaugoti su tuometinėmis pareigomis.`);
         closeEmployeeEditor();
       } catch (error) {
@@ -6054,6 +6054,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   }, [cloudMode, userRole, currentOrg?.id, onRefreshSubscription]);
 
+  const getWorkspaceErrorMessage = (error) => {
+    const message = error?.message ?? 'įvyko klaida.';
+    if (message === 'Workspace is read-only after subscription expiry') {
+      return 'Prenumerata neaktyvi arba pasibaigusi. Įmonės duomenis galite tik peržiūrėti; jų keisti ir išsaugoti negalima.';
+    }
+    if (message === 'Workspace changes require confirmed subscription payment') {
+      return 'Įmonės duomenis galėsite keisti, kai prenumeratos apmokėjimas bus patvirtintas.';
+    }
+    if (message === 'Workspace has no active subscription') {
+      return 'Įmonė neturi aktyvios prenumeratos. Duomenis galima tik peržiūrėti.';
+    }
+    return message;
+  };
   const reportWorkspaceSaveFailure = useCallback((error, context) => {
     if (/active employee|employee limit.*plan|plan.*employee limit/i.test(error?.message ?? '')) {
       employeeLimitUpgradePendingRef.current = true;
@@ -6061,7 +6074,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setNotice(`Pasiektas aktyvių darbuotojų plano limitas${currentSubscriptionPlan ? ` (${currentActiveEmployeeCount} iš ${currentSubscriptionPlan.employee_limit})` : ''}. Pasirinkite didesnį planą, kad galėtumėte pridėti aktyvų darbuotoją. Archyvuoti darbuotojai į limitą neįskaičiuojami.`);
       return;
     }
-    setNotice(`${context}: ${error?.message ?? 'įvyko klaida.'}`);
+    setNotice(`${context}: ${getWorkspaceErrorMessage(error)}`);
   }, [currentActiveEmployeeCount, currentSubscriptionPlan, setActiveTab]);
   useEffect(() => {
     reportWorkspaceSaveFailureRef.current = reportWorkspaceSaveFailure;
