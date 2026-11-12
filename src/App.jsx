@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useState } from 'react';
 import CloudEntry from './CloudEntry.jsx';
 import { isSupabaseConfigured, supabase } from './lib/supabase.js';
 import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
@@ -51,7 +51,26 @@ export default function App() {
   } else {
     page = isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
   }
-  return <>{page}<Suspense fallback={null}><CookieConsent /></Suspense></>;
+  return <>{page}<CookieConsentBoundary><Suspense fallback={null}><CookieConsent /></Suspense></CookieConsentBoundary></>;
+}
+
+class CookieConsentBoundary extends Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('Cookie consent UI failed to load:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <p role="alert" className="fixed bottom-3 left-3 z-[100] rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 shadow">Slapukų nustatymai laikinai nepasiekiami. Atnaujinkite puslapį.</p>;
+    }
+    return this.props.children;
+  }
 }
 
 function CloudLandingGate() {
