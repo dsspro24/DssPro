@@ -27,7 +27,9 @@ export default function PrivacyConsentAdmin() {
     }).then(({ data, error: requestError }) => {
       if (!active) return;
       if (requestError) {
-        setError(`Sutikimų žurnalo įkelti nepavyko: ${requestError.message}`);
+        setError(requestError.code === 'PGRST202'
+          ? 'Puslapiavimo funkcija nerasta duomenų bazėje. Pritaikykite supabase/migrations/20261112130700_paginate_privacy_consent_records.sql; jei migracija jau pritaikyta, perkraukite Supabase API schemą.'
+          : `Sutikimų žurnalo įkelti nepavyko: ${requestError.message}`);
       } else {
         const pageRecords = data ?? [];
         if (!pageRecords.length && page > 0) {

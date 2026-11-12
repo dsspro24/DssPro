@@ -55,3 +55,5 @@ $$;
 
 revoke all on function public.creator_list_privacy_consent_records(integer, integer) from public, anon;
 grant execute on function public.creator_list_privacy_consent_records(integer, integer) to authenticated;
+
+notify pgrst, 'reload schema';
