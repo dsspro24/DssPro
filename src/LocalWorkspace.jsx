@@ -1636,10 +1636,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [dssHistoryView, setDssHistoryView] = useState('specialist');
   const canManageSelectedWorkspace = userRole === 'vadovas' || (dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
-  const hasActiveEmployeeSubscription = data.subscriptions.some((subscription) => (
-    subscription.orgId === selectedOrgId
-    && isSubscriptionActiveForEmployeeAccess(subscription, validityCheckTime)
-  ));
+  const hasActiveEmployeeSubscription = userRole === 'dss' && data.employeeSubscriptionActive !== undefined
+    ? data.employeeSubscriptionActive === true
+    : data.subscriptions.some((subscription) => (
+      subscription.orgId === selectedOrgId
+      && isSubscriptionActiveForEmployeeAccess(subscription, validityCheckTime)
+    ));
   const isSubscriptionReadOnly = cloudMode && userRole === 'vadovas' && !hasActiveEmployeeSubscription && (
     subscriptionAccess.readOnly
     || subscriptionAccess.periodEnd && subscriptionAccess.readOnlyUntil
@@ -1884,6 +1886,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         protocolCommissionSignatures: organizationData.protocolCommissionSignatures ?? [],
         signatures: organizationData.signatures ?? [],
         subscriptions: organizationData.subscriptions ?? current.subscriptions,
+        employeeSubscriptionActive: organizationData.employeeSubscriptionActive ?? current.employeeSubscriptionActive,
         resources: organizationData.resources ?? current.resources,
       }));
       setDssWorkspaceLoadState({ organizationId: selectedOrgId, status: 'ready', error: '' });
@@ -1893,6 +1896,33 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     });
     return () => { active = false; };
   }, [cloudMode, userRole, onLoadDssOrganization, selectedOrgId, dssOrganizationIsOpen, dssWorkspaceLoadAttempt]);
+
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'dss' || !dssOrganizationIsOpen || !selectedOrgId) return undefined;
+    let active = true;
+    const refreshSubscriptionAccess = async () => {
+      const { data: employeeSubscriptionActive, error } = await supabase.rpc(
+        'has_active_employee_subscription',
+        { input_organization_id: selectedOrgId },
+      );
+      if (!active) return;
+      if (error) {
+        setNotice(`Prenumeratos būsenos patikrinti nepavyko: ${error.message}`);
+        return;
+      }
+      setData((current) => ({ ...current, employeeSubscriptionActive: employeeSubscriptionActive === true }));
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshSubscriptionAccess();
+    };
+    const intervalId = window.setInterval(refreshSubscriptionAccess, 60_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [cloudMode, userRole, dssOrganizationIsOpen, selectedOrgId]);
 
   const saveCreatorWorkspaceSnapshot = (workspaceData) => {
     const saveRequest = creatorSaveQueue.current.catch(() => {}).then(async () => {

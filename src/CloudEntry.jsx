@@ -1123,6 +1123,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           { data: assignments, error: assignmentsError },
           { data: protocolSignatures, error: protocolSignaturesError },
           { data: resourceAccess, error: resourceAccessError },
+          { data: employeeSubscriptionActive, error: employeeSubscriptionError },
         ] = await Promise.all([
           loadOrganizationWorkspace(organizationId, workspace?.data.resources ?? []),
           supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
@@ -1130,10 +1131,12 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           supabase.from('organization_resource_access')
             .select('document_id, settings')
             .eq('organization_id', organizationId),
+          supabase.rpc('has_active_employee_subscription', { input_organization_id: organizationId }),
         ]);
         if (assignmentsError) throw assignmentsError;
         if (protocolSignaturesError) throw protocolSignaturesError;
         if (resourceAccessError) throw resourceAccessError;
+        if (employeeSubscriptionError) throw employeeSubscriptionError;
         if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
 
         const organizationMemberships = (workspace.creatorAccounts ?? []).flatMap((account) => (account.organizations ?? [])
@@ -1179,6 +1182,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           signatures: (hydratedWorkspace.signatures ?? []).filter((signature) => signature.orgId === organizationId),
           specialists: [specialist],
           subscriptions: (hydratedWorkspace.subscriptions ?? []).filter((subscription) => subscription.orgId === organizationId),
+          employeeSubscriptionActive: employeeSubscriptionActive === true,
         };
         setCreatorPreview({
           organizationId,
@@ -1230,6 +1234,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       { data: assignments, error: assignmentsError },
       { data: protocolSignatures, error: protocolSignaturesError },
       { data: resourceAccess, error: resourceAccessError },
+      { data: employeeSubscriptionActive, error: employeeSubscriptionError },
     ] = await Promise.all([
       supabase.from('organization_memberships')
         .select('can_manage_workspace')
@@ -1243,12 +1248,14 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       supabase.from('organization_resource_access')
         .select('document_id, settings')
         .eq('organization_id', organizationId),
+      supabase.rpc('has_active_employee_subscription', { input_organization_id: organizationId }),
     ]);
     if (currentMembershipError) throw currentMembershipError;
     if (!currentMembership) throw new Error('Neturite prieigos prie šios įmonės.');
     if (assignmentsError) throw assignmentsError;
     if (protocolSignaturesError) throw protocolSignaturesError;
     if (resourceAccessError) throw resourceAccessError;
+    if (employeeSubscriptionError) throw employeeSubscriptionError;
     if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
 
     const storedWorkspace = savedWorkspace;
@@ -1284,6 +1291,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         protocolCommissionSignatures: hydratedProtocolSignatures,
         signatures: hydratedWorkspace.signatures ?? [],
         subscriptions: hydratedWorkspace.subscriptions ?? [],
+        employeeSubscriptionActive: employeeSubscriptionActive === true,
         resources: [...resourcesById.values()],
       },
     };
