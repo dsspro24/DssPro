@@ -2136,13 +2136,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         requestInFlight = false;
       }
     };
-    const intervalId = window.setInterval(refreshSubscription, 30_000);
+    const channel = supabase.channel(`manager-subscription-${currentOrg.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'workspace_subscriptions',
+        filter: `organization_id=eq.${currentOrg.id}`,
+      }, refreshSubscription)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') refreshSubscription();
+        if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) {
+          console.error(`Subscription updates are unavailable for organization ${currentOrg.id}: ${status}`);
+        }
+      });
     document.addEventListener('visibilitychange', refreshSubscription);
-    refreshSubscription();
     return () => {
       active = false;
-      window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', refreshSubscription);
+      supabase.removeChannel(channel);
     };
   }, [cloudMode, userRole, currentOrg?.id, onRefreshSubscription]);
   useEffect(() => {
