@@ -1280,6 +1280,7 @@ const SubscriptionInvoiceArchive = lazy(() => import('./SubscriptionBilling.jsx'
 const LazySubscriptionInvoiceArchive = lazy(() => import('./SubscriptionBilling.jsx').then((module) => ({ default: module.LazySubscriptionInvoiceArchive })));
 const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorInvoiceSettingsEditor })));
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
+const CreatorCustomPlanCreator = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorCustomPlanCreator })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
 export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
@@ -6537,6 +6538,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       values.endsAt,
       values.endsAtChanged === true,
     );
+    let planCode = values.planCode;
+    if (!cancelOrder && values.isCustomPlan) {
+      const { data: customPlan, error: customPlanError } = await supabase.rpc('creator_upsert_company_custom_plan', {
+        input_organization_id: values.organizationId,
+        input_subscription_id: subscriptionId,
+        input_amount_cents: values.amountCents,
+        input_employee_limit: values.employeeLimit,
+      });
+      if (customPlanError) throw customPlanError;
+      planCode = customPlan.code;
+    }
     const { data: updatedSubscription, error } = cancelOrder
       ? await supabase.rpc('creator_cancel_workspace_subscription_order', {
         input_subscription_id: subscriptionId,
@@ -6544,7 +6556,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : await supabase.rpc('creator_update_workspace_subscription', {
         input_subscription_id: subscriptionId,
         input_status: subscriptionStatus,
-        input_plan_code: values.planCode,
+        input_plan_code: planCode,
         input_amount_cents: values.amountCents,
         input_starts_at: values.startsAt || null,
         input_ends_at: values.endsAt || null,
@@ -6587,6 +6599,22 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setCreatorSubscriptions((current) => current.map((item) => item.id === subscriptionId ? refreshedSubscription : item));
     setNotice('Prenumeratos duomenys atnaujinti.');
     return refreshedSubscription;
+  };
+
+  const createCreatorCustomPlan = async (organizationId, amountCents, employeeLimit) => {
+    const { error } = await supabase.rpc('creator_upsert_company_custom_plan', {
+      input_organization_id: organizationId,
+      input_subscription_id: null,
+      input_amount_cents: amountCents,
+      input_employee_limit: employeeLimit,
+    });
+    if (error) throw error;
+    const refreshedWorkspace = await onCreatorWorkspaceChanged();
+    if (refreshedWorkspace?.data?.subscriptions) {
+      setData((current) => ({ ...current, subscriptions: refreshedWorkspace.data.subscriptions }));
+      setCreatorSubscriptions(refreshedWorkspace.data.subscriptions);
+    }
+    setNotice('Individualus planas sukurtas. Nustatykite prenumeratos būseną ir galiojimo datas, kad suteiktumėte prieigą.');
   };
 
   const deleteCreatorSubscriptionInvoice = async (subscriptionId, invoiceType) => {
@@ -8277,7 +8305,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             inputClass={inputClass}
                             buttonClass={buttonClass}
                           /></Suspense>)
-                            : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">Ši įmonė dar neturi prenumeratos ar užsakymo įrašo.</p>}
+                            : <div className="space-y-3"><p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">Ši įmonė dar neturi prenumeratos ar užsakymo įrašo.</p><Suspense fallback={<p className="text-sm text-slate-500">Atidaromi individualaus plano nustatymai…</p>}><CreatorCustomPlanCreator organizationId={organization.id} organizationName={organization.name} onCreate={createCreatorCustomPlan} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></div>}
                           <Suspense fallback={<p className="text-sm text-slate-500">Atidaroma sąskaitų istorija…</p>}><LazySubscriptionInvoiceArchive
                             organizationId={organization.id}
                             organizationName={organization.name}

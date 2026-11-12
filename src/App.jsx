@@ -651,6 +651,10 @@ function DemoApp({ cloudMode = false }) {
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar darbuotojas gali būti pakviestas į kelias įmones?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Taip. Darbuotojas gali naudoti tą pačią paskyrą kelių įmonių kvietimams ir pasirinkti, kurios įmonės darbo vietoje dirba.</p>
               </details>
+              <details className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Turite daugiau nei 200 darbuotojų?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Parašykite mums el. paštu <a className="font-semibold text-emerald-800 underline" href="mailto:dsspro@inbox.lt">dsspro@inbox.lt</a>. Laiške nurodykite įmonės pavadinimą ir darbuotojų skaičių – apskaičiuosime individualią kainą.</p>
+              </details>
             </div>
           </div>
         </section>

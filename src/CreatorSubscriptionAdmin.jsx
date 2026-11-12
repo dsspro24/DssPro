@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Eye, Pencil } from 'lucide-react';
 import dssProLogo from './assets/dss-pro-logo.webp';
 
+const companyCustomPlanOption = '__company_custom_plan__';
+
 const issuerFields = [
   ['businessName', 'Pavadinimas'],
   ['name', 'Vardas, pavardė'],
@@ -155,10 +157,50 @@ export function SubscriptionPlanPriceEditor({ plan, onSave, inputClass }) {
   </form>;
 }
 
+export function CreatorCustomPlanCreator({ organizationId, organizationName, onCreate, inputClass, buttonClass }) {
+  const [price, setPrice] = useState('');
+  const [employeeLimit, setEmployeeLimit] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async (event) => {
+    event.preventDefault();
+    const amount = Number(price.replace(',', '.'));
+    const limit = Number(employeeLimit);
+    if (!Number.isFinite(amount) || amount < 0 || !Number.isInteger(limit) || limit < 1) {
+      setError('Įveskite tinkamą mėnesio kainą ir teigiamą darbuotojų limitą.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await onCreate(organizationId, Math.round(amount * 100), limit);
+    } catch (saveError) {
+      setError(saveError.message || 'Individualaus plano sukurti nepavyko.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <form onSubmit={save} className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
+    <p className="text-sm font-semibold">Sukurti individualų planą įmonei „{organizationName}“</p>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="text-sm font-medium">Darbuotojų limitas<input className={`${inputClass} mt-1`} type="number" min="1" step="1" required value={employeeLimit} onChange={(event) => setEmployeeLimit(event.target.value)} /></label>
+      <label className="text-sm font-medium">Kaina €/mėn.<input className={`${inputClass} mt-1`} type="number" min="0" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
+    </div>
+    <p className="text-xs text-slate-600">Bus sukurtas tik šiai įmonei matomas planas ir laukianti prenumerata. Norėdami suteikti prieigą, išsaugokite ją kaip aktyvią ir nurodykite galiojimo datas.</p>
+    <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Kuriama…' : 'Sukurti individualų planą'}</button>
+    {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+  </form>;
+}
+
 export function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, now, inputClass, buttonClass }) {
   const [status, setStatus] = useState(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
   const [planCode, setPlanCode] = useState(subscription.planCode ?? 'up_to_20');
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
+  const companyCustomPlan = plans.find((plan) => plan.organization_id === subscription.orgId);
+  const [employeeLimit, setEmployeeLimit] = useState(String(companyCustomPlan?.employee_limit ?? ''));
   const [startsAt, setStartsAt] = useState(subscription.startsAt ? new Date(subscription.startsAt).toISOString().slice(0, 16) : '');
   const [endsAt, setEndsAt] = useState(subscription.endsAt ? new Date(subscription.endsAt).toISOString().slice(0, 16) : '');
   const [endsAtChanged, setEndsAtChanged] = useState(false);
@@ -170,7 +212,11 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   const [paymentEndDate, setPaymentEndDate] = useState('');
   const [error, setError] = useState('');
   const availablePlans = plans.filter((plan) => plan.active !== false
+    && (plan.organization_id == null || plan.organization_id === subscription.orgId)
     && (subscription.isAddon ? plan.code.startsWith('additional_workspace_') : !plan.code.startsWith('additional_workspace')));
+  const selectedPlan = availablePlans.find((plan) => plan.code === planCode);
+  const customPlanSelected = !subscription.isAddon
+    && (planCode === companyCustomPlanOption || selectedPlan?.organization_id === subscription.orgId);
   const price = Number(amount.replace(',', '.'));
   const remainingDays = subscription.endsAt ? Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000) : null;
   const paymentEndDateMinimum = subscription.isRenewal
@@ -235,6 +281,11 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       setError('Įveskite tinkamą kainą.');
       return;
     }
+    const employeeLimitValue = Number(employeeLimit);
+    if (customPlanSelected && (!Number.isInteger(employeeLimitValue) || employeeLimitValue < 1)) {
+      setError('Įveskite teigiamą individualaus plano darbuotojų limitą.');
+      return;
+    }
     if (status === 'active' && (!startsAt || !endsAt || new Date(endsAt) <= new Date(startsAt))) {
       setError('Aktyviai prenumeratai nurodykite tinkamą pradžios ir pabaigos laiką.');
       return;
@@ -245,6 +296,9 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       const saved = await onSave(subscription.id, {
         status,
         planCode,
+        isCustomPlan: customPlanSelected,
+        organizationId: subscription.orgId,
+        employeeLimit: customPlanSelected ? employeeLimitValue : null,
         amountCents: Math.round(price * 100),
         startsAt: startsAt ? new Date(startsAt).toISOString() : '',
         endsAt: endsAt ? new Date(endsAt).toISOString() : '',
@@ -301,8 +355,14 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         <label className="text-sm font-medium">Planas<select className={`${inputClass} mt-1`} value={planCode} onChange={(event) => {
           const selected = availablePlans.find((plan) => plan.code === event.target.value);
           setPlanCode(event.target.value);
-          if (selected) setAmount((selected.amount_cents / 100).toFixed(2));
-        }}>{availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</select></label>
+          if (selected) {
+            setAmount((selected.amount_cents / 100).toFixed(2));
+            if (selected.organization_id === subscription.orgId) setEmployeeLimit(String(selected.employee_limit));
+          } else if (event.target.value === companyCustomPlanOption) {
+            setEmployeeLimit(String(companyCustomPlan?.employee_limit ?? ''));
+          }
+        }}>{!subscription.isAddon && <option value={companyCustomPlanOption}>Individualus planas šiai įmonei</option>}{availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</select></label>
+        {customPlanSelected && <label className="text-sm font-medium">Darbuotojų limitas<input className={`${inputClass} mt-1`} type="number" min="1" step="1" required value={employeeLimit} onChange={(event) => setEmployeeLimit(event.target.value)} /></label>}
         <label className="text-sm font-medium">Kaina €/mėn.<input className={`${inputClass} mt-1`} type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
         <label className="text-sm font-medium">Galioja nuo<input className={`${inputClass} mt-1`} type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label>
         <label className="text-sm font-medium">Galioja iki<input className={`${inputClass} mt-1`} type="datetime-local" value={endsAt} onChange={(event) => { setEndsAt(event.target.value); setEndsAtChanged(true); }} /></label>
