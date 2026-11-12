@@ -1656,19 +1656,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   );
   const isAwaitingSubscriptionOrder = subscriptionAccess.reason === 'awaiting-order';
   const isWorkspaceReadOnly = isSubscriptionReadOnly || isSubscriptionLocked;
-  const isDssSubscriptionInactive = cloudMode && userRole === 'dss' && dssOrganizationIsOpen && (
-    !dssSubscriptionAccess
-    || dssSubscriptionAccess.readOnly
-    || dssSubscriptionAccess.locked
-    || dssSubscriptionAccess.periodEnd && dssSubscriptionAccess.readOnlyUntil
-      && validityCheckTime >= new Date(dssSubscriptionAccess.periodEnd).getTime()
-      && validityCheckTime < new Date(dssSubscriptionAccess.readOnlyUntil).getTime()
-    || dssSubscriptionAccess.reason === 'initial-trial'
-      && dssSubscriptionAccess.periodEnd
-      && validityCheckTime >= new Date(dssSubscriptionAccess.periodEnd).getTime()
-    || dssSubscriptionAccess.readOnlyUntil
-      && validityCheckTime >= new Date(dssSubscriptionAccess.readOnlyUntil).getTime()
-  );
+  const isDssSubscriptionInactive = cloudMode && userRole === 'dss' && dssOrganizationIsOpen
+    && !hasActiveEmployeeSubscription;
   const isEmployeeAdditionBlocked = cloudMode && userRole === 'vadovas'
     ? !hasActiveEmployeeSubscription
     : isDssSubscriptionInactive;
@@ -7658,7 +7647,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'komanda' && canManageSelectedWorkspace && <section className="space-y-5">
             <PageTitle title="Darbuotojai" subtitle="Priskirti darbai, jų atlikimas ir parašai vienoje vietoje." />
-            {!sandboxMode && <div className="flex justify-end"><button type="button" className={buttonClass} onClick={() => document.getElementById('invite-employee-dialog')?.showModal()}><Plus size={16} />Pakviesti darbuotoją</button></div>}
+            {!sandboxMode && <div className="flex justify-end"><button type="button" className={buttonClass} onClick={openEmployeeInviteDialog}><Plus size={16} />Pakviesti darbuotoją</button></div>}
             {!sandboxMode && <dialog id="invite-employee-dialog" className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl backdrop:bg-slate-950/60">
               <form onSubmit={inviteEmployee} className="space-y-5">
                 <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold">Pakviesti darbuotoją</h2><p className="mt-1 text-sm text-slate-500">Įveskite darbuotojo duomenis ir parinkite dokumentus. Jei el. paštas jau turi darbuotojo paskyrą, ji bus susieta su šia įmone — naujos paskyros kurti nereikės.</p></div><button type="button" aria-label="Uždaryti kvietimo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => document.getElementById('invite-employee-dialog')?.close()}><X size={20} /></button></div>
