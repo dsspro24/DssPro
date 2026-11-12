@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } f
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
+import { buildDssOrganization } from './lib/dssOrganization.js';
 import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
@@ -1157,6 +1158,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       savedWorkspace,
       { data: assignments, error: assignmentsError },
       { data: protocolSignatures, error: protocolSignaturesError },
+      { data: resourceAccess, error: resourceAccessError },
     ] = await Promise.all([
       supabase.from('organization_memberships')
         .select('can_manage_workspace')
@@ -1167,31 +1169,32 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       loadOrganizationWorkspace(organizationId, workspace.data.resources ?? []),
       supabase.rpc('get_organization_commission_assignments', { input_organization_id: organizationId }),
       supabase.rpc('get_organization_protocol_commission_signatures', { input_organization_id: organizationId }),
+      supabase.from('organization_resource_access')
+        .select('document_id, settings')
+        .eq('organization_id', organizationId),
     ]);
     if (currentMembershipError) throw currentMembershipError;
     if (!currentMembership) throw new Error('Neturite prieigos prie šios įmonės.');
     if (assignmentsError) throw assignmentsError;
     if (protocolSignaturesError) throw protocolSignaturesError;
+    if (resourceAccessError) throw resourceAccessError;
     if (!savedWorkspace) throw new Error('Įmonės darbo sritis dar nesukurta.');
 
     const storedWorkspace = savedWorkspace;
     const savedOrganization = storedWorkspace.organizations?.find((item) => item.id === organizationId);
-    if (!savedOrganization) throw new Error('Įmonės nustatymai nerasti.');
     const hydratedWorkspace = await hydrateWorkspaceAssets(storedWorkspace);
     const hydratedAssignments = (assignments ?? []).map((assignment) => ({
       ...assignment,
       signaturePath: assignment.consentSignaturePath,
     }));
     const hydratedProtocolSignatures = protocolSignatures ?? [];
-    const organization = {
-      ...organizationSummary,
-      ...savedOrganization,
-      id: organizationId,
-      name: organizationSummary.name,
-      companyCode: organizationSummary.companyCode,
-      dss: [...new Set([...(savedOrganization.dss ?? []), session.user.id])],
-      canManageWorkspace: currentMembership.can_manage_workspace === true,
-    };
+    const organization = buildDssOrganization({
+      summary: organizationSummary,
+      savedOrganization,
+      resourceAccess: resourceAccess ?? [],
+      specialistId: session.user.id,
+      canManageWorkspace: currentMembership.can_manage_workspace,
+    });
     const globalResources = workspace.catalog?.resources?.filter((resource) => !resource.organizationId) ?? [];
     const resourcesById = new Map(globalResources.map((resource) => [resource.id, resource]));
     for (const resource of hydratedWorkspace.resources ?? []) resourcesById.set(resource.id, resource);
