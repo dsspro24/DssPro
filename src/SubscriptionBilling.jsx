@@ -258,7 +258,7 @@ export function SubscriptionInvoiceArchive({ subscriptions, organizationName, on
         return <div key={invoice.key} className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3">
           <div className="min-w-0 flex-1">
             {canceledPreinvoice
-              ? <p className="font-semibold text-rose-800">Atšaukta</p>
+              ? <p className="font-semibold">{invoice.number} <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-900">Atšaukta</span></p>
               : <p className="font-semibold">{invoice.number} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${invoice.type === 'final' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-700'}`}>{invoice.title}</span></p>}
             {!canceledPreinvoice && <p className="mt-1 text-xs text-slate-500">{new Date(invoice.date).toLocaleDateString('lt-LT')} · {invoice.subscription.plan}{invoice.subscription.orderMonths > 1 ? ` · ${invoice.subscription.orderMonths} mėn.` : ''}</p>}
           </div>
