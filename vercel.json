@@ -2,12 +2,14 @@
   "redirects": [
     { "source": "/tinklarastis/", "destination": "/tinklarastis", "permanent": true },
     { "source": "/tinklarastis/:slug/", "destination": "/tinklarastis/:slug", "permanent": true },
-    { "source": "/naudojimo-salygos/", "destination": "/naudojimo-salygos", "permanent": true }
+    { "source": "/naudojimo-salygos/", "destination": "/naudojimo-salygos", "permanent": true },
+    { "source": "/privatumo-politika/", "destination": "/privatumo-politika", "permanent": true }
   ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/tinklarastis", "destination": "/api/blog" },
     { "source": "/tinklarastis/:slug", "destination": "/api/blog?slug=:slug" },
-    { "source": "/naudojimo-salygos", "destination": "/index.html" }
+    { "source": "/naudojimo-salygos", "destination": "/index.html" },
+    { "source": "/privatumo-politika", "destination": "/index.html" }
   ]
 }

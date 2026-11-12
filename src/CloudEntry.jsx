@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } f
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
+import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
@@ -825,6 +826,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const [notice, setNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [legalTermsAccepted, setLegalTermsAccepted] = useState(false);
   const assetMigrationStartedFor = useRef('');
 
   useEffect(() => {
@@ -898,6 +900,9 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     setSubmitting(true);
     try {
       if (authMode === 'signup') {
+        if (!legalTermsAccepted) {
+          throw new Error('Norėdami sukurti paskyrą, sutikite su Naudojimo sąlygomis ir patvirtinkite, kad susipažinote su Privatumo politika.');
+        }
         if (!/^\d{4}$/.test(form.signingPin) || form.signingPin !== form.confirmSigningPin) {
           throw new Error('Pasirašymo PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
         }
@@ -910,6 +915,9 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
               account_type: signupRole,
               ...(signupRole === 'manager' ? { plan_code: 'up_to_20' } : { plan_code: 'free' }),
               signing_pin: form.signingPin,
+              legal_terms_accepted: true,
+              terms_version: TERMS_VERSION,
+              privacy_policy_version: PRIVACY_POLICY_VERSION,
             },
             emailRedirectTo: window.location.origin,
           },
@@ -1341,7 +1349,17 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       </> : <>
         <h1 className="text-xl font-bold">{authMode === 'signup' ? signupRole === 'manager' ? 'Sukurkite vadovo paskyrą' : 'Sukurkite DSS specialisto paskyrą' : 'Prisijunkite'}</h1>{authMode === 'signup' && <p className="mt-1 text-sm text-slate-600">{signupRole === 'manager' ? 'Patvirtinus el. paštą galėsite sukurti įmonės paskyrą.' : 'Patvirtinę el. paštą iškart galėsite naudotis DSS specialisto paskyra. Įmonės duomenų įvesti nereikia; vadovų kvietimus priimsite prisijungę.'}</p>}
         {authMode === 'signup' && <div className="mt-4 grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1 text-xs font-semibold"><button type="button" className={`rounded px-2 py-2 ${signupRole === 'manager' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} onClick={() => setSignupRole('manager')}>Vadovo paskyra</button><button type="button" className={`rounded px-2 py-2 ${signupRole === 'dss_specialist' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} onClick={() => setSignupRole('dss_specialist')}>DSS specialisto paskyra</button></div>}
-        <form onSubmit={handleAuth} className="mt-5 space-y-4">{authMode === 'signup' && <><label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label></>}<label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>{authMode === 'signup' && <><label className="block text-sm font-medium">Pasirašymo PIN (4 skaitmenys)<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite pasirašymo PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label></>}<button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button></form>
+        <form onSubmit={handleAuth} className="mt-5 space-y-4">
+          {authMode === 'signup' && <label className="block text-sm font-medium">Vardas ir pavardė<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="name" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} required /></label>}
+          <label className="block text-sm font-medium">El. paštas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label>
+          <label className="block text-sm font-medium">Slaptažodis<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>
+          {authMode === 'signup' && <>
+            <label className="block text-sm font-medium">Pasirašymo PIN (4 skaitmenys)<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label>
+            <label className="block text-sm font-medium">Pakartokite pasirašymo PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label>
+            <label className="flex items-start gap-2 text-sm leading-5 text-slate-600"><input className="mt-1" type="checkbox" checked={legalTermsAccepted} onChange={(event) => setLegalTermsAccepted(event.target.checked)} required /><span>Sutinku su <a className="font-semibold text-emerald-800 underline" href="/naudojimo-salygos" target="_blank" rel="noreferrer">Naudojimo sąlygomis</a> ir patvirtinu, kad susipažinau su <a className="font-semibold text-emerald-800 underline" href="/privatumo-politika" target="_blank" rel="noreferrer">Privatumo politika</a>. Tai nėra sutikimas analitiniams slapukams.</span></label>
+          </>}
+          <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}>{authMode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}{submitting ? 'Vykdoma…' : authMode === 'signup' ? 'Sukurti paskyrą' : 'Prisijungti'}</button>
+        </form>
         {onBackToLanding ? <button type="button" className="mt-4 w-full text-sm font-semibold text-emerald-800 hover:text-emerald-950" onClick={onBackToLanding}>Pasirinkti planą ir registruotis</button>
           : <button type="button" className="mt-4 w-full text-sm font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => { setAuthMode(authMode === 'signup' ? 'login' : 'signup'); setErrorMessage(''); setNotice(''); }}>{authMode === 'signup' ? 'Jau turite paskyrą? Prisijunkite' : 'Neturite paskyros? Registruokitės'}</button>}
       </>}

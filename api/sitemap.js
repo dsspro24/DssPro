@@ -83,6 +83,7 @@ export default async function handler(request, response) {
 
     const urls = [
       sitemapUrl(`${siteUrl}/`),
+      sitemapUrl(`${siteUrl}/privatumo-politika`),
       sitemapUrl(`${siteUrl}/tinklarastis`, validDate(posts[0]?.updated_at)),
       ...posts
         .filter((post) => typeof post.slug === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(post.slug))

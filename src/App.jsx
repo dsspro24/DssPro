@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import CloudEntry from './CloudEntry.jsx';
 import { isSupabaseConfigured, supabase } from './lib/supabase.js';
+import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
 import { 
   Home, 
   BookOpen, 
@@ -25,13 +26,17 @@ import {
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 const BlogPage = lazy(() => import('./Blog.jsx'));
 const TermsOfService = lazy(() => import('./TermsOfService.jsx'));
+const PrivacyPolicy = lazy(() => import('./PrivacyPolicy.jsx'));
+const CookieConsent = lazy(() => import('./CookieConsent.jsx'));
 
 export default function App() {
+  let page;
   if (/^\/naudojimo-salygos\/?$/.test(window.location.pathname)) {
-    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamos naudojimo sąlygos…</p></main>}><TermsOfService /></Suspense>;
-  }
-  const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
-  if (blogRoute) {
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamos naudojimo sąlygos…</p></main>}><TermsOfService /></Suspense>;
+  } else if (/^\/privatumo-politika\/?$/.test(window.location.pathname)) {
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliama privatumo politika…</p></main>}><PrivacyPolicy /></Suspense>;
+  } else if (window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/)) {
+    const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
     const slug = blogRoute[1]
       ? (() => {
         try {
@@ -42,9 +47,11 @@ export default function App() {
       })()
       : '';
     const initialData = window.__BLOG_SSR__?.path === window.location.pathname ? window.__BLOG_SSR__ : null;
-    return <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamas tinklaraštis…</p></main>}><BlogPage slug={slug} initialData={initialData} /></Suspense>;
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamas tinklaraštis…</p></main>}><BlogPage slug={slug} initialData={initialData} /></Suspense>;
+  } else {
+    page = isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
   }
-  return isSupabaseConfigured ? <CloudLandingGate /> : <DemoApp />;
+  return <>{page}<Suspense fallback={null}><CookieConsent /></Suspense></>;
 }
 
 function CloudLandingGate() {
@@ -281,7 +288,12 @@ function DemoApp({ cloudMode = false }) {
     const password = String(signupForm.get('password') ?? '');
     const signingPin = String(signupForm.get('signingPin') ?? '');
     const confirmSigningPin = String(signupForm.get('confirmSigningPin') ?? '');
+    const termsAccepted = signupForm.get('legalTermsAccepted') === 'on';
 
+    if (cloudMode && !termsAccepted) {
+      setCloudSignupFeedback('Norėdami sukurti paskyrą, sutikite su Naudojimo sąlygomis ir patvirtinkite, kad susipažinote su Privatumo politika.');
+      return;
+    }
     if (!/^\d{4}$/.test(signingPin) || signingPin !== confirmSigningPin) {
       setCloudSignupFeedback('Pasirašymo PIN turi būti 4 skaitmenys, o abu įrašai turi sutapti.');
       return;
@@ -300,6 +312,9 @@ function DemoApp({ cloudMode = false }) {
             account_type: registerRole === 'dss' ? 'dss_specialist' : 'manager',
             ...(registerRole === 'vadovas' ? { plan_code: registerPlan } : { plan_code: 'free' }),
             signing_pin: signingPin,
+            legal_terms_accepted: true,
+            terms_version: TERMS_VERSION,
+            privacy_policy_version: PRIVACY_POLICY_VERSION,
           },
           emailRedirectTo: window.location.origin,
         },
@@ -586,6 +601,8 @@ function DemoApp({ cloudMode = false }) {
                 </div>
               </div>
 
+              {cloudMode && <label className="flex items-start gap-2 text-xs leading-5 text-slate-600"><input className="mt-1" type="checkbox" name="legalTermsAccepted" required /><span>Sutinku su <a className="font-semibold text-emerald-800 underline" href="/naudojimo-salygos" target="_blank" rel="noreferrer">Naudojimo sąlygomis</a> ir patvirtinu, kad susipažinau su <a className="font-semibold text-emerald-800 underline" href="/privatumo-politika" target="_blank" rel="noreferrer">Privatumo politika</a>. Tai nėra sutikimas analitiniams slapukams.</span></label>}
+
               <button type="submit" className="w-full py-3 bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-black rounded-xl mt-2 cursor-pointer transition-all shadow-md">
                 {cloudMode ? registerRole === 'vadovas' ? 'Tęsti su pasirinktu planu' : 'Sukurti nemokamą paskyrą' : 'Sukurti paskyrą'}
               </button>
@@ -624,6 +641,7 @@ function DemoApp({ cloudMode = false }) {
           <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
             <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
             <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
+            <a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a>
           </nav>
           <p className="mt-3">© 2026 DSS Pro. Visos teisės saugomos.</p>
         </footer>
