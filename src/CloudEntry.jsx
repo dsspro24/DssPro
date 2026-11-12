@@ -1106,7 +1106,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
   };
 
-  const openCreatorPreview = async (organizationId, role) => {
+  const openCreatorPreview = async (organizationId, role, previewUserId = '') => {
     setErrorMessage('');
     setCreatorPreviewLoading(true);
     try {
@@ -1142,8 +1142,12 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         const organizationMemberships = (workspace.creatorAccounts ?? []).flatMap((account) => (account.organizations ?? [])
           .filter((membership) => membership.id === organizationId)
           .map((membership) => ({ ...account, membership })));
-        const dssMembership = organizationMemberships.find((account) => account.membership.role === 'dss_specialist');
-        const specialistId = dssMembership?.id ?? `creator-preview-${organizationId}`;
+        const dssMembership = organizationMemberships.find((account) => (
+          account.membership.role === 'dss_specialist'
+          && (!previewUserId || account.id === previewUserId)
+        ));
+        if (!dssMembership) throw new Error('Pasirinkto DSS specialisto prieiga prie įmonės nerasta.');
+        const specialistId = dssMembership.id;
         const listedOrganization = workspace.data.organizations.find((item) => item.id === organizationId);
         if (!listedOrganization) throw new Error('Įmonė nerasta.');
 
@@ -1187,6 +1191,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         setCreatorPreview({
           organizationId,
           role,
+          previewUserId: specialistId,
           data,
           subscriptionAccess: getSubscriptionAccess(data.subscriptions[0], data.subscriptions),
         });
@@ -1323,7 +1328,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         dss: organizationMemberships.filter((account) => account.membership.role === 'dss_specialist').map((account) => account.id),
       };
       if (sourceOrganization) {
-        const dssId = sourceOrganization.dss?.[0] ?? `creator-preview-${sourceOrganization.id}`;
+        const dssId = creatorPreview.previewUserId ?? sourceOrganization.dss?.[0] ?? '';
         const dssSpecialist = sourceData?.specialists?.find((specialist) => specialist.id === dssId)
           ?? { id: dssId, name: 'DSS specialistas (peržiūra)', email: '', status: 'Peržiūra' };
         const previewOrganization = creatorPreview.role === 'dss'
@@ -1342,7 +1347,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           subscriptions: (sourceData?.subscriptions ?? []).filter((subscription) => subscription.orgId === creatorPreview.organizationId),
         };
         return <WorkspaceRenderBoundary><Suspense fallback={<WorkspaceLoading />}><LocalWorkspace
-          key={`creator-preview-${creatorPreview.organizationId}-${creatorPreview.role}`}
+          key={`creator-preview-${creatorPreview.organizationId}-${creatorPreview.role}-${creatorPreview.previewUserId ?? ''}`}
           userRole={creatorPreview.role}
           onRoleChange={() => {}}
           onExit={signOut}
@@ -1360,7 +1365,9 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           onRefreshSubscription={refreshSignedInSubscription}
           cloudMode
           cloudUserId={session.user.id}
-          creatorManagementContext={`${sourceOrganization.name} · ${creatorPreview.role === 'dss' ? 'DSS specialisto' : 'vadovo'} peržiūra`}
+          creatorManagementContext={creatorPreview.role === 'vadovas' ? `${sourceOrganization.name} · vadovo peržiūra` : ''}
+          creatorPreviewContext={creatorPreview.role === 'dss' ? `${sourceOrganization.name} · ${dssSpecialist.name}` : ''}
+          previewUserId={creatorPreview.role === 'dss' ? creatorPreview.previewUserId : ''}
           onExitCreatorPreview={() => setCreatorPreview(null)}
           onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
           onCreatorOrganizationDeleted={() => refreshCreatorWorkspace({ exitPreview: true })}

@@ -1282,8 +1282,9 @@ const CreatorInvoiceSettingsEditor = lazy(() => import('./CreatorSubscriptionAdm
 const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.SubscriptionPlanPriceEditor })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
+  const viewerUserId = previewUserId || cloudUserId;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
@@ -1456,7 +1457,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setHelpLoading(false);
     }
   };
-  const managerNotificationsStorageKey = `dsspro-manager-notifications:${cloudUserId || 'demo'}`;
+  const managerNotificationsStorageKey = `dsspro-manager-notifications:${viewerUserId || 'demo'}`;
   const managerSubscriptionNotificationsStorageKey = `dsspro-manager-subscription-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
     if (sandboxMode) return [];
@@ -1976,6 +1977,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       return undefined;
     }
 
+    if (previewUserId) return undefined;
     if (!cloudUserId) return undefined;
 
     if (userRole === 'kurejas') {
@@ -2047,7 +2049,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       window.clearTimeout(timeout);
       if (workspaceAutosaveTimeoutRef.current === timeout) workspaceAutosaveTimeoutRef.current = null;
     };
-  }, [data, cloudMode, cloudUserId, selectedOrgId, userRole, canManageSelectedWorkspace, sandboxMode, isWorkspaceReadOnly]);
+  }, [data, cloudMode, cloudUserId, previewUserId, selectedOrgId, userRole, canManageSelectedWorkspace, sandboxMode, isWorkspaceReadOnly]);
 
   useLayoutEffect(() => {
     const frame = previewFrameRef.current;
@@ -2288,9 +2290,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss' && dssOrganizationIsOpen)) return undefined;
     let active = true;
     const refreshTasks = async () => {
-      const { data: tasks, error } = await supabase.rpc('get_account_commission_protocol_tasks', {
-        input_organization_id: selectedOrgId,
-      });
+      const { data: tasks, error } = await supabase.rpc(
+        previewUserId ? 'creator_get_account_commission_protocol_tasks' : 'get_account_commission_protocol_tasks',
+        {
+          input_organization_id: selectedOrgId,
+          ...(previewUserId ? { input_user_id: previewUserId } : {}),
+        },
+      );
       if (!active) return;
       if (error) {
         setNotice(`Komisijos protokolų įkelti nepavyko: ${error.message}`);
@@ -2310,7 +2316,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [cloudMode, selectedOrgId, userRole, dssOrganizationIsOpen]);
+  }, [cloudMode, selectedOrgId, userRole, dssOrganizationIsOpen, previewUserId]);
   useEffect(() => {
     if (!openInviteForRehire.current || activeTab !== 'komanda') return;
     document.getElementById('invite-employee-dialog')?.showModal();
@@ -2337,10 +2343,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return () => { active = false; };
   }, [cloudMode, selectedOrgId, userRole]);
   const pendingCommissionInvitations = (data.commissionInvitations ?? []).filter((invitation) => invitation.status === 'pending'
-    && (userRole === 'darbuotojas' ? invitation.employeeId === currentEmployee?.id : invitation.userId === cloudUserId));
+    && (userRole === 'darbuotojas' ? invitation.employeeId === currentEmployee?.id : invitation.userId === viewerUserId));
   const commissionProtocolTasks = cloudMode
     ? (data.commissionTasks ?? []).filter((task) => {
-      if (task.userId ? task.userId !== cloudUserId : userRole !== 'darbuotojas' || task.employeeId !== currentEmployee?.id) return false;
+      if (task.userId ? task.userId !== viewerUserId : userRole !== 'darbuotojas' || task.employeeId !== currentEmployee?.id) return false;
       if (userRole === 'dss' && task.organizationId !== currentOrg?.id) return false;
       const organization = data.organizations.find((item) => item.id === (task.organizationId ?? currentEmployee?.orgId));
       const signerOverrides = organization?.resourceSettings?.[task.resourceId]?.commissionSignerOverrides;
@@ -2387,7 +2393,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     .filter((signature) => signature.orgId === currentOrg?.id
       && signature.role === 'Komisijos narys'
       && (cloudMode
-        ? (signature.userId ?? signature.signerUserId) === cloudUserId
+        ? (signature.userId ?? signature.signerUserId) === viewerUserId
         : signature.signer === currentSpecialist?.name))
     .map((signature) => [signature.id, signature])).values()]
     .sort((left, right) => new Date(right.signedAt).getTime() - new Date(left.signedAt).getTime());
@@ -5506,7 +5512,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
 
   const leaveDssOrganization = async () => {
-    if (creatorManagementContext) {
+    if (creatorManagementContext || previewUserId) {
       setNotice('Administratoriaus peržiūroje DSS narystė nekeičiama.');
       return;
     }
@@ -5609,7 +5615,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setActiveTab('skydelis');
     setMobileMenuOpen(false);
     if (cloudMode) {
-      if (creatorManagementContext) {
+      if (creatorManagementContext || previewUserId) {
         setDssWorkspaceLoadState({ organizationId: organization.id, status: 'ready', error: '' });
       } else {
         setDssWorkspaceLoadState({ organizationId: organization.id, status: 'loading', error: '' });
@@ -6672,7 +6678,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const markCommissionAcceptanceAsRead = (assignmentId) => {
     const nextReadIds = [...new Set([...readCommissionAcceptanceIds, assignmentId])];
     setReadCommissionAcceptanceIds(nextReadIds);
-    const userKey = cloudUserId || 'demo';
+    const userKey = viewerUserId || 'demo';
     setData((current) => ({
       ...current,
       managerNotificationsReadByUser: {
@@ -6709,7 +6715,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     return resource && ['todo', 'started', 'unsigned', 'expired', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(employee, resource).key);
   }).length, 0) + dssTasks.filter((task) => task.orgId === currentOrg?.id).length;
   const currentDateKey = toLocalDateKey(new Date(validityCheckTime));
-  const managerReadIdsFromWorkspace = data.managerNotificationsReadByUser?.[cloudUserId || 'demo'] ?? [];
+  const managerReadIdsFromWorkspace = data.managerNotificationsReadByUser?.[viewerUserId || 'demo'] ?? [];
   const updateMedicalCertificateDate = (employeeId, validUntil) => setData((current) => ({
     ...current,
     employees: current.employees.map((employee) => employee.id === employeeId
@@ -6877,7 +6883,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             })),
           ...currentCommissionAssignments
             .filter((assignment) => assignment.status === 'accepted'
-              && assignment.userId !== cloudUserId
+              && assignment.userId !== viewerUserId
               && assignment.respondedAt
               && !readCommissionAcceptanceIds.includes(assignment.id)
               && !managerReadIdsFromWorkspace.includes(assignment.id))
@@ -7169,10 +7175,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto" onClickCapture={guardReadOnlyClick} onSubmitCapture={guardReadOnlyForm} onChangeCapture={guardReadOnlyInput}>
-        <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:min-h-16 sm:px-5 print:hidden">
+        <header className="sticky top-0 z-30 flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:min-h-16 sm:px-5 print:hidden">
           <div className="flex min-w-0 items-center gap-3">
             <h1 className="text-lg font-bold text-slate-900">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</h1>
-            {creatorManagementContext && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">Administratoriaus valdymas · {creatorManagementContext}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti peržiūrą</button></div>}
+            {(creatorManagementContext || creatorPreviewContext) && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"><span className="hidden sm:inline">{creatorPreviewContext ? 'DSS peržiūra' : 'Administratoriaus valdymas'} · {creatorPreviewContext || creatorManagementContext}</span><button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 hover:bg-amber-100" onClick={onExitCreatorPreview}>Baigti peržiūrą</button></div>}
             {cloudMode && userRole === 'darbuotojas' && currentOrg?.name && <div className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900"><Building2 size={14} /><span>Aktyvi įmonė: {currentOrg.name}</span></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
@@ -7182,11 +7188,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             </button>
             {helpLoadError && <span role="alert" className="text-xs font-medium text-rose-700">Pagalbos įkelti nepavyko. <button type="button" className="underline" onClick={openWorkspaceHelp}>Bandyti dar kartą</button></span>}
             {HelpGuide && <HelpGuide
-              key={`${cloudUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
+              key={`${viewerUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
               open={helpOpen}
               role={userRole}
               navigation={activeNavigation}
-              storageKey={`dsspro-help-dismissed:${cloudUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
+              storageKey={`dsspro-help-dismissed:${viewerUserId || (sandboxMode ? 'demo' : 'local')}:${userRole}`}
               onNavigate={(tab) => { setActiveTab(tab); setNotice(''); setMobileMenuOpen(true); }}
               onHighlightTab={setHelpTourTab}
               onClose={() => setHelpOpen(false)}
@@ -7671,7 +7677,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 {userRole === 'vadovas' && cloudMode && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(specialistQuery.trim()) && <button type="button" className={`${buttonClass} mt-3`} onClick={() => inviteSpecialist({ email: specialistQuery.trim() })}><UserPlus size={16} />Ieškoti registruoto specialisto ir kviesti</button>}
                 {userRole === 'vadovas' && filteredSpecialists.map((person) => <div key={person.id} className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm"><span>{person.name}<small className="block text-slate-500">{person.email} · {person.status}</small></span><button className={buttonClass} onClick={() => inviteSpecialist(person)}>Kviesti</button></div>)}
               </Panel>
-              <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={cloudUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
+              <Panel title="DSS komisija"><p className="mb-3 text-sm text-slate-500">Vadovas gali būti paskirtas pirmininku pats arba paskirti aktyvų darbuotoją. Įmonės darbuotojus ir priskirtus išorinius DSS specialistus galima pakviesti komisijos nariais.</p><CommissionEditor org={currentOrg} employees={orgEmployees} specialists={data.specialists.filter((person) => currentOrg?.dss.includes(person.id))} managerName={currentOrg?.manager} cloudUserId={viewerUserId} canAssignEmployeeChair={userRole === 'vadovas'} assignments={currentCommissionAssignments} onInvite={inviteEmployeeToCommission} onInviteSpecialist={userRole === 'vadovas' && cloudMode ? inviteDssSpecialistToCommission : undefined} onAppointManager={userRole === 'vadovas' && cloudMode ? appointManagerAsCommissionChair : undefined} onRevoke={revokeCommissionAssignment} cloudMode={cloudMode} sandboxMode={sandboxMode} commissionPinStatus={commissionPinStatus.organizationId === currentOrg?.id ? commissionPinStatus.members : {}} onSetPin={saveCommissionPin} /></Panel>
               {userRole === 'vadovas' && <Panel title="Vadovo parašo PIN">{cloudMode ? <><p className="mb-3 text-sm text-slate-500">PIN nustatytas jūsų paskyros užbaigimo metu ir tikrinamas Supabase. Keitimui būtinas dabartinis PIN.</p><form onSubmit={changeCloudManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Dabartinis PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} pattern="[0-9]{4}" value={managerCurrentPin} onChange={(event) => setManagerCurrentPin(event.target.value)} required /></label><label className="text-sm font-medium">Naujas PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite naują PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Pakeisti pasirašymo PIN</button></form></> : <><p className="mb-3 text-sm text-slate-500">PIN naudojamas darbdavio parašui AAP dokumentuose.</p><form onSubmit={saveManagerPin} className="grid max-w-xl gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Naujas 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinDraft} onChange={(event) => setManagerPinDraft(event.target.value)} required /></label><label className="text-sm font-medium">Pakartokite PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={managerPinConfirm} onChange={(event) => setManagerPinConfirm(event.target.value)} required /></label><button className={`${buttonClass} sm:col-span-2`}><LockKeyhole size={16} />Nustatyti vadovo PIN</button></form></>}</Panel>}
             </div>
           </section>}
@@ -7945,10 +7951,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <PaginatedSignatureHistory
                 key={`${currentOrg?.id ?? ''}:${dssHistoryView}`}
                 organizationId={currentOrg?.id}
-                signerUserId={dssHistoryView === 'specialist' && cloudMode ? cloudUserId : undefined}
+                signerUserId={dssHistoryView === 'specialist' && cloudMode ? viewerUserId : undefined}
                 signerRole={dssHistoryView === 'specialist' ? 'DSS specialistas' : 'Darbuotojas'}
                 signatures={dssHistoryView === 'specialist'
-                  ? data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'DSS specialistas' && (cloudMode ? signature.signerUserId === cloudUserId : signature.signer === currentSpecialist?.name))
+                  ? data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'DSS specialistas' && (cloudMode ? signature.signerUserId === viewerUserId : signature.signer === currentSpecialist?.name))
                   : data.signatures.filter((signature) => signature.orgId === currentOrg?.id && signature.role === 'Darbuotojas')}
                 resources={data.resources}
                 employees={[...orgEmployees, ...archivedOrgEmployees.map((record) => record.employee)]}
@@ -7995,7 +8001,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'parasai' && userRole === 'darbuotojas' && <section className="space-y-5"><PageTitle title="Mano parašai" subtitle="Pasirašytų dokumentų data, veiksmo rolė ir demo aplinkos IP žyma." /><Panel title={currentEmployee?.name}><PaginatedSignatureHistory
-            key={`${currentOrg?.id ?? ''}:${userRole === 'darbuotojas' ? currentEmployee?.id ?? '' : cloudUserId}:personal-history`}
+            key={`${currentOrg?.id ?? ''}:${userRole === 'darbuotojas' ? currentEmployee?.id ?? '' : viewerUserId}:personal-history`}
             organizationId={currentOrg?.id}
             employeeId={currentEmployee?.id}
             signatures={employeeSignatures}
@@ -8157,7 +8163,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 specialists.map((account) => account.fullName || account.email).join(', ') || 'Nepriskirti',
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="rounded-md border border-emerald-800 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => onCreatorPreview(organization.id, 'vadovas')}>Valdyti kaip vadovas</button>
-                  <button type="button" className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(organization.id, 'dss')}>Peržiūrėti kaip DSS</button>
+                  {specialists.map((account) => <button key={account.id} type="button" aria-label={`Peržiūrėti kaip DSS specialistas ${account.fullName || account.email}`} className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={() => onCreatorPreview(organization.id, 'dss', account.id)}>Peržiūrėti kaip {account.fullName || account.email}</button>)}
                   <button type="button" className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100" onClick={() => deleteCreatorOrganization(organization)}>Ištrinti įmonę</button>
                 </div>,
               ])} empty="Įmonių pagal paiešką nerasta." />
