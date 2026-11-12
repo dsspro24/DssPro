@@ -2,13 +2,21 @@ import { useEffect, useState } from 'react';
 import { Cookie } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
 import { PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
+import { COOKIE_CONSENT_VALIDITY_DAYS, getCookieConsentExpiry, hasUnexpiredCookieConsent } from './lib/cookieConsent.js';
 
 const preferenceKey = 'dsspro-cookie-preferences-v1';
 
 function readPreferences() {
   try {
     const saved = JSON.parse(window.localStorage.getItem(preferenceKey) ?? 'null');
-    return saved?.policyVersion === PRIVACY_POLICY_VERSION && typeof saved.analytics === 'boolean' ? saved : null;
+    if (
+      saved?.policyVersion === PRIVACY_POLICY_VERSION
+      && typeof saved.analytics === 'boolean'
+      && hasUnexpiredCookieConsent(saved)
+    ) return saved;
+
+    if (saved) window.localStorage.removeItem(preferenceKey);
+    return null;
   } catch {
     return null;
   }
@@ -86,6 +94,29 @@ export default function CookieConsent() {
   }, [preferences]);
 
   useEffect(() => {
+    if (!preferences) return undefined;
+    let timeoutId;
+    const checkExpiry = () => {
+      if (!hasUnexpiredCookieConsent(preferences)) {
+        try {
+          window.localStorage.removeItem(preferenceKey);
+        } catch (error) {
+          setSyncError(`Pasibaigusio slapukų pasirinkimo pašalinti nepavyko: ${error.message || String(error)}`);
+        }
+        setPreferences(null);
+        return;
+      }
+
+      const remaining = getCookieConsentExpiry(preferences) - Date.now() + 1;
+      timeoutId = window.setTimeout(checkExpiry, Math.min(remaining, 2147483647));
+    };
+
+    const remaining = getCookieConsentExpiry(preferences) - Date.now() + 1;
+    timeoutId = window.setTimeout(checkExpiry, Math.min(Math.max(remaining, 1), 2147483647));
+    return () => window.clearTimeout(timeoutId);
+  }, [preferences]);
+
+  useEffect(() => {
     if (!preferences?.id || !userId || !supabase) return;
     let active = true;
     supabase.from('privacy_consent_records').insert({
@@ -114,6 +145,7 @@ export default function CookieConsent() {
       id: window.crypto.randomUUID(),
       analytics,
       policyVersion: PRIVACY_POLICY_VERSION,
+      savedAt: Date.now(),
     };
     try {
       window.localStorage.setItem(preferenceKey, JSON.stringify(next));
@@ -131,7 +163,7 @@ export default function CookieConsent() {
           <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800"><Cookie size={20} /></span>
           <div>
             <h2 id="cookie-consent-title" className="text-xl font-bold">Slapukų pasirinkimai</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">Būtini slapukai ir vietinė saugykla reikalingi prisijungimui, saugumui bei jūsų pasirinkimams išsaugoti. Analitika yra pasirenkama ir įjungiama tik jums sutikus.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">Būtini slapukai ir vietinė saugykla reikalingi prisijungimui, saugumui bei jūsų pasirinkimams išsaugoti. Analitika yra pasirenkama ir įjungiama tik jums sutikus. Sutikimas arba atsisakymas galioja {COOKIE_CONSENT_VALIDITY_DAYS} dienų; vėliau paprašysime pasirinkimą atnaujinti.</p>
           </div>
         </div>
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm">
@@ -140,9 +172,9 @@ export default function CookieConsent() {
         </label>
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm">
           <input type="checkbox" checked={analyticsDraft} onChange={(event) => setAnalyticsDraft(event.target.checked)} className="mt-0.5" />
-          <span><strong className="block">Analitiniai („Google Tag Manager“)</strong><span className="text-slate-600">Leidžia rinkti svetainės naudojimo ir įrenginio duomenis. Pasirinkimą bet kada galite pakeisti.</span></span>
+          <span><strong className="block">Analitiniai („Google Tag Manager“)</strong><span className="text-slate-600">Leidžia rinkti svetainės naudojimo ir įrenginio duomenis. Sutikimas galioja 6 mėnesius (180 dienų), bet kada galite jį pakeisti.</span></span>
         </label>
-        <p className="text-xs leading-5 text-slate-500">Prisijungusio naudotojo pasirinkimas įrašomas sutikimų žurnale. Iki prisijungimo jis saugomas tik šioje naršyklėje, o prisijungus susiejamas su paskyra. Išsamiau: <a className="font-semibold text-emerald-800 underline" href="/privatumo-politika">Privatumo politika</a> ir <a className="font-semibold text-emerald-800 underline" href="/naudojimo-salygos">Naudojimo sąlygos</a>.</p>
+        <p className="text-xs leading-5 text-slate-500">Prisijungusio naudotojo pasirinkimas įrašomas sutikimų žurnale ir saugomas 2 metus. Iki prisijungimo jis saugomas tik šioje naršyklėje, o prisijungus susiejamas su paskyra. Išsamiau: <a className="font-semibold text-emerald-800 underline" href="/privatumo-politika">Privatumo politika</a> ir <a className="font-semibold text-emerald-800 underline" href="/naudojimo-salygos">Naudojimo sąlygos</a>.</p>
         {syncError && <p role="alert" className="rounded-md bg-rose-50 p-3 text-xs text-rose-800">{syncError}</p>}
         <div className="flex flex-wrap justify-end gap-2">
           {preferences && <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setSettingsOpen(false)}>Uždaryti</button>}

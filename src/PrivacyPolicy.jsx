@@ -80,7 +80,7 @@ export default function PrivacyPolicy() {
         <section>
           <h2 className="text-xl font-bold text-slate-950">4. „Google Tag Manager“ ir analitika</h2>
           <p className="mt-2">Svetainėje naudojamas „Google Tag Manager“ konteineris <strong>GTM-NHTMXQTT</strong>. Jis gali įkelti „Google Analytics“ žymas pagal konteineryje nustatytą konfigūraciją. Šiame programos kode vardai, pavardės, el. pašto adresai, slaptažodžiai, PIN kodai, darbuotojų dokumentai ir testų duomenys nėra sąmoningai siunčiami į „Google Analytics“. Analitika įjungiama tik pasirinkus analitinius slapukus; atsisakius pasirinkimo, konteineris neįkeliamas.</p>
-          <p className="mt-2">Jei sutinkate, „Google“ žymos gali tvarkyti puslapio adresą ir nukreipimo šaltinį, apsilankymo laiką, puslapio peržiūros ar kitus konteineryje įjungtus įvykius, apytikslę vietą, naršyklės, operacinės sistemos ir įrenginio charakteristikas bei pseudoniminius slapukų identifikatorius. „Google“ IP adresą gali naudoti ryšiui ir apytikslei vietai nustatyti; tikslus saugojimas priklauso nuo „Google“ produkto ir paskyros nustatymų. Faktinės žymos ir jų saugojimo terminai priklauso nuo GTM/Analytics administratoriaus konfigūracijos, kurią prieš paskelbiant šią politiką būtina patikrinti.</p>
+          <p className="mt-2">Jei sutinkate, „Google“ žymos gali tvarkyti puslapio adresą ir nukreipimo šaltinį, apsilankymo laiką, puslapio peržiūros ar kitus konteineryje įjungtus įvykius, apytikslę vietą, naršyklės, operacinės sistemos ir įrenginio charakteristikas bei pseudoniminius slapukų identifikatorius. „Google“ IP adresą gali naudoti ryšiui ir apytikslei vietai nustatyti; tikslus saugojimas priklauso nuo „Google“ produkto ir paskyros nustatymų. Analitikos pasirinkimas (sutikimas arba atsisakymas) galioja 6 mėnesius (180 dienų) nuo paskutinio pasirinkimo; jam pasibaigus vėl paprašysime pasirinkti. Faktinės žymos ir jų saugojimo terminai priklauso nuo GTM/Analytics administratoriaus konfigūracijos, kurią prieš paskelbiant šią politiką būtina patikrinti.</p>
           <p className="mt-2">Analitikos sutikimą galite bet kada atšaukti pasirinkę „Slapukų nustatymai“ ir išvalydami naršyklės slapukus. Atšaukimas nekeičia ankstesnio tvarkymo teisėtumo ir nedaro įtakos būtinam prisijungimui.</p>
         </section>
 
@@ -91,11 +91,11 @@ export default function PrivacyPolicy() {
               <thead className="bg-slate-50"><tr><th className="p-3">Kategorija</th><th className="p-3">Paskirtis</th><th className="p-3">Pasirinkimas</th></tr></thead>
               <tbody className="divide-y divide-slate-200">
                 <tr><td className="p-3 font-semibold">Būtini</td><td className="p-3">Prisijungimo sesija, saugumas, paslaugos ir jūsų sutikimo pasirinkimo išsaugojimas. Dalį būsenos programėlė saugo naršyklės vietinėje saugykloje.</td><td className="p-3">Visada aktyvūs</td></tr>
-                <tr><td className="p-3 font-semibold">Analitiniai</td><td className="p-3">Gali būti naudojami „Google Tag Manager“ ir jo įkeliamos žymos, įskaitant „Google Analytics“ slapukus, pvz., `_ga` ir `_ga_*`, jei jie įjungti GTM.</td><td className="p-3">Tik pasirinkus</td></tr>
+                <tr><td className="p-3 font-semibold">Analitiniai</td><td className="p-3">Gali būti naudojami „Google Tag Manager“ ir jo įkeliamos žymos, įskaitant „Google Analytics“ slapukus, pvz., `_ga` ir `_ga_*`, jei jie įjungti GTM.</td><td className="p-3">Tik pasirinkus; 6 mėn. (180 d.)</td></tr>
               </tbody>
             </table>
           </div>
-          <p className="mt-3">Pasirinkimai saugomi naršyklės `localStorage` rakte `dsspro-cookie-preferences-v1`; tai nėra prisijungimo slapukas. Prisijungusio paskyros naudotojo pasirinkimo įrašas taip pat saugomas DSS Pro sutikimų žurnale. Anoniminio lankytojo pasirinkimas iki prisijungimo lieka tik jo naršyklėje.</p>
+          <p className="mt-3">Pasirinkimai ir jų pasirinkimo laikas (`savedAt`) saugomi naršyklės `localStorage` rakte `dsspro-cookie-preferences-v1`; tai nėra prisijungimo slapukas. Sutikimas arba atsisakymas galioja 6 mėnesius (180 dienų), skaičiuojant nuo paskutinio pasirinkimo. Terminui pasibaigus analitika išjungiama, o slapukų pasirinkimo langas vėl paprašo pasirinkimą atnaujinti. Prisijungusio paskyros naudotojo pasirinkimo įrašas taip pat saugomas DSS Pro sutikimų žurnale. Anoniminio lankytojo pasirinkimas iki prisijungimo lieka tik jo naršyklėje.</p>
         </section>
 
         <section>
@@ -112,7 +112,7 @@ export default function PrivacyPolicy() {
         <section>
           <h2 className="text-xl font-bold text-slate-950">7. Saugojimo trukmė</h2>
           <p className="mt-2">Paskyros duomenys saugomi paskyros ir paslaugos naudojimo laikotarpiu. Įmonės pateiktų darbuotojų ir dokumentų duomenų saugojimo terminą nustato įmonė, kaip valdytoja; pasibaigus paslaugai jie gali likti pagal sutartį, įmonės nurodymus, archyvo funkciją ir teisės aktuose nustatytus terminus. Sąskaitų dokumentai saugomi teisės aktų reikalaujamą laiką. Saugumo žurnalai, atsarginės kopijos ir „Google“ analitikos duomenys saugomi atitinkamo infrastruktūros ar analitikos paslaugų teikėjo ir paskyros nustatytą laiką.</p>
-          <p className="mt-2">Sutikimų įrašai saugomi tiek, kiek reikia sutikimo faktui, versijai ir atšaukimui įrodyti bei teisiniams reikalavimams apginti. Šiuo metu konkrečių automatinių ištrynimo terminų visoms kategorijoms sistema nenustato; prieš paskelbiant politiką teikėjas turi nustatyti ir patvirtinti taikomą saugojimo grafiką.</p>
+          <p className="mt-2">Naudojimo sąlygų ir slapukų sutikimų žurnalo įrašai saugomi 2 metus nuo įrašymo datos kaip sutikimo fakto, pasirinkimo, versijos ir laiko teisinis įrodymas; pasibaigus šiam terminui įrašai automatiškai ištrinami. Analitikos pasirinkimas naršyklėje galioja 6 mėnesius (180 dienų), po to prašoma pasirinkimą atnaujinti. Kitų kategorijų duomenų saugojimo terminai priklauso nuo jų paskirties, įmonės nurodymų, paslaugų teikėjų nustatymų ir teisės aktų.</p>
         </section>
 
         <section>
