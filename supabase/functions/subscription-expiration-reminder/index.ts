@@ -63,13 +63,13 @@ Deno.serve(async (request) => {
     const organizationName = firstReminder.organization_name;
     const subject = `Priminimas: „${organizationName}“ prenumerata baigsis po 3 dienų`;
     const html = `<p>Sveiki, ${escapeHtml(firstReminder.manager_name || 'įmonės vadove')},</p>
-      <p>Primename, kad įmonės <strong>${escapeHtml(organizationName)}</strong> DSS Pro prenumerata baigsis <strong>${escapeHtml(formattedEndDate)}</strong>, maždaug po 3 dienų.</p>
+      <p>Primename, kad įmonės <strong>${escapeHtml(organizationName)}</strong> DSS Pro prenumerata baigsis <strong>${escapeHtml(formattedEndDate)}</strong>, po 3 dienų.</p>
       <p>Jei norite toliau naudotis visomis sistemos funkcijomis, prisijunkite prie DSS Pro ir atnaujinkite prenumeratą.</p>
       <p><a href="https://www.dsspro.lt/">Prisijungti prie DSS Pro</a></p>
       <p>Pasibaigus prenumeratai darbo sritis pereis į peržiūros režimą.</p>
       <p>DSS Pro komanda</p>`;
     const text = `Sveiki, ${firstReminder.manager_name || 'įmonės vadove'},\n\n`
-      + `Primename, kad įmonės „${organizationName}“ DSS Pro prenumerata baigsis ${formattedEndDate}, maždaug po 3 dienų.\n\n`
+      + `Primename, kad įmonės „${organizationName}“ DSS Pro prenumerata baigsis ${formattedEndDate}, po 3 dienų.\n\n`
       + 'Jei norite toliau naudotis visomis sistemos funkcijomis, prisijunkite prie DSS Pro ir atnaujinkite prenumeratą: https://www.dsspro.lt/\n\n'
       + 'Pasibaigus prenumeratai darbo sritis pereis į peržiūros režimą.\n\nDSS Pro komanda';
 
