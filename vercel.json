@@ -1,4 +1,9 @@
 {
+  "redirects": [
+    { "source": "/tinklarastis/", "destination": "/tinklarastis", "permanent": true },
+    { "source": "/tinklarastis/:slug/", "destination": "/tinklarastis/:slug", "permanent": true },
+    { "source": "/naudojimo-salygos/", "destination": "/naudojimo-salygos", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/tinklarastis", "destination": "/api/blog" },
