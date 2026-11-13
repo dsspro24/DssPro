@@ -249,14 +249,6 @@ function prioritizeEffectiveSubscription(subscriptions) {
   }
   if (manualAccessIndex === 0) return subscriptions;
 
-  const currentSubscription = selectCurrentSubscription(subscriptions);
-  if (currentSubscription?.isRenewal && currentSubscription.paymentStatus === 'Apmokėta') {
-    return [
-      currentSubscription,
-      ...subscriptions.filter((subscription) => subscription.id !== currentSubscription.id),
-    ];
-  }
-
   const pendingRenewalIndex = subscriptions.findIndex((subscription) => (
     subscription.isRenewal
     && subscription.paymentStatus === 'Laukiama apmokėjimo'
@@ -274,6 +266,21 @@ function prioritizeEffectiveSubscription(subscriptions) {
       paidPrice: currentPaidPlan?.price ?? subscriptions[pendingRenewalIndex].price,
     };
     return [pendingRenewal, ...subscriptions.slice(0, pendingRenewalIndex), ...subscriptions.slice(pendingRenewalIndex + 1)];
+  }
+
+  const pendingOrder = selectCurrentSubscription(subscriptions);
+  if (pendingOrder?.paymentStatus === 'Laukiama apmokėjimo') {
+    return [
+      pendingOrder,
+      ...subscriptions.filter((subscription) => subscription.id !== pendingOrder.id),
+    ];
+  }
+
+  if (pendingOrder?.isRenewal && pendingOrder.paymentStatus === 'Apmokėta') {
+    return [
+      pendingOrder,
+      ...subscriptions.filter((subscription) => subscription.id !== pendingOrder.id),
+    ];
   }
 
   const canceledRenewalIndex = subscriptions.findIndex((subscription) => (

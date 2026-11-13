@@ -48,7 +48,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(8);
+select plan(10);
 
 select lives_ok(
   format(
@@ -179,6 +179,31 @@ select is(
       and plan_change.preinvoice_data ->> 'planChange' = 'true'
   ),
   'upgraded plan starts immediately while preserving the original paid-through end date'
+);
+
+select lives_ok(
+  format(
+    'select public.manager_cancel_workspace_subscription_order(%L::uuid)',
+    (
+      select plan_change.id
+      from public.workspace_subscriptions as plan_change
+      where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+        and plan_change.payment_status = 'pending'
+        and plan_change.preinvoice_data ->> 'planChange' = 'true'
+    )
+  ),
+  'manager can cancel an unpaid plan change to clear the pending-order block'
+);
+
+select is(
+  (
+    select plan_change.payment_status
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  'canceled',
+  'canceling a pending plan change releases the workspace for a new renewal order'
 );
 
 select * from finish();

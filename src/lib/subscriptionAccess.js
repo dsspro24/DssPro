@@ -23,6 +23,15 @@ export function selectCurrentSubscription(subscriptions, now = Date.now()) {
   ));
   if (manualAccessSubscription) return manualAccessSubscription;
 
+  const pendingOrder = subscriptions.find((subscription) => (
+    subscription.paymentStatus === 'Laukiama apmokėjimo'
+    && subscription.status !== 'Atšaukta'
+    && subscription.orderCode
+    && !(subscription.isPlanChange && subscription.dueDate
+      && new Date(subscription.dueDate).getTime() <= now)
+  ));
+  if (pendingOrder) return pendingOrder;
+
   const paidRenewal = subscriptions.find((subscription) => (
     subscription.isRenewal === true
     && subscription.paymentStatus === 'Apmokėta'
