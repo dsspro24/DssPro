@@ -359,6 +359,13 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         }}><Pencil size={16} /></button>
       </div>
     </div>
+    {subscription.planAdjustment?.type === 'prepaid_downgrade' && <p className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-950">
+      Sumažinus planą iš {subscription.planAdjustment.fromPlanName} į {subscription.planAdjustment.toPlanName}, {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((Number(subscription.planAdjustment.creditCents) || 0) / 100)} iš anksto apmokėta vertė
+      {Number(subscription.planAdjustment.extensionDays) > 0
+        ? ` paversta ${Number(subscription.planAdjustment.extensionDays).toLocaleString('lt-LT', { maximumFractionDigits: 2 })} papildomomis dienomis. Galiojimas pratęstas nuo ${subscription.planAdjustment.originalEnd ? new Date(subscription.planAdjustment.originalEnd).toLocaleDateString('lt-LT') : 'pradinės datos'} iki ${subscription.planAdjustment.extendedEnd ? new Date(subscription.planAdjustment.extendedEnd).toLocaleDateString('lt-LT') : subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'naujos datos'}.`
+        : ' liko kreditu, nes šiam planui negalima jos paversti papildomu laiku.'}
+      {Number(subscription.planAdjustment.remainingCreditCents) > 0 && ` Likutis kredite: ${new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(subscription.planAdjustment.remainingCreditCents / 100)}.`}
+    </p>}
     {detailsOpen && <dl className="grid gap-2 rounded-md bg-slate-50 p-3 text-xs sm:grid-cols-2">
       <div><dt className="text-slate-500">Įmonė / workspace</dt><dd className="font-semibold">{organizationName}</dd></div>
       <div><dt className="text-slate-500">Užsakymo ID</dt><dd className="break-all font-mono">{subscription.id}</dd></div>

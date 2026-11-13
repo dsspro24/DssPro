@@ -48,7 +48,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(14);
+select plan(20);
 
 select lives_ok(
   format(
@@ -264,6 +264,96 @@ select is(
       and renewal.preinvoice_data ->> 'renewal' = 'true'
   ),
   'the replaced renewal keeps its original service dates for invoice history'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"98000000-0000-4000-8000-000000000003","user_metadata":{"plan_code":"up_to_20"}}',
+  true
+);
+select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000003', true);
+select set_config(
+  'test.pre_downgrade_end',
+  (
+    select ends_at::text
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and status = 'active'
+      and payment_status = 'paid'
+    order by created_at desc
+    limit 1
+  ),
+  true
+);
+
+select lives_ok(
+  format(
+    'select public.manager_change_workspace_subscription_plan(%L::uuid, %L)',
+    current_setting('test.subscription_renewal_organization_id'),
+    'up_to_20'
+  ),
+  'manager can downgrade a paid plan without issuing a refund'
+);
+
+select is(
+  (
+    select plan_code
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and status = 'active'
+      and payment_status = 'paid'
+    order by created_at desc
+    limit 1
+  ),
+  'up_to_20',
+  'the cheaper plan becomes active immediately'
+);
+
+select ok(
+  (
+    select ends_at > current_setting('test.pre_downgrade_end')::timestamptz
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and status = 'active'
+      and payment_status = 'paid'
+    order by created_at desc
+    limit 1
+  ),
+  'the downgrade converts prepaid value into extra service time'
+);
+
+select ok(
+  (
+    select (plan_adjustment_data ->> 'extensionDays')::numeric > 0
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and status = 'active'
+      and payment_status = 'paid'
+    order by created_at desc
+    limit 1
+  ),
+  'the adjustment details are stored for the creator admin'
+);
+
+select is(
+  (
+    select subscription_credit_cents
+    from public.organizations
+    where id = current_setting('test.subscription_renewal_organization_id')::uuid
+  ),
+  0,
+  'converted credit is not left for an unrelated future invoice'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and status = 'active'
+  ),
+  1,
+  'only the downgraded plan remains active'
 );
 
 select * from finish();

@@ -237,6 +237,7 @@ function formatSubscription(subscription) {
     finalInvoiceNumber: subscription.final_invoice_number ?? '',
     finalInvoiceDate: subscription.final_invoice_issue_date ?? subscription.paid_at ?? null,
     paidAt: subscription.paid_at ?? null,
+    planAdjustment: subscription.plan_adjustment_data ?? null,
   };
 }
 
@@ -455,7 +456,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
       .eq('organization_id', organizationId)
       .eq('active', true),
     supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
   ]);
@@ -535,7 +536,7 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
         const subscriptions = [];
         for (let start = 0; ; start += 1000) {
           const { data: page, error } = await supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
             .order('created_at', { ascending: false })
             .range(start, start + 999);
           if (error) return { data: null, error };
@@ -1097,7 +1098,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const refreshSignedInSubscription = useCallback(async (organizationId) => {
     if (!organizationId) return [];
     const { data: subscriptionRows, error } = await supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
     if (error) throw error;

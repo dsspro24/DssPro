@@ -276,14 +276,14 @@ function resourceForDatabase(resource) {
 
 async function loadCreatorOrganizations() {
   const withParent = await supabase.from('organizations')
-    .select('id, name, company_code, parent_organization_id')
+    .select('id, name, company_code, parent_organization_id, subscription_credit_cents')
     .order('name');
   if (!withParent.error) return withParent;
   const missingParentColumn = ['42703', 'PGRST204'].includes(withParent.error.code)
     && withParent.error.message?.includes('parent_organization_id');
   if (!missingParentColumn) return withParent;
   const fallback = await supabase.from('organizations')
-    .select('id, name, company_code')
+    .select('id, name, company_code, subscription_credit_cents')
     .order('name');
   if (fallback.error) return fallback;
   return {
@@ -1710,7 +1710,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1756,6 +1756,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             finalInvoiceNumber: subscription.final_invoice_number ?? '',
             finalInvoiceDate: subscription.final_invoice_issue_date ?? subscription.paid_at ?? null,
             paidAt: subscription.paid_at ?? null,
+            planAdjustment: subscription.plan_adjustment_data ?? null,
           };
         }));
         setData((current) => {
@@ -1768,6 +1769,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               name: organization.name,
               companyCode: organization.company_code ?? '',
               parentOrganizationId: organization.parent_organization_id ?? null,
+              subscriptionCreditCents: Number(organization.subscription_credit_cents) || 0,
             })),
           };
         });
@@ -6326,11 +6328,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         setData((current) => ({ ...current, employees: [...current.employees] }));
       }
       const updatedSubscription = refreshedWorkspace?.data?.subscriptions?.find((item) => item.orgId === currentOrg.id);
-      setNotice(updatedSubscription?.paymentStatus === 'Laukiama apmokėjimo'
+      const planAdjustment = updatedSubscription?.planAdjustment;
+      if (planAdjustment?.type === 'prepaid_downgrade') {
+        const extensionDays = Number(planAdjustment.extensionDays) || 0;
+        const endDate = updatedSubscription.endsAt
+          ? new Date(updatedSubscription.endsAt).toLocaleDateString('lt-LT')
+          : '';
+        const remainingCredit = Number(planAdjustment.remainingCreditCents) || 0;
+        setNotice(extensionDays > 0
+          ? `Planas sumažintas. Iš anksto apmokėta vertė pridėjo ${extensionDays.toLocaleString('lt-LT', { maximumFractionDigits: 2 })} d.; naujas galiojimo terminas${endDate ? ` – ${endDate}` : ''}.`
+          : `Planas sumažintas. Iš anksto apmokėta vertė palikta kreditu${remainingCredit > 0 ? ` (${new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(remainingCredit / 100)})` : ''}.`);
+      } else setNotice(updatedSubscription?.paymentStatus === 'Laukiama apmokėjimo'
         ? updatedSubscription.isPlanChange
           ? 'Planas pakeistas iškart. Išankstinę sąskaitą už likusio laikotarpio kainų skirtumą atsisiųskite prenumeratos skiltyje ir apmokėkite per 5 dienas.'
           : 'Planas aktyvuotas iškart. Išankstinę sąskaitą atsisiųskite prenumeratos skiltyje ir apmokėkite per 5 dienas.'
-        : 'Planas pakeistas iškart. Sumažinimo kreditas bus pritaikytas kitai sąskaitai.');
+        : 'Planas pakeistas iškart.');
     } catch (error) {
       setNotice(`Plano pakeisti nepavyko: ${error.message}`);
     } finally {
@@ -8334,7 +8346,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             : ['Be prenumeratos', 'bg-slate-100 text-slate-700'];
                   return <section key={groupId} className="overflow-hidden rounded-lg border border-slate-200">
                     <button type="button" className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left hover:bg-slate-50" aria-expanded={expanded} onClick={() => setExpandedCreatorSubscriptionGroups((current) => ({ ...current, [groupId]: !current[groupId] }))}>
-                      <span className="flex min-w-0 flex-1 items-center gap-2"><ChevronDown size={17} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} /><span className="truncate font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${groupBadge[1]}`}>{groupBadge[0]}</span></span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2"><ChevronDown size={17} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} /><span className="truncate font-semibold">{root?.name ?? 'Nepriskirtos prenumeratos'}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${groupBadge[1]}`}>{groupBadge[0]}</span>{root?.subscriptionCreditCents > 0 && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">Kreditas {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(root.subscriptionCreditCents / 100)}</span>}</span>
                       <span className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                         {additionalWorkspaces.length > 0 && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-900">+{additionalWorkspaces.length} papild. {additionalWorkspaces.length === 1 ? 'įmonė' : 'įmonės'}</span>}
                         <span>{workspaces.length} {workspaces.length === 1 ? 'įmonė' : 'įmonių'} · {groupSubscriptions.length} {groupSubscriptions.length === 1 ? 'įrašas' : 'įrašų'}</span>
@@ -8372,7 +8384,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         return isAdditional
                           ? <section key={organization.id} className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
                             <button type="button" className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left hover:bg-emerald-50/50" aria-expanded={workspaceExpanded} onClick={() => setExpandedCreatorSubscriptionGroups((current) => ({ ...current, [`workspace-${organization.id}`]: !current[`workspace-${organization.id}`] }))}>
-                              <span className="flex min-w-0 items-center gap-2"><ChevronDown size={15} className={`shrink-0 text-emerald-800 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} /><span className="truncate text-sm font-semibold">{organization.name}</span><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">Papildoma įmonė</span></span>
+                              <span className="flex min-w-0 items-center gap-2"><ChevronDown size={15} className={`shrink-0 text-emerald-800 transition-transform ${workspaceExpanded ? 'rotate-180' : ''}`} /><span className="truncate text-sm font-semibold">{organization.name}</span><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">Papildoma įmonė</span>{organization.subscriptionCreditCents > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Kreditas {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(organization.subscriptionCreditCents / 100)}</span>}</span>
                               <span className="text-xs text-slate-500">{subscriptions.length} {subscriptions.length === 1 ? 'prenumeratos įrašas' : 'prenumeratos įrašai'}</span>
                             </button>
                             {workspaceExpanded && <div className="space-y-3 border-t border-emerald-100 bg-emerald-50/30 p-3">{workspaceContent}</div>}
