@@ -9,6 +9,7 @@ import {
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
 import { updateProtocolBatchRevision } from './lib/protocolBatchRevisions.js';
+import { isProtocolCommissionSigningAvailable } from './lib/protocolCommissionSigning.js';
 const defaultFamiliarizationTopics = [
   'Psichologinio smurto, diskriminacijos ir priekabiavimo prevencijos politika;',
   'Darbuotojų saugos ir sveikatos politika;',
@@ -650,7 +651,7 @@ const addEmployeeToProtocolBatches = (data, employee) => {
       if (!period) return;
       batch = matchingBatches
         .filter((item) => item.cadence === cadence && item.periodStart === period.start
-          && item.periodEnd === period.end && item.employeeIds?.length < protocolBatchCapacity)
+          && item.periodEnd === period.end)
         .sort(newestBatchFirst)[0];
       if (!batch) {
         const segment = matchingBatches.filter((item) => item.periodStart === period.start && (item.revision ?? 1) === 1).length + 1;
@@ -2449,7 +2450,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (userRole === 'dss' && task.organizationId !== currentOrg?.id) return false;
       const organization = data.organizations.find((item) => item.id === (task.organizationId ?? currentEmployee?.orgId));
       const signerOverrides = organization?.resourceSettings?.[task.resourceId]?.commissionSignerOverrides;
-      return typeof signerOverrides?.[task.role] === 'boolean' ? signerOverrides[task.role] : true;
+      const signingStartsNextDay = organization?.resourceSettings?.[task.resourceId]?.commissionSigningFromNextDay === true;
+      return (typeof signerOverrides?.[task.role] === 'boolean' ? signerOverrides[task.role] : true)
+        && isProtocolCommissionSigningAvailable(task.protocolDate, signingStartsNextDay, new Date(validityCheckTime));
     }).map((task) => ({
       ...task,
       batchRevision: data.protocolBatches?.find((batch) => batch.id === task.batchId)?.revision ?? task.batchRevision ?? 1,
@@ -2458,7 +2461,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       .filter((assignment) => assignment.organizationId === currentEmployee?.orgId && assignment.employeeId === currentEmployee?.id && assignment.status === 'accepted')
       .flatMap((assignment) => (data.protocolBatches ?? [])
         .filter((batch) => batch.orgId === assignment.organizationId && batch.protocolDate && batch.employeeIds?.length
-          && assignment.respondedAt)
+          && assignment.respondedAt
+          && isProtocolCommissionSigningAvailable(
+            batch.protocolDate,
+            currentOrg?.resourceSettings?.[batch.resourceId]?.commissionSigningFromNextDay === true,
+            new Date(validityCheckTime),
+          ))
         .map((batch) => {
           const resource = data.resources.find((item) => item.id === batch.resourceId && item.templateKind === 'knowledge-assessment-protocol');
           if (!resource) return null;
@@ -4063,6 +4071,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { commissionSignerOverrides } : {}),
       ...(resource.templateKind === 'knowledge-assessment-protocol' ? { protocolCadence: saved.protocolCadence ?? defaults.protocolCadence ?? 'weekly-friday' } : {}),
+      ...(resource.templateKind === 'knowledge-assessment-protocol'
+        ? { commissionSigningFromNextDay: saved.commissionSigningFromNextDay ?? defaults.commissionSigningFromNextDay ?? false }
+        : {}),
     };
     if (dateEnteredPerRecordTemplateKinds.has(resource.templateKind)) delete settingsDraft.date;
     delete settingsDraft.populateEmployees;
@@ -10238,7 +10249,8 @@ function ProtocolSettingsDialog({ resource, settings, onChange, onSave, onClose 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
     <div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės protokolo nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2></div><button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button></div>
     <label className="block text-sm font-medium">Naują protokolą kurti<select className={`${inputClass} mt-1`} value={settings.protocolCadence ?? 'weekly-friday'} onChange={(event) => onChange({ ...settings, protocolCadence: event.target.value })}><option value="weekly-friday">Kas penktadienį (pirmadienis–penktadienis)</option><option value="weekly-sunday">Kas sekmadienį (pirmadienis–sekmadienis)</option><option value="until-full">Surinkus 15 darbuotojų</option></select></label>
-    <p className="mt-2 text-sm text-slate-500">Darbuotojai grupuojami pagal pakvietimo datą. Tuščias periodas protokolo įrašo nesukuria. „Surinkus 15 darbuotojų“ režime data nustatoma, kai užsipildo paskutinė eilutė.</p>
+    <p className="mt-2 text-sm text-slate-500">Savaitiniame protokole sugrupuojami visi tą savaitę pakviesti darbuotojai. Tuščias periodas protokolo įrašo nesukuria. „Surinkus 15 darbuotojų“ režime data nustatoma, kai užsipildo paskutinė eilutė.</p>
+    <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={settings.commissionSigningFromNextDay === true} onChange={(event) => onChange({ ...settings, commissionSigningFromNextDay: event.target.checked })} /><span>Leisti komisijai pasirašyti tik nuo kitos dienos po protokolo datos<small className="mt-1 block font-normal text-slate-500">Jei savaitinis protokolas uždaromas penktadienį, komisijos nariai galės pasirašyti nuo šeštadienio. Nepažymėjus, pasirašyti galima iškart, kai protokolas paruoštas.</small></span></label>
     <label className="mt-4 block text-sm font-medium">Galiojimas (mėnesiais)<input className={`${inputClass} mt-1`} type="number" min="1" max="120" value={settings.validityMonths ?? resource.validityMonths ?? 12} onChange={(event) => onChange({ ...settings, validityMonths: event.target.value })} /></label>
     <label className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={settings.allowUnlinkedProtocolSigning !== false} onChange={(event) => onChange({ ...settings, allowUnlinkedProtocolSigning: event.target.checked })} /><span>Leisti darbuotojui atidaryti ir pasirašyti protokolą, jei testas nesusietas<small className="mt-1 block font-normal text-slate-500">Jei protokolas susietas su testu, darbuotojas galės jį atidaryti ir pasirašyti tik atlikęs bei išlaikęs testą.</small></span></label>
     <fieldset className="mt-5 space-y-2 rounded-lg border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend><p className="text-xs text-slate-500">Komisijos vaidmenys automatiškai parenkami pagal priimtus paskyrimus. Vadovas gali juos pakeisti.</p><div className="grid gap-2 sm:grid-cols-2">{protocolSignerRoleOptions.map(({ value, label }) => <label key={value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={(settings.requiredSigners ?? resource.requiredSigners ?? ['Darbuotojas']).includes(value)} disabled={value === 'Darbuotojas'} onChange={(event) => {
