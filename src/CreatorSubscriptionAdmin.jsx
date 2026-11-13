@@ -370,11 +370,11 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       <p className="text-sm text-amber-950">{subscription.isPlanChange
         ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite plano pakeitimo sąskaitą. Pakeistas planas galios iki {subscription.endsAt ? new Date(subscription.endsAt).toLocaleDateString('lt-LT') : 'dabartinio laikotarpio pabaigos'}.</>
         : subscription.isRenewal
-          ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite pratęsimą. Jei prenumerata dar galioja, {subscription.orderMonths} mėn. bus pridėti prie esamos pabaigos; jei jau pasibaigė, laikotarpis prasidės nuo apmokėjimo patvirtinimo.</>
+          ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite pratęsimą. Prenumerata galios iki {subscription.serviceEnd ? new Date(subscription.serviceEnd).toLocaleDateString('lt-LT') : 'išankstinėje sąskaitoje nurodytos pabaigos'}.</>
           : subscription.isReactivation
             ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Po apmokėjimo patvirtinimo prasidės naujas {subscription.orderMonths} mėn. laikotarpis.</>
             : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
-      {!subscription.isPlanChange && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
+      {!subscription.isPlanChange && !subscription.isRenewal && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
       <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
       {canCancelOrder && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Atšaukiama…' : isIndividualPlanOrder ? 'Atšaukti sąskaitą' : 'Pažymėti atšauktu'}</button>}
     </div>}
