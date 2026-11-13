@@ -7364,7 +7364,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {cloudMode && userRole === 'darbuotojas' && currentOrg?.name && <div className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900"><Building2 size={14} /><span>Aktyvi įmonė: {currentOrg.name}</span></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
-          <div className={`flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3 ${userRole === 'darbuotojas' ? 'max-sm:mr-auto' : ''}`}>
+          <div className={`flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3 ${userRole === 'darbuotojas' ? 'max-sm:ml-auto' : ''}`}>
             <button type="button" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" aria-busy={helpLoading} onClick={openWorkspaceHelp} className="grid size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700">
               <LifeBuoy size={18} className={helpLoading ? 'animate-pulse' : ''} />
             </button>
