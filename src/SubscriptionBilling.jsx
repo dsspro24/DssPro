@@ -4,7 +4,15 @@ import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
 export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, adminRestoreRequired = false, busy, cloudMode, managerName = '', now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
   const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
-  const primaryPlans = plans.filter((plan) => !plan.code.startsWith('additional_workspace') && isPlanSelectable(plan));
+  const currentOrganizationPlan = plans.find((plan) => (
+    plan.code === subscription?.planCode
+    && plan.organization_id === subscription?.orgId
+  ));
+  const primaryPlans = plans.filter((plan) => (
+    !plan.code.startsWith('additional_workspace')
+    && (plan.organization_id == null || plan.code === currentOrganizationPlan?.code)
+    && isPlanSelectable(plan)
+  ));
   const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
   const availablePlans = planOptions.filter((plan) => plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
