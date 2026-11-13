@@ -9,7 +9,7 @@ set search_path = ''
 as $$
 declare
   employee_organization_id uuid;
-  employee_id text;
+  employee_record_id text;
   workspace jsonb;
   employee jsonb;
   organization jsonb;
@@ -26,7 +26,7 @@ begin
   end if;
 
   select membership.organization_id, membership.employee_id
-    into employee_organization_id, employee_id
+    into employee_organization_id, employee_record_id
     from public.organization_memberships as membership
     where membership.user_id = (select auth.uid())
       and membership.role = 'employee'
@@ -46,7 +46,7 @@ begin
   select item.value
     into employee
     from jsonb_array_elements(coalesce(workspace -> 'employees', '[]'::jsonb)) as item(value)
-    where item.value ->> 'id' = employee_id;
+    where item.value ->> 'id' = employee_record_id;
 
   select item.value
     into resource
@@ -74,7 +74,7 @@ begin
       select 1
       from public.employee_test_attempts as attempt
       where attempt.organization_id = employee_organization_id
-        and attempt.employee_id = employee_id
+        and attempt.employee_id = employee_record_id
         and attempt.document_id = resource ->> 'relatedTestId'
         and attempt.passed
     )
@@ -93,7 +93,7 @@ begin
       select 1
       from public.employee_test_attempts as attempt
       where attempt.organization_id = employee_organization_id
-        and attempt.employee_id = employee_id
+        and attempt.employee_id = employee_record_id
         and attempt.document_id = input_resource_id
         and attempt.passed
     )
@@ -109,7 +109,7 @@ begin
   if exists (
     select 1
     from jsonb_array_elements(coalesce(workspace -> 'signatures', '[]'::jsonb)) as existing(value)
-    where existing.value ->> 'employeeId' = employee_id
+    where existing.value ->> 'employeeId' = employee_record_id
       and existing.value ->> 'resourceId' = input_resource_id
       and existing.value ->> 'role' = 'Darbuotojas'
       and (existing.value ->> 'validUntil' is null or (existing.value ->> 'validUntil')::timestamptz >= signature_time)
@@ -125,7 +125,7 @@ begin
   signature := jsonb_build_object(
     'id', 'sig-' || extensions.gen_random_uuid()::text,
     'orgId', employee_organization_id,
-    'employeeId', employee_id,
+    'employeeId', employee_record_id,
     'contractNumber', coalesce(employee ->> 'contractNumber', ''),
     'resourceId', input_resource_id,
     'signer', employee ->> 'name',
@@ -140,7 +140,7 @@ begin
     signature := signature || jsonb_build_object('aapSnapshot', jsonb_build_object(
       'companyName', organization ->> 'name',
       'companyCode', organization ->> 'companyCode',
-      'employeeId', employee_id,
+      'employeeId', employee_record_id,
       'employeeName', employee ->> 'name',
       'contractNumber', coalesce(employee ->> 'contractNumber', ''),
       'department', coalesce(employee ->> 'department', ''),
