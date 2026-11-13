@@ -32,6 +32,13 @@ export function selectCurrentSubscription(subscriptions, now = Date.now()) {
   ));
   if (pendingOrder) return pendingOrder;
 
+  const paidPlanChange = subscriptions.find((subscription) => (
+    subscription.isPlanChange === true
+    && subscription.paymentStatus === 'Apmokėta'
+    && isSubscriptionActiveForEmployeeAccess(subscription, now)
+  ));
+  if (paidPlanChange) return paidPlanChange;
+
   const paidRenewal = subscriptions.find((subscription) => (
     subscription.isRenewal === true
     && subscription.paymentStatus === 'Apmokėta'

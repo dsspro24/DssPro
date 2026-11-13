@@ -69,6 +69,28 @@ test('paid renewal takes precedence and displays its prepaid end date before its
   assert.equal(isSubscriptionActiveForEmployeeAccess(currentSubscription, now), true);
 });
 
+test('paid active plan change takes precedence over the superseded prepaid renewal', () => {
+  const paidRenewal = {
+    id: 'renewal',
+    isRenewal: true,
+    paymentStatus: 'Apmokėta',
+    status: 'Aktyvi',
+    startsAt: '2026-12-01T00:00:00.000Z',
+    endsAt: '2026-12-01T00:00:00.000Z',
+    serviceEnd: '2027-01-01T00:00:00.000Z',
+  };
+  const paidPlanChange = {
+    id: 'plan-change',
+    isPlanChange: true,
+    paymentStatus: 'Apmokėta',
+    status: 'Aktyvi',
+    startsAt: '2026-11-12T10:00:00.000Z',
+    endsAt: '2027-01-01T00:00:00.000Z',
+  };
+
+  assert.equal(selectCurrentSubscription([paidRenewal, paidPlanChange], now), paidPlanChange);
+});
+
 test('an active unpaid order is surfaced ahead of the paid renewal and expired plan changes are ignored', () => {
   const paidRenewal = {
     id: 'renewal',

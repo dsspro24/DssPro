@@ -283,6 +283,13 @@ function prioritizeEffectiveSubscription(subscriptions) {
     ];
   }
 
+  if (pendingOrder?.isPlanChange && pendingOrder.paymentStatus === 'Apmokėta') {
+    return [
+      pendingOrder,
+      ...subscriptions.filter((subscription) => subscription.id !== pendingOrder.id),
+    ];
+  }
+
   const canceledRenewalIndex = subscriptions.findIndex((subscription) => (
     subscription.isRenewal && subscription.status === 'Atšaukta'
   ));
