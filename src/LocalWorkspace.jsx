@@ -1468,6 +1468,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   };
   const managerNotificationsStorageKey = `dsspro-manager-notifications:${viewerUserId || 'demo'}`;
   const managerSubscriptionNotificationsStorageKey = `dsspro-manager-subscription-notifications:${cloudUserId || 'demo'}`;
+  const creatorSubscriptionNotificationsStorageKey = `dsspro-creator-subscription-notifications:${cloudUserId || 'demo'}`;
   const [readCommissionAcceptanceIds, setReadCommissionAcceptanceIds] = useState(() => {
     if (sandboxMode) return [];
     try {
@@ -1481,6 +1482,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (sandboxMode) return [];
     try {
       const savedIds = JSON.parse(localStorage.getItem(managerSubscriptionNotificationsStorageKey) ?? '[]');
+      return Array.isArray(savedIds) ? savedIds : [];
+    } catch {
+      return [];
+    }
+  });
+  const [readCreatorSubscriptionNotificationIds, setReadCreatorSubscriptionNotificationIds] = useState(() => {
+    if (sandboxMode) return [];
+    try {
+      const savedIds = JSON.parse(localStorage.getItem(creatorSubscriptionNotificationsStorageKey) ?? '[]');
       return Array.isArray(savedIds) ? savedIds : [];
     } catch {
       return [];
@@ -6477,7 +6487,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       if (!invoiceData) throw new Error('Pasirinkta sąskaita nerasta.');
       const opened = await downloadSubscriptionInvoice(invoiceData);
       if (opened && cloudMode && userRole === 'vadovas') {
-        markManagerSubscriptionNotificationAsRead(subscriptionId, invoiceType, invoiceData.invoiceNumber);
+        markManagerSubscriptionNotificationAsRead(`subscription-${invoiceType}-${subscriptionId}-${invoiceData.invoiceNumber}`);
+      } else if (opened && cloudMode && userRole === 'kurejas' && invoiceType === 'preinvoice') {
+        markCreatorSubscriptionNotificationAsRead(`subscription-invoice-${subscriptionId}-${invoiceData.invoiceNumber}`);
       }
       return opened;
     } catch (error) {
@@ -6799,14 +6811,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
   };
 
-  const markManagerSubscriptionNotificationAsRead = (subscriptionId, invoiceType, invoiceNumber) => {
-    if (!invoiceNumber) return;
-    const notificationId = `subscription-${invoiceType}-${subscriptionId}-${invoiceNumber}`;
+  const markManagerSubscriptionNotificationAsRead = (notificationId) => {
+    if (!notificationId) return;
     const nextReadIds = [...new Set([...readManagerSubscriptionNotificationIds, notificationId])];
     setReadManagerSubscriptionNotificationIds(nextReadIds);
     if (!sandboxMode) {
       try {
         localStorage.setItem(managerSubscriptionNotificationsStorageKey, JSON.stringify(nextReadIds));
+      } catch {
+        // The notification remains dismissed for the current session.
+      }
+    }
+  };
+  const markCreatorSubscriptionNotificationAsRead = (notificationId) => {
+    if (!notificationId) return;
+    const nextReadIds = [...new Set([...readCreatorSubscriptionNotificationIds, notificationId])];
+    setReadCreatorSubscriptionNotificationIds(nextReadIds);
+    if (!sandboxMode) {
+      try {
+        localStorage.setItem(creatorSubscriptionNotificationsStorageKey, JSON.stringify(nextReadIds));
       } catch {
         // The notification remains dismissed for the current session.
       }
@@ -6835,7 +6858,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ...creatorSubscriptions
         .filter((subscription) => subscription.paymentStatus === 'Laukiama apmokėjimo' || subscription.status === 'Laukiama sąskaitos')
         .map((subscription) => ({
-          id: `subscription-invoice-${subscription.id}`,
+          id: `subscription-invoice-${subscription.id}-${subscription.preinvoiceNumber || subscription.orderCode}`,
           title: 'Naujas prenumeratos užsakymas – laukia apmokėjimo',
           description: `${data.organizations.find((organization) => organization.id === subscription.orgId)?.name ?? 'Įmonė'} · ${subscription.plan} · ${subscription.orderCode} · ${new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format((subscription.preinvoiceTotalAmountCents ?? subscription.price * 100) / 100)}${subscription.createdAt ? ` · ${new Date(subscription.createdAt).toLocaleDateString('lt-LT')}` : ''}`,
           creatorSubscription: true,
@@ -6848,12 +6871,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         }))
         .filter(({ remainingDays }) => remainingDays > 0 && remainingDays <= 7)
         .map(({ subscription, remainingDays }) => ({
-          id: `subscription-ending-${subscription.id}`,
+          id: `subscription-ending-${subscription.id}-${subscription.endsAt}`,
           title: 'Artėja prenumeratos pabaiga',
           description: `${data.organizations.find((organization) => organization.id === subscription.orgId)?.name ?? 'Įmonė'} · ${subscription.plan} · liko ${remainingDays} ${remainingDays === 1 ? 'diena' : remainingDays < 10 ? 'dienos' : 'dienų'}.`,
           creatorSubscription: true,
         })),
-    ]
+    ].filter((item) => !readCreatorSubscriptionNotificationIds.includes(item.id))
     : userRole === 'darbuotojas'
     ? [
       ...pendingResourceIds.map((resourceId) => {
@@ -6911,8 +6934,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               if (!Number.isFinite(remainingDays) || remainingDays > 5) return [];
               const daysLabel = remainingDays === 1 ? 'dienos' : 'dienų';
               const hasExpired = remainingDays <= 0;
+              const notificationId = `subscription-renewal-${currentSubscription.id}-${currentSubscription.endsAt}`;
+              if (readManagerSubscriptionNotificationIds.includes(notificationId)) return [];
               return [{
-                id: `subscription-renewal-${currentSubscription.id}`,
+                id: notificationId,
                 title: hasExpired ? 'Prenumerata pasibaigė' : `Prenumerata baigsis po ${remainingDays} ${daysLabel}`,
                 description: `${currentOrg?.name ?? 'Įmonė'} · ${currentSubscription.plan}${hasExpired
                   ? ` · pasibaigė ${new Date(currentSubscription.endsAt).toLocaleDateString('lt-LT')}. Duomenis dar galima peržiūrėti ir atsisiųsti per 2 mėn. laikotarpį.`
@@ -6939,7 +6964,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     title: paymentOverdue ? 'Išankstinės sąskaitos apmokėjimo terminas praėjo' : 'Išankstinę sąskaitą reikia apmokėti',
                     description: `${organizationName} · ${subscription.plan} · ${subscription.preinvoiceNumber}${subscription.dueDate ? ` · apmokėti iki ${new Date(subscription.dueDate).toLocaleDateString('lt-LT')}` : ''}${paymentOverdue ? ' · jei jau apmokėjote, mokėjimas dar laukia administratoriaus patvirtinimo' : ''}`,
                     actionLabel: 'Peržiūrėti prenumeratą ir apmokėjimą',
-                    subscriptionInvoice: { subscriptionId: subscription.id, invoiceType: 'preinvoice' },
+                    subscriptionInvoice: {
+                      subscriptionId: subscription.id,
+                      invoiceType: 'preinvoice',
+                      invoiceNumber: subscription.preinvoiceNumber,
+                    },
                   });
                 }
               }
@@ -6951,7 +6980,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     title: 'Sąskaita faktūra paruošta atsisiųsti',
                     description: `${organizationName} · ${subscription.plan} · ${subscription.finalInvoiceNumber}`,
                     actionLabel: 'Peržiūrėti / atsisiųsti SF',
-                    subscriptionInvoice: { subscriptionId: subscription.id, invoiceType: 'final' },
+                    subscriptionInvoice: {
+                      subscriptionId: subscription.id,
+                      invoiceType: 'final',
+                      invoiceNumber: subscription.finalInvoiceNumber,
+                    },
                   });
                 }
               }
@@ -7312,6 +7345,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                   <button type="button" className="w-full min-w-0 whitespace-normal px-4 py-3 text-left hover:bg-slate-50" onClick={async () => {
                     setNotificationsOpen(false);
                     setNotice('');
+                    if (userRole === 'vadovas' && item.subscriptionInvoice) {
+                      markManagerSubscriptionNotificationAsRead(
+                        `subscription-${item.subscriptionInvoice.invoiceType}-${item.subscriptionInvoice.subscriptionId}-${item.subscriptionInvoice.invoiceNumber}`,
+                      );
+                    } else if (userRole === 'vadovas' && item.subscriptionRenewal) {
+                      markManagerSubscriptionNotificationAsRead(item.id);
+                    } else if (userRole === 'kurejas' && item.creatorSubscription) {
+                      markCreatorSubscriptionNotificationAsRead(item.id);
+                    }
                     if (userRole === 'vadovas' && item.subscriptionInvoice?.invoiceType === 'final') {
                       setActiveTab('prenumerata');
                       await openSubscriptionInvoice(item.subscriptionInvoice.subscriptionId, item.subscriptionInvoice.invoiceType);
