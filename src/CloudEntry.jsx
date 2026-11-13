@@ -186,10 +186,17 @@ function formatSubscription(subscription) {
     && subscription.preinvoice_initial_trial_access === 'true'
     && new Date(preinvoiceDueDate).getTime() > Date.now();
   const manualAccessOverride = subscription.manual_access_override === true;
+  const isPaidRenewal = subscription.preinvoice_renewal === 'true'
+    && subscription.payment_status === 'paid'
+    && subscription.preinvoice_service_end;
+  const effectiveEndsAt = isPaidRenewal ? subscription.preinvoice_service_end : subscription.ends_at;
+  const paidRenewalActive = isPaidRenewal
+    && subscription.status !== 'canceled'
+    && new Date(effectiveEndsAt).getTime() > Date.now();
   const isExpired = (
     subscription.status === 'active'
-    && subscription.ends_at
-    && new Date(subscription.ends_at).getTime() <= Date.now()
+    && effectiveEndsAt
+    && new Date(effectiveEndsAt).getTime() <= Date.now()
   ) || (
     subscription.status === 'pending'
     && hasUnpaidOrder
@@ -201,10 +208,10 @@ function formatSubscription(subscription) {
     createdAt: subscription.created_at ?? null,
     plan: subscription.plan_name,
     planCode: subscription.plan_code,
-    status: isExpired ? 'Pasibaigusi' : pendingOrderActive ? 'Aktyvi' : statusLabels[subscription.status] ?? subscription.status,
+    status: paidRenewalActive ? 'Aktyvi' : isExpired ? 'Pasibaigusi' : pendingOrderActive ? 'Aktyvi' : statusLabels[subscription.status] ?? subscription.status,
     price: subscription.amount_cents / 100,
     startsAt: subscription.starts_at,
-    endsAt: subscription.ends_at ?? (!manualAccessOverride && subscription.status !== 'active'
+    endsAt: effectiveEndsAt ?? (!manualAccessOverride && subscription.status !== 'active'
       && hasUnpaidOrder && subscription.preinvoice_renewal !== 'true' ? preinvoiceDueDate : null),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     manualAccessOverride,
