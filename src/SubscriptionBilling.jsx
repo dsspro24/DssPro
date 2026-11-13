@@ -1,26 +1,15 @@
 import { useState } from 'react';
 import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
+import { getPrimarySubscriptionPlans } from './lib/subscriptionPlans.js';
 
 export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, adminRestoreRequired = false, busy, cloudMode, managerName = '', organizationId = '', individualPlanRequested = false, now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
   const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
-  const organizationPlans = plans
-    .filter((plan) => plan.organization_id === organizationId && plan.active !== false)
-    .sort((left, right) => new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime());
-  const currentOrganizationPlan = organizationPlans.find((plan) => plan.code === subscription?.planCode)
-    ?? organizationPlans[0];
-  const primaryPlans = plans.filter((plan) => (
-    !plan.code.startsWith('additional_workspace')
-    && (plan.organization_id == null || plan.code === currentOrganizationPlan?.code)
-    && isPlanSelectable(plan)
-  ));
   const waitingForRequestedIndividualPlan = individualPlanRequested
     && (!subscription || (subscription.status === 'Laukiama sąskaitos' && !subscription.orderCode));
   const planOptions = subscription?.isAddon
     ? addonPlans
-    : waitingForRequestedIndividualPlan
-      ? currentOrganizationPlan ? [currentOrganizationPlan] : []
-      : primaryPlans;
+    : getPrimarySubscriptionPlans(plans, organizationId, subscription);
   const availablePlans = planOptions.filter((plan) => plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
     subscription?.planCode ?? availablePlans[0]?.code ?? 'up_to_20',
@@ -125,7 +114,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && !pendingOrder && !(subscription.isInitialTrialAccess && subscription.status === 'Atšaukta') && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
       </>
-      : <p className="text-sm text-slate-600">{individualPlanRequested ? 'Individualus planas dar nepriskirtas. Kai administratorius jį paruoš, jis atsiras šiame puslapyje.' : 'Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.'}</p>}
+      : <p className="text-sm text-slate-600">{individualPlanRequested ? 'Individualus planas dar nepriskirtas. Kol jis ruošiamas, galite rinktis standartinį planą; paruoštas individualus planas atsiras tame pačiame sąraše.' : 'Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.'}</p>}
 
     {canChangePlan && <form onSubmit={(event) => { event.preventDefault(); if (selectedPlan && selectedPlan.code !== subscription.planCode && selectedPlan.employee_limit >= employeeCount) onChangePlan(selectedPlan.code); }} className="space-y-3 rounded-md border border-slate-200 p-3">
       <label className="block text-sm font-medium">Keisti darbuotojų skaičiaus planą

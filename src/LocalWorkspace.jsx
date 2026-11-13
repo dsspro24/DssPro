@@ -6618,7 +6618,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ({ data: updatedSubscription, error } = await supabase.rpc('creator_cancel_workspace_subscription_order', {
         input_subscription_id: subscriptionId,
       }));
-    } else if (values.isCustomPlan && subscriptionStatus === 'active') {
+    } else if (values.issueCustomInvoice === true) {
       ({ data: updatedSubscription, error } = await supabase.rpc('creator_issue_company_custom_plan_invoice', {
         input_subscription_id: subscriptionId,
         input_organization_id: values.organizationId,
@@ -6713,7 +6713,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(cancelOrder
       ? `Išankstinė sąskaita ${updatedSubscription.order_code} atšaukta.`
       : customInvoiceIssued
-        ? `Individualus planas įsigaliojo. Vadovas gali atsisiųsti išankstinę sąskaitą ${updatedSubscription.order_code}.`
+        ? `Individualus planas paruoštas, išankstinė sąskaita ${updatedSubscription.order_code} laukia apmokėjimo. Vadovas ją gali atsisiųsti prenumeratos skiltyje.`
         : 'Prenumeratos duomenys atnaujinti.');
     return refreshedSubscription;
   };

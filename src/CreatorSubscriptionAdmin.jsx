@@ -202,7 +202,9 @@ export function CreatorCustomPlanCreator({ organizationId, organizationName, onC
 }
 
 export function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, onOpenInvoice, now, inputClass, buttonClass }) {
-  const [status, setStatus] = useState(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
+  const [status, setStatus] = useState(subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.orderCode
+    ? 'pending_payment'
+    : ({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
   const [planCode, setPlanCode] = useState(subscription.planCode ?? 'up_to_20');
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
   const companyCustomPlan = plans.find((plan) => plan.code === subscription.planCode && plan.organization_id === subscription.orgId)
@@ -226,7 +228,10 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
   const selectedPlan = availablePlans.find((plan) => plan.code === planCode);
   const customPlanSelected = !subscription.isAddon
     && (planCode === companyCustomPlanOption || selectedPlan?.organization_id === subscription.orgId);
-  const customInvoiceWillIssue = customPlanSelected && status === 'active';
+  const hasPendingInvoice = subscription.paymentStatus === 'Laukiama apmokėjimo' && Boolean(subscription.orderCode);
+  const customInvoiceWillIssue = customPlanSelected
+    && ['active', 'pending_payment'].includes(status)
+    && !hasPendingInvoice;
   const isIndividualPlanOrder = subscription.isIndividualPlan || subscription.planCode?.startsWith('individual_');
   const canCancelOrder = !subscription.isPlanChange || isIndividualPlanOrder;
   const hasRemainingActivePeriod = subscription.status === 'Aktyvi'
@@ -300,8 +305,16 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
       setError('Įveskite teigiamą individualaus plano darbuotojų limitą.');
       return;
     }
-    if (status === 'active' && (!startsAt || !endsAt || new Date(endsAt) <= new Date(startsAt))) {
+    if ((status === 'active' || customInvoiceWillIssue) && (!startsAt || !endsAt || new Date(endsAt) <= new Date(startsAt))) {
       setError('Aktyviai prenumeratai nurodykite tinkamą pradžios ir pabaigos laiką.');
+      return;
+    }
+    if (hasPendingInvoice) {
+      setError('Šiam užsakymui jau išrašyta išankstinė sąskaita. Patvirtinkite arba atšaukite ją atskiroje užsakymo dalyje.');
+      return;
+    }
+    if (status === 'pending_payment' && !customPlanSelected) {
+      setError('Laukiančiam apmokėjimo individualiam planui pasirinkite individualaus plano variantą.');
       return;
     }
     if (customInvoiceWillIssue && new Date(startsAt) > new Date()) {
@@ -315,6 +328,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         status,
         planCode,
         isCustomPlan: customPlanSelected,
+        issueCustomInvoice: customInvoiceWillIssue,
         organizationId: subscription.orgId,
         employeeLimit: customPlanSelected ? employeeLimitValue : null,
         amountCents: Math.round(price * 100),
@@ -323,7 +337,9 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         endsAtChanged,
         cancelAtPeriodEnd,
       });
-      setStatus(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
+      setStatus(saved.paymentStatus === 'Laukiama apmokėjimo' && saved.orderCode
+        ? 'pending_payment'
+        : ({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[saved.status] ?? saved.status);
       setStartsAt(saved.startsAt ? new Date(saved.startsAt).toISOString().slice(0, 16) : '');
       setEndsAt(saved.endsAt ? new Date(saved.endsAt).toISOString().slice(0, 16) : '');
       setEndsAtChanged(false);
@@ -381,7 +397,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     {editing && <form onSubmit={submit} className="space-y-3 border-t border-slate-100 pt-3">
       {customInvoiceWillIssue && <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-950">Išsaugojus individualus planas įsigalios iškart, o vadovas galės atsisiųsti išankstinę sąskaitą prenumeratos skiltyje. {hasRemainingActivePeriod ? 'Sąskaita bus apskaičiuota už likusias dienas iki dabartinės prenumeratos pabaigos; vėlesnis pratęsimas kainuos visą mėnesio kainą.' : 'Suma apskaičiuojama pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį.'} Jei sąskaita neapmokama per 5 dienas, grįžta ankstesnis planas.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="pending">Laukia sąskaitos</option><option value="active">Aktyvi</option><option value="canceled">Atšaukta</option><option value="expired">Pasibaigusi</option></select></label>
+        <label className="text-sm font-medium">Būsena<select className={`${inputClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="pending">Laukia sąskaitos</option>{(customPlanSelected || status === 'pending_payment') && <option value="pending_payment" disabled={!customPlanSelected}>Laukiama apmokėjimo</option>}<option value="active">Aktyvi</option><option value="canceled">Atšaukta</option><option value="expired">Pasibaigusi</option></select></label>
         <label className="text-sm font-medium">Planas<select className={`${inputClass} mt-1`} value={planCode} onChange={(event) => {
           const selected = availablePlans.find((plan) => plan.code === event.target.value);
           setPlanCode(event.target.value);
@@ -406,7 +422,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
         <label className="text-sm font-medium">Galioja iki<input className={`${inputClass} mt-1`} type="datetime-local" value={endsAt} onChange={(event) => { setEndsAt(event.target.value); setEndsAtChanged(true); }} /></label>
         <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={cancelAtPeriodEnd} onChange={(event) => setCancelAtPeriodEnd(event.target.checked)} />Atšaukti laikotarpio pabaigoje</label>
       </div>
-      <div className="flex flex-wrap gap-2"><button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Saugoma…' : customInvoiceWillIssue ? 'Išsaugoti planą ir išrašyti sąskaitą' : 'Išsaugoti prenumeratą'}</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setEditing(false)}>Atšaukti</button></div>
+      <div className="flex flex-wrap gap-2"><button type="submit" className={buttonClass} disabled={saving || hasPendingInvoice}>{saving ? 'Saugoma…' : customInvoiceWillIssue ? 'Išsaugoti planą ir išrašyti sąskaitą' : 'Išsaugoti prenumeratą'}</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setEditing(false)}>Atšaukti</button></div>
       {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
     </form>}
     {error && !editing && <p role="alert" className="text-sm text-rose-700">{error}</p>}
