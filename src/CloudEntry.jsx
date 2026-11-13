@@ -233,7 +233,9 @@ function formatSubscription(subscription) {
 }
 
 function prioritizeEffectiveSubscription(subscriptions) {
-  const manualAccessIndex = subscriptions.findIndex((subscription) => subscription.manualAccessOverride);
+  const manualAccessIndex = subscriptions.findIndex((subscription) => (
+    subscription.manualAccessOverride && subscription.status === 'Aktyvi'
+  ));
   if (manualAccessIndex > 0) {
     return [subscriptions[manualAccessIndex], ...subscriptions.slice(0, manualAccessIndex), ...subscriptions.slice(manualAccessIndex + 1)];
   }
