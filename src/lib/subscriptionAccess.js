@@ -27,8 +27,6 @@ export function selectCurrentSubscription(subscriptions, now = Date.now()) {
     subscription.paymentStatus === 'Laukiama apmokėjimo'
     && subscription.status !== 'Atšaukta'
     && subscription.orderCode
-    && !(subscription.isPlanChange && subscription.dueDate
-      && new Date(subscription.dueDate).getTime() <= now)
   ));
   if (pendingOrder) return pendingOrder;
 

@@ -21,8 +21,11 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
   const [companyVatCode, setCompanyVatCode] = useState('');
   const [orderMonths, setOrderMonths] = useState('1');
   const pendingOrder = subscription?.paymentStatus === 'Laukiama apmokėjimo'
-    && Boolean(subscription.preinvoiceNumber)
+    && Boolean(subscription.orderCode)
     && subscription.status !== 'Atšaukta';
+  const pendingOrderOverdue = Boolean(subscription?.dueDate
+    && Number.isFinite(new Date(subscription.dueDate).getTime())
+    && new Date(subscription.dueDate).getTime() <= now);
   const awaitingOrder = subscription?.status === 'Laukiama sąskaitos' && !subscription.orderCode;
   const canOrder = !adminRestoreRequired && !pendingOrder && (!subscription || subscription.status !== 'Aktyvi' || cloudMode);
   const effectivePlanCode = availablePlans.some((plan) => plan.code === selectedPlanCode)
@@ -90,7 +93,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">2 mėn. peržiūros laikotarpis baigėsi. Dėl prieigos atkūrimo kreipkitės į DSS Pro administratorių.</p>
           : (subscription.status === 'Laukiama sąskaitos' || locked) && <p className="text-sm text-slate-600">Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.</p>}
         {subscription.isInitialTrialAccess && subscription.paymentStatus !== 'Apmokėta' && (subscription.status !== 'Aktyvi' || locked) && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Pirmojo užsakymo 5 dienų prieiga jau panaudota. Naujas užsakymas prieigos nesuteiks, kol apmokėjimo nepatvirtins DSS Pro administratorius.</p>}
-        {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{subscription.isPlanChange
+        {subscription.paymentStatus === 'Laukiama apmokėjimo' && subscription.status !== 'Atšaukta' && <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p>{pendingOrderOverdue
+          ? <>Išankstinės sąskaitos apmokėjimo terminas praėjo. Naujo užsakymo pateikti negalima, kol šis neapmokėtas užsakymas neatšauktas. Peržiūrėkite sąskaitą arba atšaukite užsakymą.</>
+          : subscription.isPlanChange
           ? subscription.plan?.startsWith('Individualus planas')
             ? <>Individualus planas įsigaliojo iškart. Išankstinės sąskaitos suma apskaičiuota pagal nustatyto laikotarpio dienas, taikant 30 dienų mėnesį. Apmokėkite per 5 dienas; kitu atveju grįš ankstesnis planas.</>
             : <>Plano pakeitimą aktyvavome iškart. Atsisiųskite kainų skirtumo išankstinę sąskaitą ir apmokėkite per 5 dienas; kitu atveju bus grąžintas ankstesnis planas.</>
@@ -120,7 +125,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           : 'Pakeitimas įsigalioja iškart; kainų skirtumo sąskaita neišrašoma.'}</p>
       {selectedPlan?.code !== subscription.planCode && <button type="submit" className={buttonClass} disabled={busy || !selectedPlan || selectedPlan.employee_limit < employeeCount}><CreditCard size={16} />{busy ? 'Keičiama…' : `${selectedPlan && currentPlan && selectedPlan.amount_cents < currentPlan.amount_cents ? 'Sumažinti' : 'Atnaujinti'} planą`}</button>}
     </form>}
-    {pendingPlanChange && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Palaukite, kol bus patvirtintas plano pakeitimo sąskaitos apmokėjimas, arba apmokėkite ją per 5 dienas.</p>}
+    {pendingPlanChange && !pendingOrderOverdue && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Palaukite, kol bus patvirtintas plano pakeitimo sąskaitos apmokėjimas, arba apmokėkite ją per 5 dienas.</p>}
 
     {subscription?.isAddon
       ? <div className="space-y-3">

@@ -6312,7 +6312,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             : 'Užsakymas pateiktas. Laikina 5 dienų prieiga šiam užsakymui netaikoma. Apmokėkite išankstinę sąskaitą; prieiga bus atkurta DSS Pro administratoriui patvirtinus mokėjimą.');
       }
     } catch (error) {
-      setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
+      if (error.message?.includes('An unpaid order already exists for this workspace')) {
+        try {
+          await refreshCurrentSubscription(currentOrg.id);
+          setActiveTab('prenumerata');
+          setNotice('Jau yra neapmokėtas užsakymas. Peržiūrėkite jo išankstinę sąskaitą arba atšaukite užsakymą prieš pateikdami naują.');
+        } catch (refreshError) {
+          setNotice(`Jau yra neapmokėtas užsakymas, bet jo duomenų atnaujinti nepavyko: ${refreshError.message}`);
+        }
+      } else {
+        setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
+      }
     } finally {
       setSubscriptionActionBusy(false);
     }

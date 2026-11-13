@@ -113,7 +113,7 @@ test('superseded paid renewal does not override the active downgraded plan', () 
   assert.equal(selectCurrentSubscription([supersededRenewal, downgradedPlan], now), downgradedPlan);
 });
 
-test('an active unpaid order is surfaced ahead of the paid renewal and expired plan changes are ignored', () => {
+test('unpaid orders remain visible until canceled, even after the invoice deadline', () => {
   const paidRenewal = {
     id: 'renewal',
     isRenewal: true,
@@ -135,7 +135,7 @@ test('an active unpaid order is surfaced ahead of the paid renewal and expired p
   assert.equal(selectCurrentSubscription([
     paidRenewal,
     { ...pendingPlanChange, dueDate: '2026-11-11T00:00:00.000Z' },
-  ], now).id, 'renewal');
+  ], now).id, 'pending-plan-change');
 });
 
 test('frontend subscription labels use the same period check', () => {
