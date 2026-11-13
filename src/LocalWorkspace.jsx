@@ -1139,8 +1139,18 @@ const roleNavigation = {
   darbuotojas: [['uzduotys', 'Mano užduotys', BookOpen], ['mokomoji', 'Mokomoji medžiaga', GraduationCap], ['aap', 'Mano AAP', Shirt], ['parasai', 'Mano parašai', FileSignature], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   dss: [['skydelis', 'Skydelis', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['parasai', 'Istorija', FileSignature], ['archyvas', 'Archyvas', Archive], ['paskyra', 'Paskyra ir PIN', KeyRound]],
   vadovas: [['skydelis', 'Būklės pasas', LayoutDashboard], ['zurnalai', 'Pasirašomi dokumentai', FileText], ['ataskaitos', 'Ataskaitos', FileText], ['biblioteka', 'Biblioteka', BookOpen], ['archyvas', 'Archyvas', Archive], ['imone', 'Įmonės nustatymai', Building2], ['prenumerata', 'Prenumerata', CreditCard]],
-  kurejas: [['skydelis', 'Skydelis', LayoutDashboard], ['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['tinklarastis', 'Tinklaraštis', BookOpen], ['teisine-informacija', 'Teisinė informacija', FileText], ['prenumeratos', 'Prenumeratų valdymas', CreditCard], ['kurejo-saskaitos', 'Sąskaitos', FileText]],
+  kurejas: [['imones', 'Įmonės', Building2], ['paskyros', 'Paskyros', Users], ['biblioteka', 'Turinio biblioteka', BookOpen], ['tinklarastis', 'Tinklaraštis', BookOpen], ['teisine-informacija', 'Teisinė informacija', FileText], ['prenumeratos', 'Prenumeratų valdymas', CreditCard], ['kurejo-saskaitos', 'Sąskaitos', FileText]],
 };
+
+function defaultWorkspaceTabForRole(role) {
+  if (role === 'darbuotojas') return 'uzduotys';
+  if (role === 'kurejas') return 'imones';
+  return 'skydelis';
+}
+
+function normalizeWorkspaceTabForRole(tab, role) {
+  return role === 'kurejas' && tab === 'skydelis' ? 'imones' : tab;
+}
 
 function loadData() {
   try {
@@ -1399,7 +1409,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [creatorInvoiceSettings, setCreatorInvoiceSettings] = useState(() => initialCloudData?.creatorInvoiceSettings ?? defaultCreatorInvoiceSettings);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [subscriptionActionBusy, setSubscriptionActionBusy] = useState(false);
-  const [activeTab, setActiveTabState] = useState(initialActiveTab || (userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis'));
+  const [activeTab, setActiveTabState] = useState(() => normalizeWorkspaceTabForRole(
+    initialActiveTab || defaultWorkspaceTabForRole(userRole),
+    userRole,
+  ));
   const initialTabAppliedRef = useRef(false);
   useEffect(() => {
     const currentState = window.history.state;
@@ -1695,14 +1708,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const canViewCompanyArchive = userRole === 'vadovas' || (userRole === 'dss' && dssOrganizationIsOpen && dssWorkspaceIsReady
     && data.organizations.some((organization) => organization.id === selectedOrgId && organization.canManageWorkspace));
   const setActiveTab = useCallback((tab) => {
-    if (tab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive) tab = 'skydelis';
-    if (tab === activeTab) return;
+    const requestedTab = normalizeWorkspaceTabForRole(tab, userRole);
+    const nextTab = requestedTab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive
+      ? 'skydelis'
+      : requestedTab;
+    if (nextTab === activeTab) return;
     const currentState = window.history.state;
     window.history.pushState({
       ...(currentState && typeof currentState === 'object' ? currentState : {}),
-      dssProWorkspaceTab: tab,
+      dssProWorkspaceTab: nextTab,
     }, '');
-    setActiveTabState(tab);
+    setActiveTabState(nextTab);
   }, [activeTab, userRole, canViewCompanyArchive]);
   useEffect(() => {
     const periodEnd = userRole === 'dss' ? dssSubscriptionAccess?.periodEnd : subscriptionAccess.periodEnd;
@@ -1812,7 +1828,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   useEffect(() => {
     const handlePopState = (event) => {
       if (typeof event.state?.dssProWorkspaceTab === 'string') {
-        const requestedTab = event.state.dssProWorkspaceTab;
+        const requestedTab = normalizeWorkspaceTabForRole(event.state.dssProWorkspaceTab, userRole);
         setActiveTabState(requestedTab === 'archyvas' && userRole === 'dss' && !canViewCompanyArchive ? 'skydelis' : requestedTab);
       }
     };
@@ -6803,7 +6819,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const changeDemoRole = (role, accountId = '') => {
     if (sandboxMode && role === 'kurejas') return;
-    setActiveTab(role === 'darbuotojas' ? 'uzduotys' : 'skydelis');
+    setActiveTab(defaultWorkspaceTabForRole(role));
     setOpenedDssOrganizationId('');
     setMobileMenuOpen(false);
     if (role === 'darbuotojas') setTaskFilter('atliktinos');
@@ -7275,7 +7291,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
       <aside className={`sticky top-0 ${helpTourTab ? 'z-[75] lg:z-[75]' : 'z-40 lg:z-auto'} flex w-full shrink-0 flex-col bg-emerald-950 px-3 py-2 text-white shadow-lg sm:px-4 sm:py-3 lg:static lg:w-64 lg:px-4 lg:py-5 lg:shadow-none print:hidden`}>
         <div className="flex items-center justify-between lg:contents">
-          <button onClick={() => { setActiveTab(userRole === 'darbuotojas' ? 'uzduotys' : 'skydelis'); setMobileMenuOpen(false); }} className="mb-0 flex items-center gap-2 px-2 text-left text-lg font-black lg:mb-6">Dss <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-xs text-emerald-300">Pro</span></button>
+          <button onClick={() => { setActiveTab(defaultWorkspaceTabForRole(userRole)); setMobileMenuOpen(false); }} className="mb-0 flex items-center gap-2 px-2 text-left text-lg font-black lg:mb-6">Dss <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-xs text-emerald-300">Pro</span></button>
           <button type="button" aria-label={mobileMenuOpen ? 'Uždaryti meniu' : 'Atidaryti meniu'} aria-expanded={mobileMenuOpen} aria-controls="workspace-mobile-menu" className="grid size-10 place-items-center rounded-md border border-white/20 text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)}><Menu size={20} /></button>
         </div>
         <div id="workspace-mobile-menu" className={`${mobileMenuOpen ? 'block' : 'hidden'} mt-3 lg:contents`}>
