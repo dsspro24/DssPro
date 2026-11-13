@@ -7364,7 +7364,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             {cloudMode && userRole === 'darbuotojas' && currentOrg?.name && <div className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900"><Building2 size={14} /><span>Aktyvi įmonė: {currentOrg.name}</span></div>}
             <span className="hidden text-sm text-slate-500 sm:inline">DSS Pro <span className="px-2 text-slate-300">/</span><span className="font-semibold text-slate-800">{activeNavigation.find(([id]) => id === activeTab)?.[1] ?? 'Skydelis'}</span></span>
           </div>
-          <div className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3">
+          <div className={`flex min-w-0 items-center gap-2 text-sm font-semibold sm:gap-3 ${userRole === 'darbuotojas' ? 'max-sm:mr-auto' : ''}`}>
             <button type="button" title="Pagalba ir žinynas" aria-label="Pagalba ir žinynas" aria-busy={helpLoading} onClick={openWorkspaceHelp} className="grid size-9 place-items-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700">
               <LifeBuoy size={18} className={helpLoading ? 'animate-pulse' : ''} />
             </button>
@@ -7488,7 +7488,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 <span className="hidden max-w-[40vw] truncate sm:inline">{displayName}</span>
                 <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-              {profileMenuOpen && <div role="menu" className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-slate-900 shadow-xl">
+              {profileMenuOpen && <div role="menu" className={`absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-slate-900 shadow-xl ${userRole === 'darbuotojas' ? 'max-sm:right-2' : ''}`}>
                 <div className="border-b border-slate-100 px-4 py-3"><p className="truncate text-sm font-semibold">{displayName}</p><p className="mt-0.5 text-xs font-normal text-slate-500">{roleLabels[userRole]}</p></div>
                 <button type="button" role="menuitem" data-readonly-allowed onClick={() => { setProfileMenuOpen(false); onExit?.(); }} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"><LogOut size={16} />Atsijungti</button>
               </div>}
