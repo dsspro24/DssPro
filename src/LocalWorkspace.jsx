@@ -8,6 +8,7 @@ import {
 } from './lib/subscriptionAccess.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
+import { updateProtocolBatchRevision } from './lib/protocolBatchRevisions.js';
 const defaultFamiliarizationTopics = [
   'Psichologinio smurto, diskriminacijos ir priekabiavimo prevencijos politika;',
   'Darbuotojų saugos ir sveikatos politika;',
@@ -424,6 +425,7 @@ const getMedicalCertificateReminderDate = (validUntil) => {
   return toLocalDateKey(date);
 };
 const formatProtocolDate = (dateKey) => dateKey ? new Intl.DateTimeFormat('lt-LT', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${dateKey}T12:00:00`)) : '';
+const formatProtocolBatchNumber = (number, revision = 1) => `${String(number ?? '').padStart(3, '0')}${Number(revision) > 1 ? ` (red. ${revision})` : ''}`;
 const isDateExpired = (value, now) => {
   if (!value) return false;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T23:59:59.999`) : new Date(value);
@@ -596,7 +598,11 @@ const isProtocolBatchReady = (batch, employees, resource) => Boolean(batch.proto
 const addEmployeeToProtocolBatches = (data, employee) => {
   const org = data.organizations.find((item) => item.id === employee.orgId);
   if (!org) return { batches: data.protocolBatches ?? [], resourceIds: employee.resourceIds ?? [] };
-  const batches = [...(data.protocolBatches ?? [])];
+  let batches = [...(data.protocolBatches ?? [])];
+  const employeeDirectory = new Map([
+    ...(data.employees ?? []).map((item) => [item.id, item]),
+    [employee.id, employee],
+  ]);
   const resourceIds = new Set(employee.resourceIds ?? []);
   const protocols = data.resources.filter((resource) => {
     if (resource.templateKind !== 'knowledge-assessment-protocol' || !org.resources.includes(resource.id)) return false;
@@ -610,19 +616,45 @@ const addEmployeeToProtocolBatches = (data, employee) => {
   protocols.forEach((resource) => {
     const testResult = getLatestPassedProtocolTestResult(employee, resource) ?? getLatestProtocolTestResult(employee, resource);
     if (resource.relatedTestId && hasPassedProtocolTest(employee, resource)) resourceIds.add(resource.id);
-    if (batches.some((batch) => batch.orgId === org.id && batch.resourceId === resource.id && batch.employeeIds.includes(employee.id))) return;
+    const matchingBatches = batches.filter((batch) => batch.orgId === org.id && batch.resourceId === resource.id);
+    const newestBatchFirst = (left, right) => String(right.periodStart ?? '').localeCompare(String(left.periodStart ?? ''))
+      || Number(right.number ?? 0) - Number(left.number ?? 0)
+      || Number(right.revision ?? 1) - Number(left.revision ?? 1);
+    const existingEmployeeBatch = matchingBatches
+      .filter((batch) => batch.employeeIds?.includes(employee.id))
+      .sort(newestBatchFirst)[0];
+    if (existingEmployeeBatch) {
+      const { batches: updatedBatches } = updateProtocolBatchRevision({
+        batches,
+        batch: existingEmployeeBatch,
+        employee,
+        employeeDirectory,
+        isSigned: (data.protocolCommissionSignatures ?? []).some((signature) => signature.batchId === existingEmployeeBatch.id),
+        testResult,
+        getEmployeeTestResult: (record) => getLatestPassedProtocolTestResult(record, resource)
+          ?? getLatestProtocolTestResult(record, resource),
+      });
+      batches = updatedBatches;
+      return;
+    }
     const employeeDate = employee.invitedAt ?? employee.createdAt ?? testResult?.completedAt;
     if (!employeeDate) return;
     const cadence = org.resourceSettings?.[resource.id]?.protocolCadence ?? 'weekly-friday';
     let batch;
     if (cadence === 'until-full') {
-      batch = [...batches].reverse().find((item) => item.orgId === org.id && item.resourceId === resource.id && item.cadence === cadence && item.employeeIds.length < protocolBatchCapacity);
+      batch = matchingBatches
+        .filter((item) => item.cadence === cadence && item.employeeIds?.length < protocolBatchCapacity)
+        .sort(newestBatchFirst)[0];
     } else {
       const period = getProtocolPeriod(employeeDate, cadence);
       if (!period) return;
-      batch = batches.find((item) => item.orgId === org.id && item.resourceId === resource.id && item.cadence === cadence && item.periodStart === period.start && item.periodEnd === period.end && item.employeeIds.length < protocolBatchCapacity);
+      batch = matchingBatches
+        .filter((item) => item.cadence === cadence && item.periodStart === period.start
+          && item.periodEnd === period.end && item.employeeIds?.length < protocolBatchCapacity)
+        .sort(newestBatchFirst)[0];
       if (!batch) {
-        const segment = batches.filter((item) => item.orgId === org.id && item.resourceId === resource.id && item.periodStart === period.start).length + 1;
+        const segment = matchingBatches.filter((item) => item.periodStart === period.start && (item.revision ?? 1) === 1).length + 1;
+        const number = Math.max(0, ...matchingBatches.map((item) => Number(item.number) || 0)) + 1;
         batch = {
           id: `protocol-batch-${org.id}-${resource.id}-${period.start}-${segment}`,
           orgId: org.id,
@@ -631,7 +663,8 @@ const addEmployeeToProtocolBatches = (data, employee) => {
           periodStart: period.start,
           periodEnd: period.end,
           protocolDate: period.end,
-          number: batches.filter((item) => item.orgId === org.id && item.resourceId === resource.id).length + 1,
+          number,
+          revision: 1,
           employeeIds: [],
           createdAt: new Date().toISOString(),
         };
@@ -639,7 +672,7 @@ const addEmployeeToProtocolBatches = (data, employee) => {
       }
     }
     if (!batch) {
-      const number = batches.filter((item) => item.orgId === org.id && item.resourceId === resource.id).length + 1;
+      const number = Math.max(0, ...matchingBatches.map((item) => Number(item.number) || 0)) + 1;
       batch = {
         id: `protocol-batch-${org.id}-${resource.id}-fill-${number}`,
         orgId: org.id,
@@ -649,15 +682,26 @@ const addEmployeeToProtocolBatches = (data, employee) => {
         periodEnd: '',
         protocolDate: '',
         number,
+        revision: 1,
         employeeIds: [],
         createdAt: new Date().toISOString(),
       };
       batches.push(batch);
     }
-    batch.employeeIds = [...batch.employeeIds, employee.id];
-    if (cadence === 'until-full' && batch.employeeIds.length === protocolBatchCapacity) {
-      batch.periodEnd = employeeDate.slice(0, 10);
-      batch.protocolDate = batch.periodEnd;
+    const { batches: updatedBatches, batch: updatedBatch } = updateProtocolBatchRevision({
+      batches,
+      batch,
+      employee,
+      employeeDirectory,
+      isSigned: (data.protocolCommissionSignatures ?? []).some((signature) => signature.batchId === batch.id),
+      testResult,
+      getEmployeeTestResult: (record) => getLatestPassedProtocolTestResult(record, resource)
+        ?? getLatestProtocolTestResult(record, resource),
+    });
+    batches = updatedBatches;
+    if (cadence === 'until-full' && updatedBatch.employeeIds.length === protocolBatchCapacity) {
+      const filledBatch = { ...updatedBatch, periodEnd: employeeDate.slice(0, 10), protocolDate: employeeDate.slice(0, 10) };
+      batches = batches.map((item) => item.id === updatedBatch.id ? filledBatch : item);
     }
   });
 
@@ -2406,7 +2450,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const organization = data.organizations.find((item) => item.id === (task.organizationId ?? currentEmployee?.orgId));
       const signerOverrides = organization?.resourceSettings?.[task.resourceId]?.commissionSignerOverrides;
       return typeof signerOverrides?.[task.role] === 'boolean' ? signerOverrides[task.role] : true;
-    })
+    }).map((task) => ({
+      ...task,
+      batchRevision: data.protocolBatches?.find((batch) => batch.id === task.batchId)?.revision ?? task.batchRevision ?? 1,
+    }))
     : (data.commissionAssignments ?? [])
       .filter((assignment) => assignment.organizationId === currentEmployee?.orgId && assignment.employeeId === currentEmployee?.id && assignment.status === 'accepted')
       .flatMap((assignment) => (data.protocolBatches ?? [])
@@ -2429,6 +2476,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             role: assignment.role,
             batchId: batch.id,
             batchNumber: batch.number,
+            batchRevision: batch.revision ?? 1,
             protocolDate: batch.protocolDate,
             resourceId: resource.id,
             resourceTitle: resource.title,
@@ -2668,7 +2716,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         && (protocolStatusFilter === 'visos' || status === protocolStatusFilter)
         && query.includes(protocolSearch.trim().toLocaleLowerCase('lt'));
     })
-    .sort((left, right) => (right.batch.periodStart ?? '').localeCompare(left.batch.periodStart ?? '') || right.batch.number - left.batch.number) : [];
+    .sort((left, right) => (right.batch.periodStart ?? '').localeCompare(left.batch.periodStart ?? '')
+      || right.batch.number - left.batch.number
+      || Number(right.batch.revision ?? 1) - Number(left.batch.revision ?? 1)) : [];
   const protocolPageSize = 10;
   const protocolPageCount = Math.max(1, Math.ceil(visibleProtocolBatches.length / protocolPageSize));
   const currentProtocolPage = Math.min(protocolPage, protocolPageCount);
@@ -2693,7 +2743,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       const status = ready ? 'Paruoštas'
         : batch.cadence === 'until-full' && employees.length < protocolBatchCapacity ? 'Kaupiamas'
           : resource.relatedTestId ? 'Laukia testo' : 'Laukia datos';
-      return [batch.number, resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => previewProtocolBatch(resource, batch)}><Eye size={15} />Peržiūrėti</button>];
+      return [formatProtocolBatchNumber(batch.number, batch.revision), resource.title, batch.cadence === 'until-full' ? 'Iki 15 darbuotojų' : `${formatProtocolDate(batch.periodStart)} – ${formatProtocolDate(batch.periodEnd)}`, batch.protocolDate ? formatProtocolDate(batch.protocolDate) : 'Pildomas', status, <button type="button" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold hover:bg-slate-50" onClick={() => previewProtocolBatch(resource, batch)}><Eye size={15} />Peržiūrėti</button>];
     })} /><div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3"><p className="text-sm text-slate-500">Rodoma {(currentProtocolPage - 1) * protocolPageSize + 1}–{Math.min(currentProtocolPage * protocolPageSize, visibleProtocolBatches.length)} iš {visibleProtocolBatches.length}</p><nav className="flex items-center gap-2" aria-label="Protokolų puslapiavimas"><button type="button" aria-label="Ankstesnis protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage <= 1} onClick={() => setProtocolPage((page) => Math.max(1, page - 1))}><ChevronLeft size={17} /></button><span className="text-sm tabular-nums">{currentProtocolPage} / {protocolPageCount}</span><button type="button" aria-label="Kitas protokolų puslapis" className="grid size-10 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={currentProtocolPage >= protocolPageCount} onClick={() => setProtocolPage((page) => Math.min(protocolPageCount, page + 1))}><ChevronRight size={17} /></button></nav></div></> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">{(data.protocolBatches ?? []).some((batch) => batch.orgId === currentOrg?.id) ? 'Pagal pasirinktus filtrus protokolų nerasta.' : 'Kai darbuotojas pakviečiamas į protokolo mokymo programą, jo periodas atsiranda šiame registre.'}</p>}
   </Panel> : null;
   const reportTestResults = useMemo(() => {
@@ -4829,16 +4879,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : (data.archivedEmployees ?? [])
         .filter((record) => record.orgId === currentOrg?.id)
         .map((record) => record.employee);
+    const applyProtocolBatchSnapshot = (person, employeeId) => {
+      const snapshot = protocolBatch?.employeeSnapshots?.find((item) => item.id === employeeId);
+      return person && snapshot ? { ...person, ...snapshot } : person;
+    };
     const activeEmployees = templateOnly || archivedRecord ? [] : protocolBatch
-      ? protocolBatch.employeeIds.map((employeeId) => data.employees.find((item) => item.id === employeeId)).filter(Boolean)
+      ? protocolBatch.employeeIds.map((employeeId) => applyProtocolBatchSnapshot(
+        data.employees.find((item) => item.id === employeeId),
+        employeeId,
+      )).filter(Boolean)
       : userRole === 'darbuotojas'
         ? [currentEmployee].filter((item) => item?.resourceIds?.includes(resource.id))
         : data.employees.filter((item) => item.orgId === currentOrg?.id && item.resourceIds?.includes(resource.id));
     const archivedEmployees = archivedRecord
       ? [archivedRecord.employee]
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
-      ? protocolBatch.employeeIds.map((employeeId) => data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee
-        ?? previewArchivedEmployees.find((employee) => employee.id === employeeId)).filter(Boolean)
+      ? protocolBatch.employeeIds.map((employeeId) => applyProtocolBatchSnapshot(
+        data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee
+          ?? previewArchivedEmployees.find((employee) => employee.id === employeeId),
+        employeeId,
+      )).filter(Boolean)
       : previewArchivedEmployees.filter((employee) => employee.resourceIds?.includes(resource.id));
     const sequenceEmployees = [...new Map([
       ...data.employees.filter((person) => person.orgId === currentOrg?.id),
@@ -4892,7 +4952,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const previewOrganization = archivedRecord
       ? { ...currentOrg, ...archivedRecord.organization }
       : currentOrg;
-    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: archivedRecord ? [...data.resources, ...archivedRecord.resources] : data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? String(protocolBatch.number).padStart(3, '0') : '' };
+    const previewDocument = { ...configuredResource, image: '', previewSpecialists: templateOnly ? [] : data.specialists, previewEmployees, previewCommissionAssignments: commissionAssignments, previewProtocolCommissionSignatures: protocolCommissionSignatures, templateOnly, aapCatalogPreview, previewResources: archivedRecord ? [...data.resources, ...archivedRecord.resources] : data.resources, workerSignedPreview, protocolBatchId, protocolBatchDate: protocolBatch?.protocolDate ?? '', protocolDateText: protocolBatch?.protocolDate ? formatProtocolDate(protocolBatch.protocolDate) : protocolBatch?.cadence === 'until-full' ? 'Pildomas' : '', protocolNumber: protocolBatch ? formatProtocolBatchNumber(protocolBatch.number, protocolBatch.revision) : '' };
     const previewEmployee = employeeId
       ? previewEmployees.find((person) => person.id === employeeId)
       : currentEmployee;
