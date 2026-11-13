@@ -48,7 +48,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(10);
+select plan(14);
 
 select lives_ok(
   format(
@@ -204,6 +204,66 @@ select is(
   ),
   'canceled',
   'canceling a pending plan change releases the workspace for a new renewal order'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"98000000-0000-4000-8000-000000000003","user_metadata":{"plan_code":"up_to_20"}}',
+  true
+);
+select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000003', true);
+
+select lives_ok(
+  format(
+    'select public.manager_change_workspace_subscription_plan(%L::uuid, %L)',
+    current_setting('test.subscription_renewal_organization_id'),
+    'up_to_50'
+  ),
+  'manager can create a replacement plan change with a prepaid future renewal'
+);
+
+select set_config('request.jwt.claims', '{"sub":"98000000-0000-4000-8000-000000000004"}', true);
+select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000004', true);
+
+select lives_ok(
+  format(
+    'select public.creator_confirm_workspace_subscription_payment(%L::uuid, null)',
+    (
+      select plan_change.id
+      from public.workspace_subscriptions as plan_change
+      where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+        and plan_change.payment_status = 'pending'
+        and plan_change.preinvoice_data ->> 'planChange' = 'true'
+    )
+  ),
+  'creator can confirm a plan change without violating the subscription period constraint'
+);
+
+select is(
+  (
+    select renewal.status
+    from public.workspace_subscriptions as renewal
+    where renewal.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and renewal.preinvoice_data ->> 'renewal' = 'true'
+  ),
+  'expired',
+  'the replaced future renewal is no longer active after the plan change'
+);
+
+select is(
+  (
+    select renewal.ends_at
+    from public.workspace_subscriptions as renewal
+    where renewal.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and renewal.preinvoice_data ->> 'renewal' = 'true'
+  ),
+  (
+    select (renewal.preinvoice_data ->> 'serviceEnd')::timestamptz
+    from public.workspace_subscriptions as renewal
+    where renewal.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and renewal.preinvoice_data ->> 'renewal' = 'true'
+  ),
+  'the replaced renewal keeps its original service dates for invoice history'
 );
 
 select * from finish();
