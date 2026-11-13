@@ -233,23 +233,15 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     && subscription.endsAt
     && new Date(subscription.endsAt).getTime() > now;
   const price = Number(amount.replace(',', '.'));
-  const remainingDays = subscription.endsAt ? Math.ceil((new Date(subscription.endsAt).getTime() - now) / 86_400_000) : null;
+  const subscriptionEndTime = subscription.endsAt ? new Date(subscription.endsAt).getTime() : null;
+  const subscriptionRemainingTime = subscriptionEndTime !== null
+    ? subscriptionEndTime > now
+      ? ` · liko ${Math.ceil((subscriptionEndTime - now) / 86_400_000)} d.`
+      : ' · galiojimas pasibaigė'
+    : '';
   const paymentEndDateMinimum = subscription.isRenewal
     ? new Date(Math.max(new Date(subscription.serviceStart ?? now).getTime(), now)).toISOString().slice(0, 10)
     : subscription.orderedAt?.slice(0, 10);
-  const lifecycle = subscription.paymentStatus === 'Laukiama apmokėjimo'
-    ? ['Laukia apmokėjimo', 'bg-orange-100 text-orange-900']
-    : subscription.status === 'Aktyvi' && remainingDays !== null && remainingDays <= 0
-      ? ['Pasibaigusi', 'bg-rose-100 text-rose-900']
-      : subscription.status === 'Aktyvi' && remainingDays !== null && remainingDays <= 5
-        ? [`Baigiasi po ${Math.max(1, remainingDays)} d.`, 'bg-yellow-100 text-yellow-900']
-        : subscription.status === 'Aktyvi'
-          ? ['Aktyvi', 'bg-emerald-100 text-emerald-900']
-          : subscription.status === 'Pasibaigusi'
-            ? ['Pasibaigusi', 'bg-rose-100 text-rose-900']
-            : subscription.status === 'Atšaukta'
-              ? ['Atšaukta', 'bg-slate-100 text-slate-700']
-              : [subscription.status, 'bg-slate-100 text-slate-700'];
   const confirmPayment = async () => {
     setConfirmingPayment(true);
     setError('');
@@ -347,7 +339,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold">{subscription.plan} · {new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(subscription.price)} / mėn.</p>
-        <p className="mt-1 flex flex-wrap items-center gap-2 text-xs"><span className={`rounded-full px-2 py-1 font-semibold ${lifecycle[1]}`}>{lifecycle[0]}</span><span className="text-slate-600">{subscription.endsAt ? `iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}` : ''}{subscription.cancelAtPeriodEnd ? ' · atšaukiama laikotarpio pabaigoje' : ''}</span></p>
+        <p className="mt-1 text-xs text-slate-600">Būsena: {subscription.cancelAtPeriodEnd ? 'Atšaukiama laikotarpio pabaigoje' : subscription.status}{subscription.endsAt ? ` · galioja iki ${new Date(subscription.endsAt).toLocaleDateString('lt-LT')}${subscriptionRemainingTime}` : ''}</p>
         {subscription.status === 'Laukiama sąskaitos' && <p className="mt-1 text-xs font-semibold text-amber-800">Laukia sąskaitos išrašymo</p>}
         {subscription.orderCode && <p className="mt-1 text-xs font-semibold text-slate-700">Užsakymas {subscription.orderCode} · {subscription.paymentStatus}{subscription.isPlanChange && subscription.plan?.startsWith('Individualus planas') ? ' · individualus laikotarpis' : ` · ${subscription.orderMonths} mėn.`}</p>}
       </div>

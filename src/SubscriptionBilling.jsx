@@ -113,7 +113,11 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
           {planOptions.map((plan) => <option key={plan.code} value={plan.code} disabled={plan.employee_limit < employeeCount && plan.code !== subscription.planCode}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.{plan.employee_limit < employeeCount && plan.code !== subscription.planCode ? ' · nepakanka aktyvių darbuotojų limitui' : ''}</option>)}
         </select>
       </label>
-      <p className="text-xs text-slate-500">Pakeitimas įsigalioja iškart; kaina perskaičiuojama už likusį laikotarpį.</p>
+      <p className="text-xs text-slate-500">{selectedPlan && currentPlan && selectedPlan.amount_cents < currentPlan.amount_cents
+        ? 'Sumažinus planą, nepanaudota iš anksto apmokėta vertė paverčiama papildomomis pigesnio plano galiojimo dienomis.'
+        : selectedPlan && currentPlan && selectedPlan.amount_cents > currentPlan.amount_cents
+          ? 'Padidinus planą, jis įsigalioja iškart, o už visą likusį iš anksto apmokėtą laikotarpį išrašoma kainų skirtumo išankstinė sąskaita. Apmokėkite ją per 5 dienas.'
+          : 'Pakeitimas įsigalioja iškart; kainų skirtumo sąskaita neišrašoma.'}</p>
       {selectedPlan?.code !== subscription.planCode && <button type="submit" className={buttonClass} disabled={busy || !selectedPlan || selectedPlan.employee_limit < employeeCount}><CreditCard size={16} />{busy ? 'Keičiama…' : `${selectedPlan && currentPlan && selectedPlan.amount_cents < currentPlan.amount_cents ? 'Sumažinti' : 'Atnaujinti'} planą`}</button>}
     </form>}
     {pendingPlanChange && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Palaukite, kol bus patvirtintas plano pakeitimo sąskaitos apmokėjimas, arba apmokėkite ją per 5 dienas.</p>}

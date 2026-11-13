@@ -2965,7 +2965,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         return {
           root,
           workspaces: workspaces.map((organization) => {
-            const subscriptions = (subscriptionsByOrganization.get(organization.id) ?? []).slice(0, 1);
+            const currentSubscription = selectCurrentSubscription(
+              subscriptionsByOrganization.get(organization.id) ?? [],
+              validityCheckTime,
+            );
+            const subscriptions = currentSubscription ? [currentSubscription] : [];
             return { organization, subscriptions };
           }),
         };
@@ -2973,16 +2977,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const includedOrganizationIds = new Set(groups.flatMap((group) => group.workspaces.map(({ organization }) => organization.id)));
     const orphanSubscriptions = creatorSubscriptions.filter((subscription) => !includedOrganizationIds.has(subscription.orgId));
     if (orphanSubscriptions.length) {
+      const currentSubscription = selectCurrentSubscription(orphanSubscriptions, validityCheckTime);
       groups.push({
         root: null,
         workspaces: [{
           organization: { id: 'unknown-organization', name: 'Nepriskirta įmonė' },
-          subscriptions: orphanSubscriptions.slice(0, 1),
+          subscriptions: currentSubscription ? [currentSubscription] : [],
         }],
       });
     }
     return groups;
-  }, [data.organizations, creatorSubscriptions]);
+  }, [data.organizations, creatorSubscriptions, validityCheckTime]);
   const creatorSubscriptionSummary = useMemo(() => {
     const now = validityCheckTime;
     const summary = { active: 0, expiring: 0, expired: 0, pending: 0, canceled: 0, none: 0 };

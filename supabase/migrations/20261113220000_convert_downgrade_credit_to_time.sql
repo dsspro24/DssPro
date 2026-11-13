@@ -19,9 +19,8 @@ declare
   active_employee_count integer;
   order_months integer;
   issue_time timestamptz := now();
-  period_start timestamptz;
   period_end timestamptz;
-  remaining_ratio numeric := 1;
+  remaining_months numeric := 0;
   net_amount_cents integer;
   vat_amount_cents integer := 0;
   total_amount_cents integer;
@@ -100,7 +99,6 @@ begin
   end if;
 
   order_months := greatest(1, coalesce(current_subscription.order_months, 1));
-  period_start := coalesce(current_subscription.starts_at, current_subscription.ordered_at, issue_time);
   period_end := current_subscription.ends_at;
   initial_order := current_subscription.order_code is not null
     and current_subscription.payment_status = 'pending';
@@ -115,32 +113,53 @@ begin
         cancel_at_period_end = false,
         updated_at = issue_time
     where id = current_subscription.id;
-    period_start := issue_time;
     period_end := issue_time + interval '5 days';
     total_amount_cents := selected_plan.amount_cents * order_months;
   else
-    select max(ends_at) into period_end
-    from public.workspace_subscriptions
-    where organization_id = input_organization_id
-      and status = 'active'
-      and payment_status = 'paid'
-      and ends_at > issue_time;
+    select max(paid_period.ends_at),
+      coalesce(sum(paid_period.remaining_months), 0),
+      round(coalesce(sum(
+        (selected_plan.amount_cents - paid_period.amount_cents) * paid_period.remaining_months
+      ), 0))::integer
+    into period_end, remaining_months, price_delta_cents
+    from (
+      select paid_period.*,
+        case
+          when paid_period.plan_adjustment_data ->> 'type' = 'prepaid_downgrade'
+            or paid_period.preinvoice_data ->> 'planChange' = 'true'
+          then coalesce(
+            nullif(paid_period.plan_adjustment_data ->> 'serviceMonths', '')::numeric,
+            nullif(paid_period.preinvoice_data ->> 'serviceMonths', '')::numeric,
+            extract(epoch from (paid_period.ends_at - paid_period.period_start)) / (30 * 86400.0)
+          ) * paid_period.remaining_period_ratio
+          else greatest(1, coalesce(paid_period.order_months, 1)) * paid_period.remaining_period_ratio
+        end as remaining_months
+      from (
+        select subscription.*,
+          coalesce(subscription.starts_at, subscription.ordered_at, issue_time) as period_start,
+          greatest(0, least(1,
+            extract(epoch from (
+              subscription.ends_at
+              - greatest(coalesce(subscription.starts_at, subscription.ordered_at, issue_time), issue_time)
+            ))
+            / nullif(extract(epoch from (
+              subscription.ends_at - coalesce(subscription.starts_at, subscription.ordered_at, issue_time)
+            )), 0)
+          )) as remaining_period_ratio
+        from public.workspace_subscriptions as subscription
+        where subscription.organization_id = input_organization_id
+          and subscription.status = 'active'
+          and subscription.payment_status = 'paid'
+          and subscription.ends_at > issue_time
+      ) as paid_period
+    ) as paid_period;
     period_end := coalesce(period_end, current_subscription.ends_at);
     if period_end is null or period_end <= issue_time then
       raise exception 'The current subscription period has ended';
     end if;
-    remaining_ratio := greatest(0,
-      extract(epoch from (period_end - issue_time))
-      / nullif(extract(epoch from (period_end - period_start)), 0)
-    );
-    if period_start <= issue_time then
-      remaining_ratio := least(1, remaining_ratio);
+    if remaining_months <= 0 then
+      raise exception 'The current subscription period has no prepaid time remaining';
     end if;
-    price_delta_cents := round(
-      (selected_plan.amount_cents - current_subscription.amount_cents)
-      * order_months * remaining_ratio
-    )::integer;
-
     if price_delta_cents < 0 then
       if billing_settings.vat_registered and not billing_settings.vat_included then
         credit_cents := abs(price_delta_cents)
@@ -203,6 +222,7 @@ begin
           'toPlanName', selected_plan.name,
           'creditCents', prepaid_credit_cents,
           'extensionDays', round(extension_seconds / 86400, 2),
+          'serviceMonths', remaining_months + extension_seconds / (30 * 86400.0),
           'originalEnd', original_period_end,
           'extendedEnd', period_end,
           'remainingCreditCents', remaining_credit_cents,
@@ -260,6 +280,7 @@ begin
       'serviceStart', issue_time,
       'serviceEnd', case when initial_order then issue_time + make_interval(months => order_months) else period_end end,
       'months', order_months,
+      'serviceMonths', case when initial_order then order_months else remaining_months end,
       'planChange', not initial_order,
       'issuer', billing_settings.issuer_details,
       'recipient', jsonb_build_object('name', organization_record.name, 'companyCode', organization_record.company_code),

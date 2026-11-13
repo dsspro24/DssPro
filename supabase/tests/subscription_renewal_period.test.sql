@@ -48,7 +48,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(20);
+select plan(24);
 
 select lives_ok(
   format(
@@ -145,22 +145,72 @@ select is(
       and plan_change.preinvoice_data ->> 'planChange' = 'true'
   ),
   (
-    select round(
-      (selected_plan.amount_cents - current_subscription.amount_cents)::numeric
-      * current_subscription.order_months
-      * greatest(
-        0,
-        extract(epoch from (current_subscription.ends_at - now()))
-          / nullif(extract(epoch from (current_subscription.ends_at - current_subscription.starts_at)), 0)
-      )
-    )::integer
-    from public.workspace_subscriptions as current_subscription
-    join public.subscription_plans as selected_plan on selected_plan.code = 'up_to_50'
-    where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
-      and current_subscription.preinvoice_data ->> 'renewal' = 'true'
-      and current_subscription.payment_status = 'paid'
+    with paid_periods as (
+      select current_subscription.amount_cents,
+        greatest(1, coalesce(current_subscription.order_months, 1))
+          * greatest(0, least(1,
+            extract(epoch from (
+              current_subscription.ends_at
+              - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
+            ))
+            / nullif(extract(epoch from (
+              current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
+            )), 0)
+          )) as remaining_months
+      from public.workspace_subscriptions as current_subscription
+      where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+        and current_subscription.status = 'active'
+        and current_subscription.payment_status = 'paid'
+        and current_subscription.ends_at > now()
+    ),
+    price_delta as (
+      select round(sum((selected_plan.amount_cents - paid_periods.amount_cents) * paid_periods.remaining_months))::integer as amount_cents
+      from paid_periods
+      cross join public.subscription_plans as selected_plan
+      where selected_plan.code = 'up_to_50'
+    )
+    select case
+      when coalesce(billing.vat_registered, false) and coalesce(billing.vat_included, false)
+        then price_delta.amount_cents
+      when coalesce(billing.vat_registered, false)
+        then price_delta.amount_cents
+          + round(price_delta.amount_cents * coalesce(billing.vat_rate, 21) / 100.0)::integer
+      else price_delta.amount_cents
+    end
+    from price_delta
+    left join public.creator_billing_settings as billing on billing.id = true
   ),
-  'upgrade invoice includes the remaining prepaid period before and after the renewal start'
+  'upgrade invoice covers the remaining value of current and renewed paid periods'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'serviceMonths')::numeric
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    select sum(
+      greatest(1, coalesce(current_subscription.order_months, 1))
+      * greatest(0, least(1,
+        extract(epoch from (
+          current_subscription.ends_at
+          - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
+        ))
+        / nullif(extract(epoch from (
+          current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
+        )), 0)
+      ))
+    )
+    from public.workspace_subscriptions as current_subscription
+    where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and current_subscription.status = 'active'
+      and current_subscription.payment_status = 'paid'
+      and current_subscription.ends_at > now()
+  ),
+  'upgrade invoice stores the combined remaining service months'
 );
 
 select is(
@@ -343,6 +393,69 @@ select is(
   ),
   0,
   'converted credit is not left for an unrelated future invoice'
+);
+
+select lives_ok(
+  format(
+    'select public.manager_change_workspace_subscription_plan(%L::uuid, %L)',
+    current_setting('test.subscription_renewal_organization_id'),
+    'up_to_50'
+  ),
+  'manager can upgrade after a downgrade extended the paid period'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'serviceMonths')::numeric
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    select (downgrade.plan_adjustment_data ->> 'serviceMonths')::numeric
+    from public.workspace_subscriptions as downgrade
+    where downgrade.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and downgrade.plan_adjustment_data ->> 'type' = 'prepaid_downgrade'
+  ),
+  'a later upgrade includes the downgraded plan time and its extension'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'totalAmountCents')::integer
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    with downgrade as (
+      select
+        (plan_adjustment_data ->> 'serviceMonths')::numeric as service_months,
+        amount_cents
+      from public.workspace_subscriptions
+      where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+        and plan_adjustment_data ->> 'type' = 'prepaid_downgrade'
+    ),
+    price_delta as (
+      select round((selected_plan.amount_cents - downgrade.amount_cents) * downgrade.service_months)::integer as amount_cents
+      from downgrade
+      cross join public.subscription_plans as selected_plan
+      where selected_plan.code = 'up_to_50'
+    )
+    select case
+      when coalesce(billing.vat_registered, false) and coalesce(billing.vat_included, false)
+        then price_delta.amount_cents
+      when coalesce(billing.vat_registered, false)
+        then price_delta.amount_cents
+          + round(price_delta.amount_cents * coalesce(billing.vat_rate, 21) / 100.0)::integer
+      else price_delta.amount_cents
+    end
+    from price_delta
+    left join public.creator_billing_settings as billing on billing.id = true
+  ),
+  'upgrade invoice correctly prices all remaining and extended downgrade time'
 );
 
 select is(
