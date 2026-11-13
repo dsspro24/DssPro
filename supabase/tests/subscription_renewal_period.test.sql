@@ -11,14 +11,24 @@ values (
   '{"plan_code":"up_to_20"}'::jsonb
 );
 
-insert into auth.users (id, aud, role, email, raw_user_meta_data)
-values (
-  '98000000-0000-4000-8000-000000000004',
-  'authenticated',
-  'authenticated',
-  'dsspro24@gmail.com',
-  '{}'::jsonb
-);
+do $$
+declare
+  creator_id uuid;
+begin
+  select id into creator_id
+  from auth.users
+  where lower(btrim(email)) = 'dsspro24@gmail.com'
+  limit 1;
+
+  if creator_id is null then
+    creator_id := gen_random_uuid();
+    insert into auth.users (id, aud, role, email, raw_user_meta_data)
+    values (creator_id, 'authenticated', 'authenticated', 'dsspro24@gmail.com', '{}'::jsonb);
+  end if;
+
+  perform set_config('test.subscription_renewal_creator_id', creator_id::text, true);
+end;
+$$;
 
 insert into public.profiles (id, full_name, account_type)
 values ('98000000-0000-4000-8000-000000000003', 'Subscription Renewal Manager', 'manager')
@@ -48,7 +58,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(24);
+select plan(27);
 
 select lives_ok(
   format(
@@ -75,8 +85,16 @@ select is(
   'renewal service end adds one month after the remaining five days'
 );
 
-select set_config('request.jwt.claims', '{"sub":"98000000-0000-4000-8000-000000000004"}', true);
-select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000004', true);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object('sub', current_setting('test.subscription_renewal_creator_id'))::text,
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  current_setting('test.subscription_renewal_creator_id'),
+  true
+);
 
 select lives_ok(
   format(
@@ -147,16 +165,25 @@ select is(
   (
     with paid_periods as (
       select current_subscription.amount_cents,
-        greatest(1, coalesce(current_subscription.order_months, 1))
-          * greatest(0, least(1,
-            extract(epoch from (
-              current_subscription.ends_at
-              - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
+        case
+          when current_subscription.ends_at > coalesce(
+            current_subscription.starts_at, current_subscription.ordered_at, now()
+          ) + make_interval(months => greatest(1, coalesce(current_subscription.order_months, 1)))
+          then greatest(0, extract(epoch from (
+            current_subscription.ends_at
+            - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at, now()), now())
+          )) / (30 * 86400.0))
+          else greatest(1, coalesce(current_subscription.order_months, 1))
+            * greatest(0, least(1,
+              extract(epoch from (
+                current_subscription.ends_at
+                - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
+              ))
+              / nullif(extract(epoch from (
+                current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
+              )), 0)
             ))
-            / nullif(extract(epoch from (
-              current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
-            )), 0)
-          )) as remaining_months
+        end as remaining_months
       from public.workspace_subscriptions as current_subscription
       where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
         and current_subscription.status = 'active'
@@ -193,16 +220,25 @@ select is(
   ),
   (
     select sum(
-      greatest(1, coalesce(current_subscription.order_months, 1))
-      * greatest(0, least(1,
-        extract(epoch from (
+      case
+        when current_subscription.ends_at > coalesce(
+          current_subscription.starts_at, current_subscription.ordered_at, now()
+        ) + make_interval(months => greatest(1, coalesce(current_subscription.order_months, 1)))
+        then greatest(0, extract(epoch from (
           current_subscription.ends_at
-          - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
-        ))
-        / nullif(extract(epoch from (
-          current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
-        )), 0)
-      ))
+          - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at, now()), now())
+        )) / (30 * 86400.0))
+        else greatest(1, coalesce(current_subscription.order_months, 1))
+          * greatest(0, least(1,
+            extract(epoch from (
+              current_subscription.ends_at
+              - greatest(coalesce(current_subscription.starts_at, current_subscription.ordered_at), now())
+            ))
+            / nullif(extract(epoch from (
+              current_subscription.ends_at - coalesce(current_subscription.starts_at, current_subscription.ordered_at)
+            )), 0)
+          ))
+      end
     )
     from public.workspace_subscriptions as current_subscription
     where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
@@ -272,8 +308,16 @@ select lives_ok(
   'manager can create a replacement plan change with a prepaid future renewal'
 );
 
-select set_config('request.jwt.claims', '{"sub":"98000000-0000-4000-8000-000000000004"}', true);
-select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000004', true);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object('sub', current_setting('test.subscription_renewal_creator_id'))::text,
+  true
+);
+select set_config(
+  'request.jwt.claim.sub',
+  current_setting('test.subscription_renewal_creator_id'),
+  true
+);
 
 select lives_ok(
   format(
@@ -467,6 +511,75 @@ select is(
   ),
   1,
   'only the downgraded plan remains active'
+);
+
+select set_config(
+  'test.subscription_extended_period_organization_id',
+  public.create_organization_with_billing_details(
+    'Subscription extended period test',
+    null,
+    'Test address',
+    ''
+  )::text,
+  true
+);
+update public.workspace_subscriptions
+set status = 'active',
+    starts_at = now() - interval '30 days',
+    ends_at = now() + interval '100 days',
+    order_months = 1,
+    payment_status = 'paid'
+where organization_id = current_setting('test.subscription_extended_period_organization_id')::uuid;
+
+select lives_ok(
+  format(
+    'select public.manager_change_workspace_subscription_plan(%L::uuid, %L)',
+    current_setting('test.subscription_extended_period_organization_id'),
+    'up_to_75'
+  ),
+  'manager can upgrade a plan with one hundred prepaid days remaining'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'serviceMonths')::numeric
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_extended_period_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  100::numeric / 30,
+  'upgrade invoice accounts for all one hundred remaining prepaid days'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'totalAmountCents')::integer
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_extended_period_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    select case
+      when coalesce(billing.vat_registered, false) and coalesce(billing.vat_included, false)
+        then price_delta.amount_cents
+      when coalesce(billing.vat_registered, false)
+        then price_delta.amount_cents
+          + round(price_delta.amount_cents * coalesce(billing.vat_rate, 21) / 100.0)::integer
+      else price_delta.amount_cents
+    end
+    from (
+      select round((target_plan.amount_cents - current_plan.amount_cents) * 100.0 / 30)::integer
+        as amount_cents
+      from public.subscription_plans as target_plan
+      cross join public.subscription_plans as current_plan
+      where target_plan.code = 'up_to_75'
+        and current_plan.code = 'up_to_20'
+    ) as price_delta
+    left join public.creator_billing_settings as billing on billing.id = true
+  ),
+  'upgrade invoice charges the plan-price difference for the full prepaid period'
 );
 
 select * from finish();
