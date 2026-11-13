@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Pencil } from 'lucide-react';
+import { Eye, FileText, Pencil } from 'lucide-react';
 import dssProLogo from './assets/dss-pro-logo.webp';
 
 const companyCustomPlanOption = '__company_custom_plan__';
@@ -201,7 +201,7 @@ export function CreatorCustomPlanCreator({ organizationId, organizationName, onC
   </form>;
 }
 
-export function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, now, inputClass, buttonClass }) {
+export function CreatorSubscriptionEditor({ subscription, organizationName, plans, onSave, onConfirmPayment, onOpenInvoice, now, inputClass, buttonClass }) {
   const [status, setStatus] = useState(({ 'Laukiama sąskaitos': 'pending', Aktyvi: 'active', Atšaukta: 'canceled', Pasibaigusi: 'expired' })[subscription.status] ?? subscription.status);
   const [planCode, setPlanCode] = useState(subscription.planCode ?? 'up_to_20');
   const [amount, setAmount] = useState(String(subscription.price ?? 0));
@@ -375,6 +375,7 @@ export function CreatorSubscriptionEditor({ subscription, organizationName, plan
             ? <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Po apmokėjimo patvirtinimo prasidės naujas {subscription.orderMonths} mėn. laikotarpis.</>
             : <>Gavę pavedimą pagal kodą <strong>{subscription.orderCode}</strong>, patvirtinkite jį. Galiojimo pabaiga skaičiuojama nuo išankstinės sąskaitos išrašymo datos ({subscription.orderMonths} mėn.).</>}</p>
       {!subscription.isPlanChange && !subscription.isRenewal && <label className="block max-w-xs text-sm font-medium">Arba nurodykite tikslią galiojimo pabaigą<input className={`${inputClass} mt-1`} type="date" min={paymentEndDateMinimum} value={paymentEndDate} onChange={(event) => setPaymentEndDate(event.target.value)} /></label>}
+      {subscription.preinvoiceNumber && onOpenInvoice && <button type="button" className="mr-2 inline-flex items-center gap-1.5 rounded-md border border-amber-800 px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100" onClick={() => onOpenInvoice(subscription.id, 'preinvoice')}><FileText size={15} />Peržiūrėti išankstinę sąskaitą</button>}
       <button type="button" className={buttonClass} disabled={confirmingPayment} onClick={confirmPayment}>{confirmingPayment ? 'Tvirtinama…' : subscription.isPlanChange ? 'Patvirtinti kainų skirtumo apmokėjimą' : `Patvirtinti apmokėjimą · ${subscription.orderMonths} mėn.`}</button>
       {canCancelOrder && <button type="button" className="ml-2 rounded-md border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-900 disabled:opacity-50" disabled={saving || confirmingPayment} onClick={closeCanceledOrder}>{saving ? 'Atšaukiama…' : isIndividualPlanOrder ? 'Atšaukti sąskaitą' : 'Pažymėti atšauktu'}</button>}
     </div>}

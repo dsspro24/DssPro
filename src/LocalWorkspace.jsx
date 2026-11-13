@@ -8353,6 +8353,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             plans={subscriptionPlans}
                             onSave={saveCreatorSubscription}
                             onConfirmPayment={confirmSubscriptionPayment}
+                            onOpenInvoice={openSubscriptionInvoice}
                             now={validityCheckTime}
                             inputClass={inputClass}
                             buttonClass={buttonClass}
