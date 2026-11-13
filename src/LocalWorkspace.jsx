@@ -1719,18 +1719,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         if (!active) return;
         const statusLabels = { pending: 'Laukiama sąskaitos', active: 'Aktyvi', canceled: 'Atšaukta', expired: 'Pasibaigusi' };
         setCreatorSubscriptions((subscriptionsResult.data ?? []).map((subscription) => {
+          const paidRenewal = subscription.preinvoice_renewal === 'true'
+            && subscription.payment_status === 'paid'
+            && subscription.preinvoice_service_end;
+          const effectiveEndsAt = paidRenewal ? subscription.preinvoice_service_end : subscription.ends_at;
+          const paidRenewalActive = paidRenewal
+            && subscription.status === 'active'
+            && new Date(effectiveEndsAt).getTime() > Date.now();
           const expired = subscription.status === 'active'
-            && subscription.ends_at
-            && new Date(subscription.ends_at).getTime() <= Date.now();
+            && effectiveEndsAt
+            && new Date(effectiveEndsAt).getTime() <= Date.now();
           return {
             id: subscription.id,
             orgId: subscription.organization_id,
             plan: subscription.plan_name,
             planCode: subscription.plan_code,
-            status: expired ? 'Pasibaigusi' : statusLabels[subscription.status] ?? subscription.status,
+            status: paidRenewalActive ? 'Aktyvi' : expired ? 'Pasibaigusi' : statusLabels[subscription.status] ?? subscription.status,
             price: subscription.amount_cents / 100,
             startsAt: subscription.starts_at,
-            endsAt: subscription.ends_at,
+            endsAt: effectiveEndsAt,
             createdAt: subscription.created_at,
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
             manualAccessOverride: subscription.manual_access_override === true,

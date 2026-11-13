@@ -42,6 +42,7 @@ export function selectCurrentSubscription(subscriptions, now = Date.now()) {
   const paidRenewal = subscriptions.find((subscription) => (
     subscription.isRenewal === true
     && subscription.paymentStatus === 'Apmokėta'
+    && ['active', 'Aktyvi'].includes(subscription.status)
     && subscription.serviceEnd
     && new Date(subscription.serviceEnd).getTime() > now
   ));

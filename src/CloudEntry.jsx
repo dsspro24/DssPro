@@ -191,7 +191,7 @@ function formatSubscription(subscription) {
     && subscription.preinvoice_service_end;
   const effectiveEndsAt = isPaidRenewal ? subscription.preinvoice_service_end : subscription.ends_at;
   const paidRenewalActive = isPaidRenewal
-    && subscription.status !== 'canceled'
+    && subscription.status === 'active'
     && new Date(effectiveEndsAt).getTime() > Date.now();
   const isExpired = (
     subscription.status === 'active'
