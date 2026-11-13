@@ -32,7 +32,7 @@ select set_config(
   true
 );
 
-select plan(21);
+select plan(28);
 
 select is(
   (select status from public.workspace_subscriptions
@@ -133,6 +133,103 @@ select is(
      and preinvoice_data ->> 'initialTrialAccess' = 'false'),
   'false',
   'subsequent orders are not marked as the one-time trial'
+);
+select throws_ok(
+  format(
+    'select public.request_workspace_subscription(%L::uuid, %L, 1)',
+    current_setting('test.initial_subscription_organization_id'),
+    'up_to_20'
+  ),
+  'P0001',
+  'An unpaid order already exists for this workspace. Cancel it before placing another order.',
+  'a current unpaid order still blocks a duplicate request'
+);
+select set_config(
+  'test.initial_subscription_stale_order_id',
+  (
+    select id::text
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+      and status = 'pending'
+      and order_code is not null
+  ),
+  true
+);
+update public.workspace_subscriptions
+set preinvoice_data = jsonb_set(
+  jsonb_set(preinvoice_data, '{planChange}', 'true'::jsonb, true),
+  '{dueDate}',
+  to_jsonb((now() - interval '1 day')::text),
+  true
+)
+where id = current_setting('test.initial_subscription_stale_order_id')::uuid;
+select is(
+  (public.request_workspace_subscription(
+    current_setting('test.initial_subscription_organization_id')::uuid,
+    'up_to_20',
+    1
+  )).status,
+  'pending',
+  'a new order replaces an expired plan-change order without a pending-index conflict'
+);
+select is(
+  (
+    select status || ':' || payment_status
+    from public.workspace_subscriptions
+    where id = current_setting('test.initial_subscription_stale_order_id')::uuid
+  ),
+  'pending:pending',
+  'the expired order remains unchanged in invoice history'
+);
+select is(
+  (select count(*)::integer from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+     and status = 'pending'
+     and order_code is not null),
+  2,
+  'a new order can coexist with an expired invoice in history'
+);
+select set_config(
+  'test.initial_subscription_canceled_order_id',
+  (
+    select id::text
+    from public.workspace_subscriptions
+    where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+      and status = 'pending'
+      and order_code is not null
+    order by created_at desc
+    limit 1
+  ),
+  true
+);
+update public.workspace_subscriptions
+set payment_status = 'canceled'
+where id = current_setting('test.initial_subscription_canceled_order_id')::uuid;
+select is(
+  (public.request_workspace_subscription(
+    current_setting('test.initial_subscription_organization_id')::uuid,
+    'up_to_20',
+    1
+  )).status,
+  'pending',
+  'a new order replaces a canceled invoice still marked pending'
+);
+select is(
+  (
+    select status || ':' || payment_status
+    from public.workspace_subscriptions
+    where id = current_setting('test.initial_subscription_canceled_order_id')::uuid
+  ),
+  'pending:canceled',
+  'the canceled invoice remains unchanged in history'
+);
+select is(
+  (select count(*)::integer from public.workspace_subscriptions
+   where organization_id = current_setting('test.initial_subscription_organization_id')::uuid
+     and status = 'pending'
+     and order_code is not null),
+  3,
+  'a new order can coexist with a canceled invoice in history'
 );
 select ok(
   public.has_workspace_read_access(current_setting('test.initial_subscription_organization_id')::uuid),
