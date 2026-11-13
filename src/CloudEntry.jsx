@@ -454,6 +454,7 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
     { data: workspace, error: workspaceError },
     { data: organizationDocuments, error: documentsError },
     { data: subscriptionRows, error: subscriptionError },
+    { data: testAttempts, error: testAttemptsError },
   ] = await Promise.all([
     supabase.rpc('get_organization_workspace_metadata', { input_organization_id: organizationId }),
     supabase.from('organization_documents')
@@ -464,10 +465,25 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
       .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
+    (async () => {
+      const attempts = [];
+      for (let start = 0; ; start += 1000) {
+        const { data: page, error } = await supabase.from('employee_test_attempts')
+          .select('attempt_id, employee_id, document_id, score, passed, completed_at, metadata')
+          .eq('organization_id', organizationId)
+          .order('completed_at', { ascending: true })
+          .order('attempt_id', { ascending: true })
+          .range(start, start + 999);
+        if (error) return { data: null, error };
+        attempts.push(...(page ?? []));
+        if ((page ?? []).length < 1000) return { data: attempts, error: null };
+      }
+    })(),
   ]);
   if (workspaceError) throw workspaceError;
   if (documentsError) throw documentsError;
   if (subscriptionError) throw subscriptionError;
+  if (testAttemptsError) throw testAttemptsError;
 
   const mapDocuments = (documents, resourceOrganizationId = '') => documents.map((document) => {
     if (!document.payload || typeof document.payload !== 'object' || Array.isArray(document.payload)) {
@@ -491,9 +507,37 @@ async function loadOrganizationWorkspace(organizationId, sharedResources = []) {
   }
 
   const scopedWorkspace = scopeWorkspaceToOrganization(workspace, organizationId);
-  return scopedWorkspace
+  const testAttemptsByEmployee = new Map();
+  for (const attempt of testAttempts ?? []) {
+    const employeeAttempts = testAttemptsByEmployee.get(attempt.employee_id) ?? [];
+    employeeAttempts.push(attempt);
+    testAttemptsByEmployee.set(attempt.employee_id, employeeAttempts);
+  }
+  const employeesWithTestAttempts = (scopedWorkspace?.employees ?? []).map((employee) => {
+    const testResultsByAttemptId = new Map(
+      (employee.testResults ?? []).map((result) => [
+        `${employee.id}:${result.resourceId}:${result.completedAt}`,
+        result,
+      ]),
+    );
+    for (const attempt of testAttemptsByEmployee.get(employee.id) ?? []) {
+      testResultsByAttemptId.set(attempt.attempt_id, {
+        ...(testResultsByAttemptId.get(attempt.attempt_id) ?? {}),
+        ...attempt.metadata,
+        resourceId: attempt.document_id,
+        score: attempt.score,
+        passed: attempt.passed,
+        completedAt: attempt.completed_at,
+      });
+    }
+    return { ...employee, testResults: [...testResultsByAttemptId.values()] };
+  });
+  const workspaceWithTestAttempts = scopedWorkspace
+    ? { ...scopedWorkspace, employees: employeesWithTestAttempts }
+    : null;
+  return workspaceWithTestAttempts
     ? {
-      ...scopedWorkspace,
+      ...workspaceWithTestAttempts,
       subscriptions: prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription)),
       resources: [
         ...sharedCatalogResources,
