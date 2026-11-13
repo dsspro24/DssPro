@@ -1,19 +1,26 @@
 import { useState } from 'react';
 import { CreditCard, Download, RotateCcw, Trash2 } from 'lucide-react';
 
-export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, adminRestoreRequired = false, busy, cloudMode, managerName = '', now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
+export function SubscriptionCard({ subscription, plans, employeeCount, readOnly, locked, adminRestoreRequired = false, busy, cloudMode, managerName = '', organizationId = '', individualPlanRequested = false, now = 0, onOrder, onCancelOrder, onChangePlan, onAddCompany, onDemoAction, onOpenInvoice, inputClass, buttonClass }) {
   const isPlanSelectable = (plan) => plan.active !== false || plan.code === subscription?.planCode;
   const addonPlans = plans.filter((plan) => plan.code.startsWith('additional_workspace_') && isPlanSelectable(plan));
-  const currentOrganizationPlan = plans.find((plan) => (
-    plan.code === subscription?.planCode
-    && plan.organization_id === subscription?.orgId
-  ));
+  const organizationPlans = plans
+    .filter((plan) => plan.organization_id === organizationId && plan.active !== false)
+    .sort((left, right) => new Date(right.created_at ?? 0).getTime() - new Date(left.created_at ?? 0).getTime());
+  const currentOrganizationPlan = organizationPlans.find((plan) => plan.code === subscription?.planCode)
+    ?? organizationPlans[0];
   const primaryPlans = plans.filter((plan) => (
     !plan.code.startsWith('additional_workspace')
     && (plan.organization_id == null || plan.code === currentOrganizationPlan?.code)
     && isPlanSelectable(plan)
   ));
-  const planOptions = subscription?.isAddon ? addonPlans : primaryPlans;
+  const waitingForRequestedIndividualPlan = individualPlanRequested
+    && (!subscription || (subscription.status === 'Laukiama sąskaitos' && !subscription.orderCode));
+  const planOptions = subscription?.isAddon
+    ? addonPlans
+    : waitingForRequestedIndividualPlan
+      ? currentOrganizationPlan ? [currentOrganizationPlan] : []
+      : primaryPlans;
   const availablePlans = planOptions.filter((plan) => plan.employee_limit >= employeeCount);
   const [selectedPlanCode, setSelectedPlanCode] = useState(
     subscription?.planCode ?? availablePlans[0]?.code ?? 'up_to_20',
@@ -118,7 +125,7 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         {subscription.paymentStatus === 'Apmokėta' && <p className="text-sm text-emerald-800">Mokėjimas užsakymui {subscription.orderCode} patvirtintas.</p>}
         {readOnly && !pendingOrder && !(subscription.isInitialTrialAccess && subscription.status === 'Atšaukta') && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Prenumerata pasibaigė. 2 mėn. peržiūros laikotarpiu galima peržiūrėti duomenis ir atsisiųsti PDF.</p>}
       </>
-      : <p className="text-sm text-slate-600">Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.</p>}
+      : <p className="text-sm text-slate-600">{individualPlanRequested ? 'Individualus planas dar nepriskirtas. Kai administratorius jį paruoš, jis atsiras šiame puslapyje.' : 'Prenumeratos įrašas dar nesukurtas. Pateikite užsakymą.'}</p>}
 
     {canChangePlan && <form onSubmit={(event) => { event.preventDefault(); if (selectedPlan && selectedPlan.code !== subscription.planCode && selectedPlan.employee_limit >= employeeCount) onChangePlan(selectedPlan.code); }} className="space-y-3 rounded-md border border-slate-200 p-3">
       <label className="block text-sm font-medium">Keisti darbuotojų skaičiaus planą
@@ -145,7 +152,9 @@ export function SubscriptionCard({ subscription, plans, employeeCount, readOnly,
         </div>}
         {activeSubscription && canOrder && <p className="text-xs text-slate-600">Išankstinę sąskaitą galite užsisakyti dabar. Apmokėjus mėnesiai bus pridėti prie esamos galiojimo pabaigos.</p>}
       </div>
-      : canOrder ? <form onSubmit={handleOrder} className="space-y-3">
+      : waitingForRequestedIndividualPlan && !availablePlans.length
+        ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Individualus planas dar neparuoštas arba jo darbuotojų limitas per mažas. Parašykite <a className="font-semibold underline" href="mailto:dsspro@inbox.lt">dsspro@inbox.lt</a>. Kai planas bus sukurtas, jis atsiras čia ir galėsite pateikti užsakymą.</p>
+        : canOrder ? <form onSubmit={handleOrder} className="space-y-3">
         {!canChangePlan && <label className="block text-sm font-medium">Darbuotojų skaičiaus planas
           <select className={`${inputClass} mt-1`} value={effectivePlanCode} onChange={(event) => setSelectedPlanCode(event.target.value)} disabled={!availablePlans.length}>
             {availablePlans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name} · {formatPrice(plan.amount_cents / 100)} €/mėn.</option>)}

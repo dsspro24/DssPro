@@ -1291,7 +1291,7 @@ const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmi
 const CreatorCustomPlanCreator = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorCustomPlanCreator })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, individualPlanRequested = false, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const viewerUserId = previewUserId || cloudUserId;
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
@@ -2166,6 +2166,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const organizationSubscriptions = data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id);
   const currentSubscription = selectCurrentSubscription(organizationSubscriptions, validityCheckTime);
+  useEffect(() => {
+    if (!cloudMode || userRole !== 'vadovas' || activeTab !== 'prenumerata' || !onRefreshSubscription || !currentOrg?.id) return undefined;
+    let active = true;
+    onRefreshSubscription(currentOrg.id)
+      .then((subscriptions) => {
+        if (active && subscriptions) setData((current) => ({ ...current, subscriptions }));
+      })
+      .catch((error) => {
+        if (active) setNotice(`Prenumeratos atnaujinti nepavyko: ${error.message}`);
+      });
+    return () => { active = false; };
+  }, [activeTab, cloudMode, currentOrg?.id, onRefreshSubscription, userRole]);
   const currentSubscriptionPlan = subscriptionPlans.find((plan) => plan.code === (
     currentSubscription?.isRenewal && currentSubscription.paymentStatus === 'Laukiama apmokėjimo'
       ? currentSubscription.paidPlanCode
@@ -6320,6 +6332,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         } catch (refreshError) {
           setNotice(`Jau yra neapmokėtas užsakymas, bet jo duomenų atnaujinti nepavyko: ${refreshError.message}`);
         }
+      } else if (error.message?.includes('Selected subscription plan is unavailable')) {
+        try {
+          await refreshCurrentSubscription(currentOrg.id);
+          setNotice('Pasirinktas planas nebeaktyvus. Planų sąrašas atnaujintas; pasirinkite vieną iš rodomų planų.');
+        } catch (refreshError) {
+          setNotice(`Pasirinktas planas nebeaktyvus, o prenumeratos duomenų atnaujinti nepavyko: ${refreshError.message}`);
+        }
       } else {
         setNotice(`Prenumeratos užsakyti nepavyko: ${error.message}`);
       }
@@ -6712,7 +6731,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setData((current) => ({ ...current, subscriptions: refreshedWorkspace.data.subscriptions }));
       setCreatorSubscriptions(refreshedWorkspace.data.subscriptions);
     }
-    setNotice('Individualus planas sukurtas. Nustatykite prenumeratos būseną ir galiojimo datas, kad suteiktumėte prieigą.');
+    setNotice('Individualus planas sukurtas ir įmonei prieinamas prenumeratos skiltyje. Vadovas gali jį pasirinkti ir pateikti užsakymą.');
   };
 
   const deleteCreatorSubscriptionInvoice = async (subscriptionId, invoiceType) => {
@@ -8339,7 +8358,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
             <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
-            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && subscriptionAccess.reason === 'grace-period-ended'} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
+            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && subscriptionAccess.reason === 'grace-period-ended'} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} organizationId={currentOrg?.id ?? ''} individualPlanRequested={individualPlanRequested} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
               <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice inputClass={inputClass} /></Suspense>
@@ -8420,6 +8439,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                     {expanded && <div className="space-y-4 border-t border-slate-200 bg-slate-50/60 p-4">
                       {workspaces.map(({ organization, subscriptions }) => {
                         const isAdditional = Boolean(organization.parentOrganizationId);
+                        const hasActiveIndividualPlan = subscriptionPlans.some((plan) => (
+                          plan.organization_id === organization.id && plan.active !== false
+                        ));
                         const workspaceExpanded = expandedCreatorSubscriptionGroups[`workspace-${organization.id}`] === true;
                         const workspaceContent = <>
                           {subscriptions.length
@@ -8434,7 +8456,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                             inputClass={inputClass}
                             buttonClass={buttonClass}
                           /></Suspense>)
-                            : <div className="space-y-3"><p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">Ši įmonė dar neturi prenumeratos ar užsakymo įrašo.</p><Suspense fallback={<p className="text-sm text-slate-500">Atidaromi individualaus plano nustatymai…</p>}><CreatorCustomPlanCreator organizationId={organization.id} organizationName={organization.name} onCreate={createCreatorCustomPlan} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></div>}
+                            : <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">Ši įmonė dar neturi prenumeratos ar užsakymo įrašo.</p>}
+                          {!isAdditional && !hasActiveIndividualPlan && <Suspense fallback={<p className="text-sm text-slate-500">Atidaromi individualaus plano nustatymai…</p>}><CreatorCustomPlanCreator organizationId={organization.id} organizationName={organization.name} onCreate={createCreatorCustomPlan} inputClass={inputClass} buttonClass={buttonClass} /></Suspense>}
                           <Suspense fallback={<p className="text-sm text-slate-500">Atidaroma sąskaitų istorija…</p>}><LazySubscriptionInvoiceArchive
                             organizationId={organization.id}
                             organizationName={organization.name}

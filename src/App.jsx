@@ -558,6 +558,11 @@ function DemoApp({ cloudMode = false }) {
                   </span>
                 </button>
               ))}
+              <button type="button" aria-pressed={registerRole === 'vadovas' && registerPlan === 'individual_request'} onClick={() => { setRegisterRole('vadovas'); setRegisterPlan('individual_request'); }} className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors sm:px-5 ${registerRole === 'vadovas' && registerPlan === 'individual_request' ? 'border-emerald-700 bg-emerald-50/70 ring-1 ring-emerald-700' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+                <span className="block font-semibold text-slate-900">Reikia individualaus plano?</span>
+                <span className="mt-1 block text-xs text-slate-500">Sukurkite paskyrą ir įmonę, tada atsiųskite įmonės pavadinimą ir darbuotojų skaičių el. paštu <span className="font-semibold text-emerald-800">dsspro@inbox.lt</span>. Paruoštą planą galėsite užsakyti.</span>
+              </button>
+              <p className="px-1 text-xs text-slate-500">Rašyti el. paštu: <a className="font-semibold text-emerald-800 underline" href="mailto:dsspro@inbox.lt?subject=Individualaus%20plano%20u%C5%BEklausa">dsspro@inbox.lt</a></p>
             </div>
           </div>
 
@@ -581,7 +586,9 @@ function DemoApp({ cloudMode = false }) {
             </div>
             {cloudMode && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-950">
               {registerRole === 'vadovas'
-                ? `Pasirinktas ${subscriptionPlans.find((plan) => plan.code === registerPlan)?.name ?? 'planas'}. Sukurkite paskyrą ir patvirtinkite el. paštą; tada galėsite sukurti įmonę ir užsakyti prenumeratą.`
+                ? registerPlan === 'individual_request'
+                  ? 'Individualaus plano užsakymas bus prieinamas, kai DSS Pro administratorius jį paruoš jūsų įmonei.'
+                  : `Pasirinktas ${subscriptionPlans.find((plan) => plan.code === registerPlan)?.name ?? 'planas'}. Sukurkite paskyrą ir patvirtinkite el. paštą; tada galėsite sukurti įmonę ir užsakyti prenumeratą.`
                 : 'Sukurkite atskirą DSS specialisto paskyrą ir patvirtinkite el. paštą. Įmonės duomenų įvesti nereikia; vadovo kvietimą priimsite prisijungę.'}
             </p>}
 
@@ -623,7 +630,7 @@ function DemoApp({ cloudMode = false }) {
               {cloudMode && <label className="flex items-start gap-2 text-xs leading-5 text-slate-600"><input className="mt-1" type="checkbox" name="legalTermsAccepted" required /><span>Sutinku su <a className="font-semibold text-emerald-800 underline" href="/naudojimo-salygos" target="_blank" rel="noreferrer">Naudojimo sąlygomis</a> ir patvirtinu, kad susipažinau su <a className="font-semibold text-emerald-800 underline" href="/privatumo-politika" target="_blank" rel="noreferrer">Privatumo politika</a>. Tai nėra sutikimas analitiniams slapukams.</span></label>}
 
               <button type="submit" className="w-full py-3 bg-[#20e090] hover:bg-[#1bc880] text-[#0c4a3b] font-black rounded-xl mt-2 cursor-pointer transition-all shadow-md">
-                {cloudMode ? registerRole === 'vadovas' ? 'Tęsti su pasirinktu planu' : 'Sukurti nemokamą paskyrą' : 'Sukurti paskyrą'}
+                {cloudMode ? registerRole === 'vadovas' ? registerPlan === 'individual_request' ? 'Tęsti su individualaus plano užklausa' : 'Tęsti su pasirinktu planu' : 'Sukurti nemokamą paskyrą' : 'Sukurti paskyrą'}
               </button>
               {cloudSignupFeedback && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">{cloudSignupFeedback}</p>}
             </form>

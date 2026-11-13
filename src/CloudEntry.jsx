@@ -1059,7 +1059,9 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         throw new Error('Įmonė sukurta, bet jos darbo srities duomenys dar nepasiekiami. Bandykite įkelti iš naujo.');
       }
       setInitialWorkspaceTab('prenumerata');
-      setInitialWorkspaceNotice('Įmonė sukurta. Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.');
+      setInitialWorkspaceNotice(session.user.user_metadata?.plan_code === 'individual_request'
+        ? 'Įmonė sukurta. Parašykite dsspro@inbox.lt ir nurodykite įmonės pavadinimą bei darbuotojų skaičių. Paruoštą individualų planą rasite prenumeratos skiltyje.'
+        : 'Įmonė sukurta. Pasirinkite prenumeratos laikotarpį ir pateikite užsakymą.');
       setWorkspace(loadedWorkspace);
       setWorkspaceStatus('ready');
     } catch (error) {
@@ -1102,15 +1104,23 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
 
   const refreshSignedInSubscription = useCallback(async (organizationId) => {
     if (!organizationId) return [];
-    const { data: subscriptionRows, error } = await supabase.from('workspace_subscriptions')
-      .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
+    const [subscriptionsResult, plansResult] = await Promise.all([
+      supabase.from('workspace_subscriptions')
+        .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, plan_adjustment_data, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at, updated_at')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false }),
+      supabase.from('subscription_plans')
+        .select('code, name, amount_cents, employee_limit, active, organization_id, created_at')
+        .order('employee_limit'),
+    ]);
+    if (subscriptionsResult.error) throw subscriptionsResult.error;
+    if (plansResult.error) throw plansResult.error;
+    const { data: subscriptionRows } = subscriptionsResult;
     const subscriptions = prioritizeEffectiveSubscription((subscriptionRows ?? []).map(formatSubscription));
     setWorkspace((current) => current?.organization?.id === organizationId
       ? {
         ...current,
+        subscriptionPlans: plansResult.data ?? [],
         subscriptionAccess: getSubscriptionAccess(subscriptions[0], subscriptions),
         data: { ...current.data, subscriptions },
       }
@@ -1437,6 +1447,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       availableOrganizations={workspace.availableOrganizations ?? []}
       subscriptionPlans={workspace.subscriptionPlans ?? []}
       subscriptionAccess={workspace.subscriptionAccess ?? { readOnly: false, locked: false }}
+      individualPlanRequested={session.user.user_metadata?.plan_code === 'individual_request'}
       cloudManagerName={workspace.managerName}
       cloudUserCreatedAt={session.user.created_at ?? ''}
       onLoadDssOrganization={workspace.dss ? loadDssOrganization : undefined}
@@ -1463,7 +1474,9 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
         <h1 className="text-xl font-bold">Nustatykite pasirašymo PIN</h1><p className="mt-1 text-sm text-slate-600">PIN bus naudojamas dokumentams pasirašyti. Jis saugomas užšifruotu hash’u ir niekada nerodomas nustatymuose.</p>
         <form onSubmit={finishSigningPinSetup} className="mt-5 space-y-4"><label className="block text-sm font-medium">4 skaitmenų PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.signingPin} onChange={(event) => setForm({ ...form, signingPin: event.target.value })} required /></label><label className="block text-sm font-medium">Pakartokite PIN<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} pattern="[0-9]{4}" value={form.confirmSigningPin} onChange={(event) => setForm({ ...form, confirmSigningPin: event.target.value })} required /></label><button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={submitting}><LogIn size={16} />{submitting ? 'Išsaugoma…' : 'Nustatyti PIN'}</button></form>
       </> : session && workspaceStatus === 'organization-needed' ? <>
-        <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų. Pateikti rekvizitai bus naudojami sąskaitoms, o PVM kodą ir adresą vėliau galėsite keisti įmonės nustatymuose.</p><p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Pasirinktas planas: {({ up_to_20: 'Iki 20 darbuotojų · 29,99 €/mėn.', up_to_50: 'Iki 50 darbuotojų · 49,99 €/mėn.', up_to_75: 'Iki 75 darbuotojų · 59,99 €/mėn.', up_to_200: 'Iki 200 darbuotojų · 129,99 €/mėn.' })[session.user.user_metadata?.plan_code] ?? 'Iki 20 darbuotojų · 29,99 €/mėn.'}. Išankstinę sąskaitą apmokėkite per 5 dienas.</p>
+        <h1 className="text-xl font-bold">Sukurkite įmonę</h1><p className="mt-1 text-sm text-slate-600">Įmonės duomenys bus atskirti nuo kitų paskyrų. Pateikti rekvizitai bus naudojami sąskaitoms, o PVM kodą ir adresą vėliau galėsite keisti įmonės nustatymuose.</p><p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{session.user.user_metadata?.plan_code === 'individual_request'
+          ? <>Jūsų įmonei reikalingas individualus planas. Sukūrę įmonę, parašykite <a className="font-semibold underline" href="mailto:dsspro@inbox.lt">dsspro@inbox.lt</a> ir nurodykite įmonės pavadinimą bei darbuotojų skaičių. Paruoštą planą rasite prenumeratos skiltyje.</>
+          : `Pasirinktas planas: ${({ up_to_20: 'Iki 20 darbuotojų · 29,99 €/mėn.', up_to_50: 'Iki 50 darbuotojų · 49,99 €/mėn.', up_to_75: 'Iki 75 darbuotojų · 59,99 €/mėn.', up_to_200: 'Iki 200 darbuotojų · 129,99 €/mėn.' })[session.user.user_metadata?.plan_code] ?? 'Iki 20 darbuotojų · 29,99 €/mėn.'}. Išankstinę sąskaitą apmokėkite per 5 dienas.`}</p>
         <form onSubmit={createOrganization} className="mt-5 space-y-4">
           <label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="organization" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label>
           <label className="block text-sm font-medium">Įmonės kodas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label>

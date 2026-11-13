@@ -195,7 +195,7 @@ export function CreatorCustomPlanCreator({ organizationId, organizationName, onC
       <label className="text-sm font-medium">Darbuotojų limitas<input className={`${inputClass} mt-1`} type="number" min="1" step="1" required value={employeeLimit} onChange={(event) => setEmployeeLimit(event.target.value)} /></label>
       <label className="text-sm font-medium">Kaina €/mėn.<input className={`${inputClass} mt-1`} type="number" min="0" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
     </div>
-    <p className="text-xs text-slate-600">Bus sukurtas tik šiai įmonei matomas planas ir laukianti prenumerata. Norėdami suteikti prieigą, išsaugokite ją kaip aktyvią ir nurodykite galiojimo datas.</p>
+    <p className="text-xs text-slate-600">Bus sukurtas tik šiai įmonei matomas individualus planas. Vadovas galės jį pasirinkti prenumeratos skiltyje ir pateikti užsakymą.</p>
     <button type="submit" className={buttonClass} disabled={saving}>{saving ? 'Kuriama…' : 'Sukurti individualų planą'}</button>
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </form>;
