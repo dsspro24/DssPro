@@ -48,7 +48,7 @@ set status = 'active',
     payment_status = 'paid'
 where organization_id = current_setting('test.subscription_renewal_organization_id')::uuid;
 
-select plan(4);
+select plan(8);
 
 select lives_ok(
   format(
@@ -105,6 +105,80 @@ select is(
       and renewal.preinvoice_data ->> 'renewal' = 'true'
   ),
   'confirmed renewal keeps the exact preliminary invoice end even when an override date is passed'
+);
+
+select is(
+  (
+    select current_subscription.status
+    from public.workspace_subscriptions as current_subscription
+    where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and current_subscription.payment_status = 'paid'
+      and current_subscription.preinvoice_data ->> 'renewal' is distinct from 'true'
+      and current_subscription.ends_at > now()
+  ),
+  'active',
+  'confirming an early renewal keeps the current paid period active until its original end'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"98000000-0000-4000-8000-000000000003","user_metadata":{"plan_code":"up_to_20"}}',
+  true
+);
+select set_config('request.jwt.claim.sub', '98000000-0000-4000-8000-000000000003', true);
+
+select lives_ok(
+  format(
+    'select public.manager_change_workspace_subscription_plan(%L::uuid, %L)',
+    current_setting('test.subscription_renewal_organization_id'),
+    'up_to_50'
+  ),
+  'manager can upgrade a plan with prepaid renewal time remaining'
+);
+
+select is(
+  (
+    select (plan_change.preinvoice_data ->> 'totalAmountCents')::integer
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    select round(
+      (selected_plan.amount_cents - current_subscription.amount_cents)::numeric
+      * current_subscription.order_months
+      * greatest(
+        0,
+        extract(epoch from (current_subscription.ends_at - now()))
+          / nullif(extract(epoch from (current_subscription.ends_at - current_subscription.starts_at)), 0)
+      )
+    )::integer
+    from public.workspace_subscriptions as current_subscription
+    join public.subscription_plans as selected_plan on selected_plan.code = 'up_to_50'
+    where current_subscription.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and current_subscription.preinvoice_data ->> 'renewal' = 'true'
+      and current_subscription.payment_status = 'paid'
+  ),
+  'upgrade invoice includes the remaining prepaid period before and after the renewal start'
+);
+
+select is(
+  (
+    select plan_change.starts_at
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  (
+    select (plan_change.preinvoice_data ->> 'serviceStart')::timestamptz
+    from public.workspace_subscriptions as plan_change
+    where plan_change.organization_id = current_setting('test.subscription_renewal_organization_id')::uuid
+      and plan_change.payment_status = 'pending'
+      and plan_change.preinvoice_data ->> 'planChange' = 'true'
+  ),
+  'upgraded plan starts immediately while preserving the original paid-through end date'
 );
 
 select * from finish();

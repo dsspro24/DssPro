@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from './lib/supabase.js';
-import { isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
+import { isSubscriptionActiveForEmployeeAccess, selectCurrentSubscription } from './lib/subscriptionAccess.js';
 import { buildDssOrganization } from './lib/dssOrganization.js';
 import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
 
@@ -248,6 +248,14 @@ function prioritizeEffectiveSubscription(subscriptions) {
     return [subscriptions[manualAccessIndex], ...subscriptions.slice(0, manualAccessIndex), ...subscriptions.slice(manualAccessIndex + 1)];
   }
   if (manualAccessIndex === 0) return subscriptions;
+
+  const currentSubscription = selectCurrentSubscription(subscriptions);
+  if (currentSubscription?.isRenewal && currentSubscription.paymentStatus === 'Apmokėta') {
+    return [
+      currentSubscription,
+      ...subscriptions.filter((subscription) => subscription.id !== currentSubscription.id),
+    ];
+  }
 
   const pendingRenewalIndex = subscriptions.findIndex((subscription) => (
     subscription.isRenewal

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   getSubscriptionStatusAfterManualExtension,
   isSubscriptionActiveForEmployeeAccess,
+  selectCurrentSubscription,
 } from './subscriptionAccess.js';
 
 const now = Date.parse('2026-11-12T10:00:00.000Z');
@@ -40,6 +41,32 @@ test('subscription is inactive outside its start and end dates', () => {
 
 test('subscription with no date bounds remains active, matching the invite function', () => {
   assert.equal(isSubscriptionActiveForEmployeeAccess({ status: 'active' }, now), true);
+});
+
+test('paid renewal takes precedence and displays its prepaid end date before its start date', () => {
+  const paidRenewal = {
+    id: 'renewal',
+    isRenewal: true,
+    paymentStatus: 'Apmokėta',
+    status: 'Pasibaigusi',
+    startsAt: '2026-12-01T00:00:00.000Z',
+    endsAt: '2026-12-01T00:00:00.000Z',
+    serviceEnd: '2027-01-01T00:00:00.000Z',
+  };
+  const oldSubscription = {
+    id: 'old',
+    status: 'Pasibaigusi',
+    paymentStatus: 'Apmokėta',
+    endsAt: '2026-12-01T00:00:00.000Z',
+  };
+
+  const currentSubscription = selectCurrentSubscription([oldSubscription, paidRenewal], now);
+  assert.deepEqual(currentSubscription, {
+    ...paidRenewal,
+    status: 'Aktyvi',
+    endsAt: paidRenewal.serviceEnd,
+  });
+  assert.equal(isSubscriptionActiveForEmployeeAccess(currentSubscription, now), true);
 });
 
 test('frontend subscription labels use the same period check', () => {

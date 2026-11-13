@@ -1,7 +1,11 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SignaturePad from './SignaturePad.jsx';
 import { hydrateSignatureImages, removeSignatureAsset, uploadCreatorAsset, uploadSignatureSvg } from './lib/storageAssets.js';
-import { getSubscriptionStatusAfterManualExtension, isSubscriptionActiveForEmployeeAccess } from './lib/subscriptionAccess.js';
+import {
+  getSubscriptionStatusAfterManualExtension,
+  isSubscriptionActiveForEmployeeAccess,
+  selectCurrentSubscription,
+} from './lib/subscriptionAccess.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
 const defaultFamiliarizationTopics = [
@@ -2142,9 +2146,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
   const organizationSubscriptions = data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id);
-  const currentSubscription = organizationSubscriptions.find((subscription) =>
-    isSubscriptionActiveForEmployeeAccess(subscription, validityCheckTime))
-    ?? organizationSubscriptions[0];
+  const currentSubscription = selectCurrentSubscription(organizationSubscriptions, validityCheckTime);
   const currentSubscriptionPlan = subscriptionPlans.find((plan) => plan.code === (
     currentSubscription?.isRenewal && currentSubscription.paymentStatus === 'Laukiama apmokėjimo'
       ? currentSubscription.paidPlanCode
