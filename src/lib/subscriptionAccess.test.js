@@ -138,6 +138,27 @@ test('unpaid orders remain visible until canceled, even after the invoice deadli
   ], now).id, 'pending-plan-change');
 });
 
+test('unpaid orders take precedence over manual access until paid or canceled', () => {
+  const manualAccessSubscription = {
+    id: 'manual-access',
+    manualAccessOverride: true,
+    paymentStatus: 'Apmokėta',
+    status: 'Aktyvi',
+  };
+  const pendingOrder = {
+    id: 'pending-order',
+    paymentStatus: 'Laukiama apmokėjimo',
+    status: 'Aktyvi',
+    orderCode: 'DSS26111317',
+  };
+
+  assert.equal(selectCurrentSubscription([manualAccessSubscription, pendingOrder], now), pendingOrder);
+  assert.equal(selectCurrentSubscription([
+    manualAccessSubscription,
+    { ...pendingOrder, status: 'Atšaukta' },
+  ], now), manualAccessSubscription);
+});
+
 test('frontend subscription labels use the same period check', () => {
   assert.equal(isSubscriptionActiveForEmployeeAccess({
     status: 'Aktyvi',

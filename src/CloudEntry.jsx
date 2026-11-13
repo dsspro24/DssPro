@@ -242,7 +242,12 @@ function formatSubscription(subscription) {
 }
 
 function prioritizeEffectiveSubscription(subscriptions) {
-  const manualAccessIndex = subscriptions.findIndex((subscription) => (
+  const hasPendingOrder = subscriptions.some((subscription) => (
+    subscription.paymentStatus === 'Laukiama apmokėjimo'
+    && subscription.status !== 'Atšaukta'
+    && subscription.orderCode
+  ));
+  const manualAccessIndex = hasPendingOrder ? -1 : subscriptions.findIndex((subscription) => (
     subscription.manualAccessOverride && subscription.status === 'Aktyvi'
   ));
   if (manualAccessIndex > 0) {

@@ -18,17 +18,17 @@ export function isSubscriptionActiveForEmployeeAccess(subscription, now = Date.n
 }
 
 export function selectCurrentSubscription(subscriptions, now = Date.now()) {
-  const manualAccessSubscription = subscriptions.find((subscription) => (
-    subscription.manualAccessOverride && subscription.status === 'Aktyvi'
-  ));
-  if (manualAccessSubscription) return manualAccessSubscription;
-
   const pendingOrder = subscriptions.find((subscription) => (
     subscription.paymentStatus === 'Laukiama apmokėjimo'
     && subscription.status !== 'Atšaukta'
     && subscription.orderCode
   ));
   if (pendingOrder) return pendingOrder;
+
+  const manualAccessSubscription = subscriptions.find((subscription) => (
+    subscription.manualAccessOverride && subscription.status === 'Aktyvi'
+  ));
+  if (manualAccessSubscription) return manualAccessSubscription;
 
   const paidPlanChange = subscriptions.find((subscription) => (
     subscription.isPlanChange === true
