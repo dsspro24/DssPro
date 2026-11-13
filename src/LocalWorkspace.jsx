@@ -1706,7 +1706,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       try {
         const [subscriptionsResult, organizationsResult] = await Promise.all([
           supabase.from('workspace_subscriptions')
-            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
+            .select('id, organization_id, plan_code, plan_name, status, amount_cents, is_addon, starts_at, ends_at, cancel_at_period_end, manual_access_override, order_code, ordered_at, order_months, payment_status, preinvoice_number:preinvoice_data->>invoiceNumber, preinvoice_issue_date:preinvoice_data->>issueDate, preinvoice_due_date:preinvoice_data->>dueDate, preinvoice_plan_change:preinvoice_data->>planChange, preinvoice_renewal:preinvoice_data->>renewal, preinvoice_reactivation:preinvoice_data->>reactivation, preinvoice_initial_trial_access:preinvoice_data->>initialTrialAccess, preinvoice_service_start:preinvoice_data->>serviceStart, preinvoice_service_end:preinvoice_data->>serviceEnd, preinvoice_total_amount_cents:preinvoice_data->>totalAmountCents, final_invoice_number, final_invoice_issue_date:final_invoice_data->>issueDate, paid_at, created_at')
             .order('created_at', { ascending: false }),
           loadCreatorOrganizations(),
         ]);
@@ -1744,6 +1744,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             isReactivation: subscription.preinvoice_reactivation === 'true',
             isInitialTrialAccess: subscription.preinvoice_initial_trial_access === 'true',
             serviceStart: subscription.preinvoice_service_start ?? null,
+            serviceEnd: subscription.preinvoice_service_end ?? null,
             dueDate: subscription.preinvoice_due_date ?? null,
             preinvoiceNumber: subscription.preinvoice_number ?? '',
             preinvoiceDate: subscription.preinvoice_issue_date ?? subscription.ordered_at ?? null,
@@ -6255,6 +6256,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           isRenewal: preinvoice.renewal === true || preinvoice.renewal === 'true',
           isReactivation: preinvoice.reactivation === true || preinvoice.reactivation === 'true',
           serviceStart: preinvoice.serviceStart ?? null,
+          serviceEnd: preinvoice.serviceEnd ?? null,
           finalInvoiceNumber: orderedSubscription.final_invoice_number ?? '',
           finalInvoiceDate: orderedSubscription.final_invoice_data?.issueDate ?? orderedSubscription.paid_at ?? null,
           paidAt: orderedSubscription.paid_at ?? null,
@@ -6617,6 +6619,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       isInitialTrialAccess: updatedSubscription.preinvoice_data?.initialTrialAccess === true
         || updatedSubscription.preinvoice_data?.initialTrialAccess === 'true',
       serviceStart: updatedSubscription.preinvoice_data?.serviceStart ?? null,
+      serviceEnd: updatedSubscription.preinvoice_data?.serviceEnd ?? null,
       finalInvoiceNumber: updatedSubscription.final_invoice_number ?? '',
       finalInvoiceDate: updatedSubscription.final_invoice_data?.issueDate ?? updatedSubscription.paid_at ?? null,
       paidAt: updatedSubscription.paid_at ?? null,
