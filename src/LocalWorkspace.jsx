@@ -2313,10 +2313,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace]);
 
   const currentOrg = data.organizations.find((org) => org.id === selectedOrgId) ?? data.organizations[0];
-  const accidentIncidentJournalResource = data.resources.find((resource) => resource.id === accidentIncidentJournalResourceId);
-  const accidentIncidentJournalEntries = normalizeIncidentJournalEntries(
-    currentOrg?.resourceSettings?.[accidentIncidentJournalResourceId]?.incidentEntries,
-  );
   const organizationSubscriptions = data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id);
   const currentSubscription = selectCurrentSubscription(organizationSubscriptions, validityCheckTime);
   useEffect(() => {
@@ -8733,27 +8729,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'ataskaitos' && canManageSelectedWorkspace && <section className="space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3"><PageTitle title="Ataskaitos" subtitle="Dokumentų eiga, darbuotojų testų rezultatai ir užfiksuoti parašai." /></div>
             <ReportCategoryFilters resources={selectedOrgResources} selectedType={reportTypeFilter} onTypeChange={(type) => { setReportTypeFilter(type); setReportTestTargetId(null); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }} />
-            {currentOrg?.resources?.includes(accidentIncidentJournalResourceId) && accidentIncidentJournalResource && <Panel title="Nelaimingų atsitikimų ir incidentų žurnalas">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-slate-600">Žurnalo įrašų ir parašų būsenos. Pasirašius įrašą, paskirtas darbuotojas gauna pranešimą ir pasirašo savo paskyroje.</p>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className={buttonClass} onClick={() => openResourcePreview(accidentIncidentJournalResource)}><Download size={15} />Peržiūrėti / atsisiųsti</button>
-                </div>
-              </div>
-              {accidentIncidentJournalEntries.length ? <div className="mt-4 space-y-2">{accidentIncidentJournalEntries.map((entry, index) => {
-                const employee = data.employees.find((person) => person.id === entry.assignedEmployeeId);
-                const status = entry.employeeSignature ? 'Užbaigta · darbuotojas pasirašė'
-                  : entry.managerSignature ? 'Laukiama darbuotojo parašo'
-                    : 'Laukiama vadovo / DSS parašo';
-                return <div key={entry.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-slate-200 p-3">
-                  <div className="min-w-0 text-sm"><p className="font-semibold">{index + 1}. {entry.injuredName} · {entry.eventType}</p><p className="mt-1 text-xs text-slate-500">{employee?.name ?? 'Darbuotojas nepasirinktas'} · {entry.eventDateTime ? new Date(entry.eventDateTime).toLocaleString('lt-LT') : 'Data nenurodyta'} · {status}</p>
-                    {entry.managerSignature && <p className="mt-1 text-xs text-slate-600">Patvirtino {entry.managerSignature.signer} · {entry.managerSignature.signedAt ? new Date(entry.managerSignature.signedAt).toLocaleString('lt-LT') : ''} · IP {entry.managerSignature.ip}</p>}
-                    {entry.employeeSignature && <p className="mt-1 text-xs text-slate-600">Darbuotojas {entry.employeeSignature.signer} · {entry.employeeSignature.signedAt ? new Date(entry.employeeSignature.signedAt).toLocaleString('lt-LT') : ''} · IP {entry.employeeSignature.ip}</p>}
-                  </div>
-                  {!entry.managerSignature && !isWorkspaceReadOnly && !canBrowseReportsReadOnly && <button type="button" className="rounded-md border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => openIncidentJournalSignDialog('manager', entry)}><FileSignature size={14} />Pasirašyti ir pranešti</button>}
-                </div>;
-              })}</div> : <p className="mt-4 rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">Žurnale dar nėra įrašų.</p>}
-            </Panel>}
             {cloudMode && reportArchiveData.organizationId !== currentOrg?.id && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Įkeliami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.loading && <p role="status" className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">Atnaujinami archyvuotų darbuotojų ataskaitų duomenys…</p>}
             {cloudMode && reportArchiveData.organizationId === currentOrg?.id && reportArchiveData.error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Archyvuotų darbuotojų ataskaitų duomenų įkelti nepavyko: {reportArchiveData.error}</p>}
