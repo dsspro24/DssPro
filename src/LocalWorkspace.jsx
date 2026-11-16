@@ -1859,7 +1859,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [employeeAssignmentSaving, setEmployeeAssignmentSaving] = useState(false);
   const [employeeResourceDraft, setEmployeeResourceDraft] = useState([]);
   const [employeeSignerDraft, setEmployeeSignerDraft] = useState({});
-  const [taskFilter, setTaskFilter] = useState('atliktinos');
+  const [taskFilter, setTaskFilter] = useState('visos');
   const [taskSearch, setTaskSearch] = useState('');
   const [specialistQuery, setSpecialistQuery] = useState('');
   const [inviteDssCanManageWorkspace, setInviteDssCanManageWorkspace] = useState(true);
@@ -3998,14 +3998,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   });
   const paginatedOrgEmployees = sortedOrgEmployees.slice((currentEmployeePage - 1) * employeePageSize, currentEmployeePage * employeePageSize);
   const employeeSignatures = data.signatures.filter((signature) => signature.employeeId === currentEmployee?.id && signature.role === 'Darbuotojas');
-  const pendingResourceIds = (currentEmployee?.resourceIds ?? []).filter((resourceId) => {
-    const resource = data.resources.find((item) => item.id === resourceId);
-    return resource && ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(currentEmployee, resource).key);
-  });
-  const startedCount = (currentEmployee?.resourceIds ?? []).filter((resourceId) => getTaskStatus(currentEmployee, data.resources.find((item) => item.id === resourceId)).key === 'started').length;
-  const unsignedCount = (currentEmployee?.resourceIds ?? []).filter((resourceId) => getTaskStatus(currentEmployee, data.resources.find((item) => item.id === resourceId)).key === 'unsigned').length;
-  const workerSignedCount = (currentEmployee?.resourceIds ?? []).filter((resourceId) => ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(currentEmployee, data.resources.find((item) => item.id === resourceId)).key)).length;
   const employeeResources = (currentEmployee?.resourceIds ?? []).map((id) => data.resources.find((resource) => resource.id === id)).filter(isEmployeeAssignableResource);
+  const pendingResourceIds = employeeResources
+    .filter((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(currentEmployee, resource).key))
+    .map((resource) => resource.id);
+  const startedCount = employeeResources.filter((resource) => getTaskStatus(currentEmployee, resource).key === 'started').length;
+  const unsignedCount = employeeResources.filter((resource) => getTaskStatus(currentEmployee, resource).key === 'unsigned').length;
+  const workerSignedCount = employeeResources.filter((resource) => ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(currentEmployee, resource).key)).length;
   const visibleEmployeeResources = employeeResources.filter((resource) => {
     const status = getTaskStatus(currentEmployee, resource).key;
     const matchesFilter = taskFilter === 'visos' || (taskFilter === 'atliktinos' && !['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status)) || (taskFilter === 'baigtos' && ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status));
@@ -8489,7 +8488,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setActiveTab(defaultWorkspaceTabForRole(role));
     setOpenedDssOrganizationId('');
     setMobileMenuOpen(false);
-    if (role === 'darbuotojas') setTaskFilter('atliktinos');
+    if (role === 'darbuotojas') setTaskFilter('visos');
     setNotificationsOpen(false);
     const organizations = role === 'dss' ? data.organizations.filter((org) => org.dss.includes(selectedSpecialistId) || org.dssInvitations?.some((invite) => invite.specialistId === selectedSpecialistId)) : data.organizations;
     if (organizations[0]) {
@@ -9288,7 +9287,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'skydelis' && (
             <section className="mx-auto w-full max-w-[1400px] space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? dssOrganizationIsOpen ? currentOrg?.name ?? 'Įmonės darbo vieta' : 'Pasirinkite įmonę' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : userRole === 'dss' && !dssOrganizationIsOpen ? 'Pasirinkite įmonę, kurią norite peržiūrėti ir tvarkyti.' : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : sandboxMode ? 'izoliuotas demo, pakeitimai tik šiame skirtuke' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div>{userRole === 'dss' && dssOrganizationIsOpen && <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={returnToDssOrganizations}><ChevronLeft size={16} />Grįžti į įmonių sąrašą</button><button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssOrganizationLeaveSubmitting} onClick={leaveDssOrganization}>{dssOrganizationLeaveSubmitting ? 'Vykdoma…' : 'Nebesu šios įmonės DSS specialistas'}</button></div>}</div>
-              {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
+              {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeResources.length} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? dssOrganizationIsOpen ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Įmonės darbuotojai" value={orgEmployees.length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div> : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /></div>
                   : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={currentActiveEmployeeCount} hint={currentSubscriptionPlan ? `Plano limitas: ${currentSubscriptionPlan.employee_limit} aktyvių darbuotojų` : 'Plano darbuotojų limitas nenustatytas'} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
@@ -9716,7 +9715,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <PageTitle title="Mano užduotys" subtitle="Priskirti testai, žurnalai, kortelės ir protokolai." />
               <label className="relative block w-full lg:max-w-xs"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Ieškoti užduočių..." /></label>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={currentEmployee?.resourceIds.length ?? 0} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeResources.length} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
             {currentEmployee?.status !== 'Aktyvus' && !hasSavedAapSizes(currentEmployee) && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">Užpildykite ir išsaugokite AAP dydžius, kad galėtumėte atidaryti AAP kortelę.</div>}
             <div className="flex gap-6 overflow-x-auto border-b border-slate-200 text-sm font-semibold" role="tablist" aria-label="Užduočių filtras">
               {[
