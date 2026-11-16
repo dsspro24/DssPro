@@ -45,6 +45,8 @@ $$;
 
 revoke all on function public.enforce_protocol_commission_signing_from_next_day() from public, anon, authenticated;
 
+drop trigger if exists protocol_commission_signing_from_next_day on public.protocol_commission_signatures;
+
 create trigger protocol_commission_signing_from_next_day
   before insert on public.protocol_commission_signatures
   for each row

@@ -1401,6 +1401,28 @@
         "Vadovas"
       ],
       "defaultSettings": {}
+    },
+    {
+      "id": "res-evacuation-plan-familiarization-journal",
+      "title": "Darbuotojų, supažindintų su evakavimo planais, registravimo žurnalas",
+      "type": "Žurnalas",
+      "category": "Priešgaisrinė sauga",
+      "duration": "15 įrašų",
+      "templateKind": "evacuation-plan-journal",
+      "signatures": true,
+      "requiredSigners": [
+        "Darbuotojas",
+        "DSS specialistas"
+      ],
+      "defaultSettings": {
+        "rowCount": 15,
+        "populateEmployees": true,
+        "documentNumber": "",
+        "signatureFieldRoles": {
+          "instructor": "DSS specialistas",
+          "employee": "Darbuotojas"
+        }
+      }
     }
   ]
 }

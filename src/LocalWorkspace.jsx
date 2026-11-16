@@ -48,6 +48,7 @@ const defaultDocumentTemplateLoaders = new Map([
   ['res-intro-dss-journal', () => import('./assets/intro-dss-instructions-journal.html?raw').then(({ default: html }) => html)],
   ['res-work-rules-journal', () => import('./assets/work-rules-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['res-fire-safety-journal', () => import('./assets/fire-safety-instructions-journal.html?raw').then(({ default: html }) => html)],
+  ['res-evacuation-plan-familiarization-journal', () => import('./assets/evacuation-plan-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['res-knowledge-assessment-protocol', () => import('./assets/knowledge-assessment-protocol.html?raw').then(({ default: html }) => html)],
   ['knowledge-assessment-protocol', () => import('./assets/knowledge-assessment-protocol.html?raw').then(({ default: html }) => html)],
   ['res-job-description-journal', () => import('./assets/job-description-familiarization-journal.html?raw').then(({ default: html }) => html)],
@@ -62,6 +63,7 @@ const defaultDocumentTemplateLoaders = new Map([
   ['intro-dss-journal', () => import('./assets/intro-dss-instructions-journal.html?raw').then(({ default: html }) => html)],
   ['work-rules-journal', () => import('./assets/work-rules-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['fire-safety-journal', () => import('./assets/fire-safety-instructions-journal.html?raw').then(({ default: html }) => html)],
+  ['evacuation-plan-journal', () => import('./assets/evacuation-plan-familiarization-journal.html?raw').then(({ default: html }) => html)],
 ]);
 import {
   Archive,
@@ -741,6 +743,15 @@ const getFireSafetySignatureFieldRoles = (resource, settings = {}) => {
     ...(settings.signatureFieldRoles ?? {}),
   };
 };
+const evacuationPlanSignatureFieldDefaults = {
+  instructor: 'DSS specialistas',
+  employee: 'Darbuotojas',
+};
+const getEvacuationPlanSignatureFieldRoles = (resource, settings = {}) => ({
+  ...evacuationPlanSignatureFieldDefaults,
+  ...(resource?.defaultSettings?.signatureFieldRoles ?? {}),
+  ...(settings.signatureFieldRoles ?? {}),
+});
 const fireSafetyInstructionDefaults = {
   instructionNumber: '',
   instructionTitle: '',
@@ -765,6 +776,7 @@ function getFireSafetyInstructionRows(settings = {}) {
 }
 const chemicalSafetyInstructionCardId = 'res-chemical-safety-instruction-card';
 const dateEnteredPerRecordTemplateKinds = new Set([
+  'evacuation-plan-journal',
   'fire-safety-journal',
   'work-rules-journal',
   'workplace-dss-journal',
@@ -923,7 +935,7 @@ const initialData = {
       dssInvitations: [],
       commission: ['Tomas Vaitkus', 'Rasa Kazlauskienė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-height', 'res-aap'],
+      resources: ['res-fire', 'res-height', 'res-aap', 'res-evacuation-plan-familiarization-journal'],
     },
     {
       id: 'org-logistika',
@@ -936,7 +948,7 @@ const initialData = {
       dssInvitations: [],
       commission: ['Aistė Rimkutė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-chemical'],
+      resources: ['res-fire', 'res-chemical', 'res-evacuation-plan-familiarization-journal'],
     },
   ],
   employees: [
@@ -977,6 +989,7 @@ const initialData = {
     { id: 'res-work-rules-journal', title: 'Darbo tvarkos taisyklių supažindinimo žurnalas', type: 'Žurnalas', category: 'Darbo tvarkos taisyklės', image: '/courses/safety-standdown.jpg', duration: '15 darbuotojų', templateKind: 'work-rules-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true } },
     { id: internalDocumentsRegisterId, title: 'Darbuotojų supažindinimo su įmonės vidaus norminiais dokumentais registracijos žurnalas', type: 'Žurnalas', category: 'Įmonės vidaus dokumentai', duration: '12 darbuotojų', templateKind: 'internal-documents-register', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, introInstructionLabel: 'Darbuotojų saugos ir sveikatos įvadinis instruktavimas', fireInstructionLabel: 'Gaisrinės saugos įvadinis instruktavimas', workRulesLabel: 'Supažindinimas su Darbo tvarkos taisyklėmis', jobDescriptionLabel: 'Supažindinimas su Pareiginiais nuostatais', riskAssessmentLabel: 'Supažindinimas su Profesinės rizikos vertinimo dokumentais', safetyDataSheetsLabel: 'Supažindinimas su saugos duomenų lapais', registerConfirmationLabel: 'Patvirtinimas apie įrašą šiame žurnale', signatureFieldRoles: { dssInstructor: 'instruktavęs', dssEmployee: 'Darbuotojas', fireInstructor: 'instruktavęs', fireEmployee: 'Darbuotojas', workRules: 'Darbuotojas', jobDescription: 'Darbuotojas', riskAssessment: 'Darbuotojas', safetyDataSheet: 'Darbuotojas', registerConfirmation: 'Darbuotojas' }, jobDescriptionNumber: '', riskAssessmentNumber: '', safetyDataSheetNumber: '' } },
     { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instruktavimų darbo vietoje registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', templateKind: 'fire-safety-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', approvalDate: '', instructorName: '', instructorPosition: '', changedInstruction: '', signatureFieldRoles: fireSafetySignatureFieldDefaults } },
+    { id: 'res-evacuation-plan-familiarization-journal', title: 'Darbuotojų, supažindintų su evakavimo planais, registravimo žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', duration: '15 įrašų', templateKind: 'evacuation-plan-journal', signatures: true, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultForOrganizations: true, defaultSettings: { rowCount: 15, populateEmployees: true, documentNumber: '', signatureFieldRoles: evacuationPlanSignatureFieldDefaults } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
@@ -1883,6 +1896,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [workerSigningTarget, setWorkerSigningTarget] = useState(null);
   const [workerAapBothPagesConfirmed, setWorkerAapBothPagesConfirmed] = useState(false);
   const [workerSignPin, setWorkerSignPin] = useState('');
+  const [workerPersonalCode, setWorkerPersonalCode] = useState('');
   const [workerSignError, setWorkerSignError] = useState('');
   const [signatureInk, setSignatureInk] = useState('');
 
@@ -4066,6 +4080,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ...(resource.templateKind === 'fire-safety-journal'
         ? { signatureFieldRoles: getFireSafetySignatureFieldRoles(resource, saved) }
         : {}),
+      ...(resource.templateKind === 'evacuation-plan-journal'
+        ? { signatureFieldRoles: getEvacuationPlanSignatureFieldRoles(resource, saved) }
+        : {}),
       ...(resource.templateKind === 'familiarization-card'
         ? { familiarizationTopics: saved.familiarizationTopics ?? defaults.familiarizationTopics ?? defaultFamiliarizationTopics }
         : {}),
@@ -4126,6 +4143,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         settings.signatureFieldRoles.independentWorkPermit,
       ]
         .filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
+    } else if (resourceSettingsTarget.templateKind === 'evacuation-plan-journal') {
+      settings.signatureFieldRoles = {
+        ...evacuationPlanSignatureFieldDefaults,
+        ...(settings.signatureFieldRoles ?? {}),
+      };
+      settings.requiredSigners = [...new Set([
+        'Darbuotojas',
+        settings.signatureFieldRoles.instructor,
+      ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
     } else if (resourceSettingsTarget.templateKind === 'intro-dss-journal') {
       const instructorRole = settings.requiredSigners.find((role) => ['Vadovas', 'DSS specialistas'].includes(role)) ?? 'DSS specialistas';
       settings.requiredSigners = [...new Set(['Darbuotojas', instructorRole])];
@@ -4161,7 +4187,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`„${resourceSettingsTarget.title}“ nustatymai išsaugoti įmonei.`);
   };
 
-  const recordWorkerSignature = (employee, resource, savedSignature = null) => {
+  const recordWorkerSignature = (employee, resource, savedSignature = null, personalCodeSnapshot = '') => {
     const existing = hasCurrentWorkerSignature(employee.id, resource.id);
     if (existing) return;
     const signature = {
@@ -4181,6 +4207,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         ...(resource.id === 'res-aap' ? { bothPagesConfirmed: true } : {}),
         ip: '127.0.0.1 (demo)',
       }),
+      ...(resource.templateKind === 'evacuation-plan-journal'
+        ? { personalCodeSnapshot: savedSignature?.personalCodeSnapshot ?? personalCodeSnapshot }
+        : {}),
       positionSnapshot: savedSignature?.positionSnapshot ?? savedSignature?.aapSnapshot?.position ?? employee.position ?? 'Darbuotojas',
     };
     setData((current) => ({
@@ -4211,6 +4240,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setWorkerAapBothPagesConfirmed(false);
     setSignatureInk('');
     setWorkerSignPin('');
+    setWorkerPersonalCode('');
     setWorkerSignError('');
   };
 
@@ -4236,6 +4266,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     if (resource.id === 'res-aap' && !workerAapBothPagesConfirmed) {
       setWorkerSignError('Patvirtinkite, kad vienu parašu pasirašote abu AAP kortelės lapus.');
+      return;
+    }
+    if (resource.templateKind === 'evacuation-plan-journal' && !workerPersonalCode.trim()) {
+      setWorkerSignError('Prieš pasirašydami įveskite asmens kodą.');
       return;
     }
     if (!signatureInk) {
@@ -4271,13 +4305,18 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           input_resource_id: resource.id,
           input_pin: workerSignPin,
           input_signature_image: uploadedSignature.path,
+          ...(resource.templateKind === 'evacuation-plan-journal' ? { input_personal_code: workerPersonalCode.trim() } : {}),
         });
       if (error) {
         await removeSignatureAsset(uploadedSignature.path);
         const isMissingAapSignatureFunction = resource.id === 'res-aap'
           && error.message?.includes('record_employee_aap_card_signature_with_image');
+        const isMissingEvacuationPersonalCodeFunction = resource.templateKind === 'evacuation-plan-journal'
+          && error.message?.includes('record_employee_signature_with_image');
         setWorkerSignError(isMissingAapSignatureFunction
           ? 'AAP kortelės parašo išsaugoti nepavyko. Serveryje neatnaujinta parašo funkcija; pritaikykite naujausias Supabase migracijas ir bandykite dar kartą.'
+          : isMissingEvacuationPersonalCodeFunction
+            ? 'Žurnalo parašo išsaugoti nepavyko. Serveryje neatnaujinta funkcija asmens kodui išsaugoti; pritaikykite naujausias Supabase migracijas ir bandykite dar kartą.'
           : error.message || 'PIN patikrinti nepavyko.');
         return;
       }
@@ -4289,17 +4328,19 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       recordWorkerSignature(employee, resource, {
         ...signature,
         signaturePath: uploadedSignature.path,
+        ...(resource.templateKind === 'evacuation-plan-journal' ? { personalCodeSnapshot: workerPersonalCode.trim() } : {}),
         ...(resource.id === 'res-aap' ? { bothPagesConfirmed: workerAapBothPagesConfirmed } : {}),
       });
     } else if (workerSignPin !== employee.pin) {
       setWorkerSignError('PIN kodas neteisingas.');
       return;
     } else {
-      recordWorkerSignature(employee, resource);
+      recordWorkerSignature(employee, resource, null, workerPersonalCode.trim());
     }
     setWorkerSigningTarget(null);
     setWorkerAapBothPagesConfirmed(false);
     setWorkerSignPin('');
+    setWorkerPersonalCode('');
     setSignatureInk('');
   };
 
@@ -4360,14 +4401,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
       };
     }
-    if (resource.id === 'res-fire-safety-journal' || resource.id === 'res-medical-examination-schedule' || resource.id === 'res-work-rules-journal') {
+    if (resource.id === 'res-fire-safety-journal'
+      || resource.id === 'res-medical-examination-schedule'
+      || resource.id === 'res-work-rules-journal'
+      || resource.id === 'res-evacuation-plan-familiarization-journal') {
       const defaultResource = initialData.resources.find((item) => item.id === resource.id);
       resource = {
         ...defaultResource,
         ...resource,
-        title: resource.id === 'res-fire-safety-journal' ? defaultResource?.title : resource.title,
-        html: resource.id === 'res-fire-safety-journal' ? undefined : defaultResource?.html || resource.html,
-        htmlUrl: resource.id === 'res-fire-safety-journal' ? undefined : resource.htmlUrl,
+        title: ['res-fire-safety-journal', 'res-evacuation-plan-familiarization-journal'].includes(resource.id) ? defaultResource?.title : resource.title,
+        html: ['res-fire-safety-journal', 'res-evacuation-plan-familiarization-journal'].includes(resource.id) ? undefined : defaultResource?.html || resource.html,
+        htmlUrl: ['res-fire-safety-journal', 'res-evacuation-plan-familiarization-journal'].includes(resource.id) ? undefined : resource.htmlUrl,
         templateKind: resource.templateKind ?? defaultResource?.templateKind,
         requiredSigners: resource.requiredSigners ?? defaultResource?.requiredSigners,
         defaultSettings: { ...defaultResource?.defaultSettings, ...resource.defaultSettings },
@@ -8742,7 +8786,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </form>}
       </dialog>
       {aapIssueSigningTarget && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmAapIssueSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti AAP gavimą</h2><p className="text-sm text-slate-600">{(data.aapIssuances ?? []).find((issuance) => issuance.id === aapIssueSigningTarget)?.items.map((item) => `${item.name} (${item.quantity} ${item.unit})`).join(', ')}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{aapIssueSignError && <p role="alert" className="text-sm text-rose-700">{aapIssueSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" disabled={aapIssueSignSubmitting} onClick={() => { setAapIssueSigningTarget(null); setSignatureInk(''); setWorkerSignPin(''); setAapIssueSignError(''); }}>Atšaukti</button><button className={buttonClass} disabled={aapIssueSignSubmitting || !signatureInk}>{aapIssueSignSubmitting ? 'Išsaugoma…' : <><FileSignature size={15} />Patvirtinti gavimą</>}</button></div></form></div>}
-      {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2><p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p>{workerSigningTarget.resourceId === 'res-aap' && <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={workerAapBothPagesConfirmed} onChange={(event) => { setWorkerAapBothPagesConfirmed(event.target.checked); setWorkerSignError(''); }} /><span>Patvirtinu, kad vienu parašu pasirašau abu šio AAP kortelės lapus. Tas pats PIN parašas bus pateiktas abiejų lapų vietose.</span></label>}<SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>{workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setWorkerAapBothPagesConfirmed(false); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={workerSigningTarget.resourceId === 'res-aap' && !workerAapBothPagesConfirmed}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
+      {workerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+        <form onSubmit={confirmWorkerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6">
+          <h2 className="text-lg font-bold">Patvirtinti darbuotojo parašą</h2>
+          <p className="text-sm text-slate-600">{data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.title}</p>
+          {workerSigningTarget.resourceId === 'res-aap' && <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm"><input className="mt-0.5" type="checkbox" checked={workerAapBothPagesConfirmed} onChange={(event) => { setWorkerAapBothPagesConfirmed(event.target.checked); setWorkerSignError(''); }} /><span>Patvirtinu, kad vienu parašu pasirašau abu šio AAP kortelės lapus. Tas pats PIN parašas bus pateiktas abiejų lapų vietose.</span></label>}
+          {data.resources.find((resource) => resource.id === workerSigningTarget.resourceId)?.templateKind === 'evacuation-plan-journal' && <label className="block text-sm font-medium">Asmens kodas
+            <input className={`${inputClass} mt-1`} value={workerPersonalCode} onChange={(event) => { setWorkerPersonalCode(event.target.value); setWorkerSignError(''); }} maxLength={32} autoComplete="off" required />
+            <span className="mt-1 block text-xs font-normal text-slate-500">Bus įrašytas prie jūsų parašo šiame žurnale.</span>
+          </label>}
+          <SignaturePad value={signatureInk} onChange={setSignatureInk} />
+          <label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={workerSignPin} onChange={(event) => setWorkerSignPin(event.target.value)} required /></label>
+          {workerSignError && <p role="alert" className="text-sm text-rose-700">{workerSignError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setWorkerSigningTarget(null); setWorkerAapBothPagesConfirmed(false); setWorkerPersonalCode(''); setWorkerSignPin(''); setWorkerSignError(''); setSignatureInk(''); }}>Atšaukti</button>
+            <button className={buttonClass} disabled={workerSigningTarget.resourceId === 'res-aap' && !workerAapBothPagesConfirmed}><FileSignature size={15} />Pasirašyti</button>
+          </div>
+        </form>
+      </div>}
       {managerSigningTasks.length > 0 && userRole === 'vadovas' && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signManagerTasks} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Vadovo parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentOrg?.manager} · {managerSigningTasks.length} dokumentų</p>{managerSigningSubmitting && <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950"><span className="size-5 shrink-0 animate-spin rounded-full border-2 border-sky-700 border-t-transparent" aria-hidden="true" /><span><strong className="block">Pasirašoma, prašome palaukti…</strong><span className="text-sky-800">Pasirašyta {managerSigningProgress} iš {managerSigningTasks.length} dokumentų.</span></span></div>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{managerSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={managerReviewConfirmed} disabled={managerSigningSubmitting} onChange={(event) => { setManagerReviewConfirmed(event.target.checked); setManagerSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label><div className={managerSigningSubmitting ? 'pointer-events-none opacity-60' : ''}><SignaturePad value={signatureInk} onChange={setSignatureInk} /></div><label className="block text-sm font-medium">Vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={managerSigningPin} onChange={(event) => { setManagerSigningPin(event.target.value); setManagerSigningError(''); }} required disabled={managerSigningSubmitting} /></label>{managerSigningError && <p role="alert" className="text-sm text-rose-700">{managerSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={managerSigningSubmitting} onClick={() => { setManagerSigningTasks([]); setManagerSigningPin(''); setManagerReviewConfirmed(false); setManagerSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={managerSigningSubmitting || !managerReviewConfirmed}>{managerSigningSubmitting ? <><span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />Pasirašoma…</> : <><FileSignature size={15} />Pasirašyti ({managerSigningTasks.length})</>}</button></div></form></div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti vadovo parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · {data.resources.find((resource) => resource.id === employerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
       {dssSigningTasks.length > 0 && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={signDssTask} className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">DSS parašo patvirtinimas</h2><p className="text-sm text-slate-600">{currentSpecialist?.name} · {dssSigningTasks.length} dokumentų</p>{dssSigningSubmitting && <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950"><span className="size-5 shrink-0 animate-spin rounded-full border-2 border-sky-700 border-t-transparent" aria-hidden="true" /><span><strong className="block">Pasirašoma, prašome palaukti…</strong><span className="text-sky-800">Pasirašyta {dssSigningProgress} iš {dssSigningTasks.length} dokumentų.</span></span></div>}{dssSigningTasks.length === dssSignatureBatchSize && selectedCurrentDssTasks.length > dssSigningTasks.length && <p className="rounded-md bg-sky-50 p-3 text-sm text-sky-900">Šį kartą bus pasirašyta iki {dssSignatureBatchSize} dokumentų. Likę pasirinkti dokumentai bus palikti kitai pasirašymo partijai.</p>}<div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">{dssSigningTasks.map((task) => <div key={task.id} className="text-sm"><p className="font-semibold">{data.employees.find((employee) => employee.id === task.employeeId)?.name ?? task.signer}</p><p className="text-slate-600">{data.resources.find((resource) => resource.id === task.resourceId)?.title ?? 'Dokumentas'}</p></div>)}</div>{dssSigningTasks.length > 1 && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={dssReviewConfirmed} disabled={dssSigningSubmitting} onChange={(event) => { setDssReviewConfirmed(event.target.checked); setDssSigningError(''); }} /><span>Patvirtinu, kad peržiūrėjau visus pasirinktus dokumentus.</span></label>}<div className={dssSigningSubmitting ? 'pointer-events-none opacity-60' : ''}><SignaturePad value={signatureInk} onChange={setSignatureInk} /></div><label className="block text-sm font-medium">4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={signPinDraft} onChange={(event) => { setSignPinDraft(event.target.value); setDssSigningError(''); }} required disabled={dssSigningSubmitting} /></label>{dssSigningError && <p role="alert" className="text-sm text-rose-700">{dssSigningError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={dssSigningSubmitting} onClick={() => { setDssSigningTasks([]); setSignPinDraft(''); setDssReviewConfirmed(false); setDssSigningError(''); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass} disabled={dssSigningSubmitting || (dssSigningTasks.length > 1 && !dssReviewConfirmed)}>{dssSigningSubmitting ? <><span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />Pasirašoma…</> : <><FileSignature size={15} />Pasirašyti ({dssSigningTasks.length})</>}</button></div></form></div>}
@@ -9079,6 +9140,14 @@ function getRequiredSigners(resource, org, employee) {
       fieldRoles.independentWorkPermit,
     ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
   }
+  if (resource?.templateKind === 'evacuation-plan-journal') {
+    const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
+    const fieldRoles = getEvacuationPlanSignatureFieldRoles(resource, savedSettings);
+    return [...new Set([
+      fieldRoles.employee,
+      fieldRoles.instructor,
+    ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
+  }
   if (resource?.templateKind === 'internal-documents-register' && Array.isArray(organizationRequiredSigners)) {
     return normalizeEmployeeDocumentSignerRoles(organizationRequiredSigners);
   }
@@ -9245,7 +9314,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function populateJournalRows(html, resource, employee, org, signatures, specialists, allResources = []) {
-  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
+  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -9415,7 +9484,24 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const workerProof = proof(item, worker);
       const workerDate = formatDate(worker?.signedAt);
 
-      if (resource.templateKind === 'medical-examination-schedule') {
+      if (resource.templateKind === 'evacuation-plan-journal') {
+        const settings = resource.defaultSettings ?? {};
+        const fieldRoles = getEvacuationPlanSignatureFieldRoles(resource, settings);
+        const employeeEntry = entries.find((entry) => entry.role === fieldRoles.employee);
+        const instructorEntry = fieldRoles.instructor === 'niekas'
+          ? null
+          : entries.find((entry) => entry.role === fieldRoles.instructor);
+        writeRow(row, [
+          formatDate(employeeEntry?.signedAt ?? instructorEntry?.signedAt),
+          escapeHtml(item.name),
+          escapeHtml(employeeEntry?.personalCodeSnapshot ?? item.personalCode ?? item.personalId ?? ''),
+          escapeHtml(positionFor(item)),
+          escapeHtml(settings.documentNumber ?? ''),
+          instructorEntry ? `${escapeHtml(instructorEntry.role)} · ${nameFor(instructorEntry)}` : '',
+          proof(item, instructorEntry),
+          proof(item, employeeEntry),
+        ]);
+      } else if (resource.templateKind === 'medical-examination-schedule') {
         const settings = resource.defaultSettings ?? {};
         writeRow(row, [
           String(item.sequenceNumber ?? ''),
@@ -9849,6 +9935,7 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       COMPANY_CODE: escapeHtml(org?.companyCode ?? ''),
       DIRECTOR_NAME: escapeHtml(resource.defaultSettings?.directorName ?? org?.manager ?? ''),
       DOCUMENT_DATE: escapeHtml(documentDate),
+      DOCUMENT_NUMBER: escapeHtml(resource.defaultSettings?.documentNumber ?? ''),
       PROTOCOL_TITLE: escapeHtml(resource.title ?? ''),
       PROTOCOL_DATE: escapeHtml(resource.protocolDateText ?? ''),
       PROTOCOL_NUMBER: escapeHtml(resource.protocolNumber ?? ''),
@@ -10317,9 +10404,43 @@ function LegacyResourceSettingsDialog({ resource, settings, resources = [], orga
 
 function ResourceSettingsDialog(props) {
   if (normalizeResourceType(props.resource) === 'Testas') return <TestResourceSettingsDialog {...props} />;
+  if (props.resource.templateKind === 'evacuation-plan-journal') return <EvacuationPlanResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
   return <LegacyResourceSettingsDialog {...props} />;
+}
+
+function EvacuationPlanResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
+  const fieldRoles = getEvacuationPlanSignatureFieldRoles(resource, settings);
+  const updateInstructorRole = (role) => onChange({
+    ...settings,
+    signatureFieldRoles: { ...fieldRoles, instructor: role },
+    requiredSigners: ['Darbuotojas', ...(role === 'niekas' ? [] : [role])],
+  });
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+    <form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Dokumento numeris ir pasirašančiųjų vaidmenys taikomi šios įmonės žurnalui.</p></div>
+        <button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button>
+      </div>
+      <label className="block text-sm font-medium">Evakavimo plano dokumento Nr.
+        <input className={`${inputClass} mt-1`} value={settings.documentNumber ?? ''} onChange={(event) => onChange({ ...settings, documentNumber: event.target.value })} placeholder="Pvz., EP-01" />
+      </label>
+      <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold">Kas pasirašo</legend>
+        <label className="block text-sm font-medium">Supažindinęs asmuo
+          <select className={`${inputClass} mt-1`} value={fieldRoles.instructor} onChange={(event) => updateInstructorRole(event.target.value)}>
+            <option value="DSS specialistas">DSS specialistas</option>
+            <option value="Vadovas">Įmonės vadovas</option>
+            <option value="niekas">Niekas nepasirašo</option>
+          </select>
+        </label>
+        <p className="text-xs text-slate-600">Darbuotojo parašas yra privalomas. Žurnale fiksuojami darbuotojo ir pasirinkto supažindinusio asmens parašai.</p>
+      </fieldset>
+      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+    </form>
+  </div>;
 }
 
 function TestResourceSettingsDialog({ resource, settings, organization, resources = [], availableResourceIds = [], onChange, onSave, onClose }) {
