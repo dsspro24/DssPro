@@ -23,8 +23,16 @@ set data = jsonb_set(
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; padding: 14px; color: #1e293b; font: 9px/1.3 Arial, sans-serif; }
-    @page { size: A4 landscape; margin: 7mm; }
-    .journal-page { max-width: 1160px; margin: 0 auto; padding: 8px; background: #fff; }
+    @page portrait-page { size: A4 portrait; margin: 15mm; }
+    @page landscape-page { size: A4 landscape; margin: 7mm; }
+    .cover-page { page: portrait-page; max-width: 800px; min-height: 1050px; margin: 0 auto 30px; padding: 40px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .cover-field { width: 80%; margin-bottom: 35px; }
+    .cover-value { min-height: 32px; padding-bottom: 6px; border-bottom: 2px solid #cbd5e1; color: #0f172a; font-size: 18px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .cover-label { margin-top: 6px; color: #64748b; font-size: 11px; font-style: italic; }
+    .cover-title-group { margin: 60px 0 40px; }
+    .cover-main-title { max-width: 90%; margin: 0 auto; color: #0f172a; font-size: 17px; font-weight: 700; letter-spacing: .8px; line-height: 1.5; text-transform: uppercase; }
+    .cover-subtitle { margin-top: 35px; color: #2563eb; font-size: 26px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+    .journal-page { page: landscape-page; max-width: 1160px; margin: 0 auto; padding: 8px; background: #fff; }
     .journal-header { margin-bottom: 8px; text-align: center; }
     .company-name { color: #0f172a; font-size: 13px; font-weight: 700; text-transform: uppercase; }
     .company-code { margin-top: 2px; color: #475569; font-size: 9px; }
@@ -44,13 +52,23 @@ set data = jsonb_set(
     .col-signature { width: 13%; }
     @media print {
       body { padding: 0; }
-      .journal-page { max-width: 100%; padding: 0; }
+      .cover-page { min-height: 255mm; margin: 0; padding: 0; border: 0; border-radius: 0; break-after: page; page-break-after: always; }
+      .journal-page { max-width: 100%; margin: 0; padding: 0; break-after: avoid; page-break-after: avoid; }
       .journal-table thead { display: table-header-group; }
       .journal-table tr { break-inside: avoid; page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
+  <section class="cover-page">
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_NAME }}</div><div class="cover-label">(įmonės pavadinimas)</div></div>
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_CODE }}</div><div class="cover-label">(įmonės kodas)</div></div>
+    <div class="cover-field"><div class="cover-value">{{ DOCUMENT_NUMBER }}</div><div class="cover-label">(dokumento numeris)</div></div>
+    <div class="cover-title-group">
+      <div class="cover-main-title">Darbuotojų, supažindintų su evakavimo planais, registravimo</div>
+      <div class="cover-subtitle">Žurnalas</div>
+    </div>
+  </section>
   <main class="journal-page">
     <header class="journal-header">
       <div class="company-name">{{ COMPANY_NAME }}</div>
