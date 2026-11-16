@@ -5192,7 +5192,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       for (const resource of selectedResources) {
         const completeResource = await getResourceWithHtml(resource);
         const html = completeResource.html
-          ? await inlineDemoHtmlAssets(completeResource.html, completeResource.htmlUrl ?? window.location.href)
+          ? await inlineDemoHtmlAssets(completeResource.html, completeResource.htmlUrl || window.location.href)
           : '';
         const imageSource = completeResource.imageUrl
           ?? (typeof completeResource.image === 'string' ? completeResource.image : '');
