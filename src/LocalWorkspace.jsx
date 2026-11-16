@@ -10416,7 +10416,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         writeRow(row, [
           formatDate(employeeEntry?.signedAt ?? instructorEntry?.signedAt),
           escapeHtml(item.name),
-          escapeHtml(employeeEntry?.personalCodeSnapshot ?? item.personalCode ?? item.personalId ?? ''),
+          escapeHtml(findSignature(item, 'Darbuotojas')?.personalCodeSnapshot ?? employeeEntry?.personalCodeSnapshot ?? item.personalCode ?? item.personalId ?? ''),
           escapeHtml(positionFor(item)),
           escapeHtml(settings.documentNumber ?? ''),
           instructorEntry ? `${escapeHtml(instructorEntry.role)} · ${nameFor(instructorEntry)}` : '',
