@@ -4932,7 +4932,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = resource.templateKind !== accidentIncidentJournalTemplateKind && (userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka')) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka' && resource.templateKind !== accidentIncidentJournalTemplateKind) } = {}) => {
     if (!templateOnly && userRole === 'darbuotojas' && normalizeResourceType(resource) === 'Testas') {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const unsignedPassedResult = getUnsignedPassedTestResult(employee, resource.id, data.signatures);
