@@ -1485,6 +1485,23 @@
         },
         "maintenanceEntries": []
       }
+    },
+    {
+      "id": "res-first-aid-kit-inspection-journal",
+      "title": "Pirmosios pagalbos rinkinio (vaistinėlės) patikros ir papildymo žurnalas",
+      "type": "Žurnalas",
+      "category": "Pirmoji pagalba",
+      "duration": "15 įrašų",
+      "templateKind": "first-aid-kit-inspection-journal",
+      "adminOnly": true,
+      "defaultForOrganizations": true,
+      "requiredSigners": [],
+      "defaultSettings": {
+        "rowCount": 15,
+        "defaultLocation": "",
+        "defaultInspectorEmployeeId": "",
+        "inspectionEntries": []
+      }
     }
   ]
 }
