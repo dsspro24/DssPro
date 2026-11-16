@@ -1461,6 +1461,30 @@
         "resolutionRole": "Vadovas",
         "violationEntries": []
       }
+    },
+    {
+      "id": "res-fire-automation-maintenance-journal",
+      "title": "Gaisrinės automatikos įrenginio techninės priežiūros ir remonto apskaitos žurnalas",
+      "type": "Žurnalas",
+      "category": "Priešgaisrinė sauga",
+      "duration": "15 įrašų",
+      "templateKind": "fire-automation-maintenance-journal",
+      "adminOnly": true,
+      "defaultForOrganizations": true,
+      "requiredSigners": [],
+      "defaultSettings": {
+        "rowCount": 15,
+        "documentNumber": "",
+        "equipmentName": "",
+        "equipmentIdentifier": "",
+        "equipmentLocation": "",
+        "allowExternalPerformer": true,
+        "signatureFieldRoles": {
+          "performer": "Darbuotojas",
+          "responsible": "Darbuotojas"
+        },
+        "maintenanceEntries": []
+      }
     }
   ]
 }
