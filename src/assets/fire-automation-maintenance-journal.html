@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gaisrinės automatikos įrenginio techninės priežiūros ir remonto apskaitos žurnalas</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 14px; color: #1e293b; font: 9px/1.35 Arial, sans-serif; }
+    @page portrait-page { size: A4 portrait; margin: 15mm; }
+    @page landscape-page { size: A4 landscape; margin: 8mm; }
+    .cover-page { page: portrait-page; max-width: 800px; min-height: 1050px; margin: 0 auto 30px; padding: 40px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .cover-field { width: 80%; margin-bottom: 35px; }
+    .cover-value { min-height: 32px; padding-bottom: 6px; border-bottom: 2px solid #cbd5e1; color: #0f172a; font-size: 18px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .cover-label { margin-top: 6px; color: #64748b; font-size: 11px; font-style: italic; }
+    .cover-title-group { margin: 60px 0 40px; }
+    .cover-main-title { max-width: 90%; margin: 0 auto; color: #0f172a; font-size: 18px; font-weight: 700; letter-spacing: .8px; line-height: 1.5; text-transform: uppercase; }
+    .cover-subtitle { margin-top: 35px; color: #2563eb; font-size: 26px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+    .journal-page { page: landscape-page; max-width: 1120px; min-height: 750px; margin: 0 auto 30px; padding: 20px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; display: flex; flex-direction: column; }
+    .journal-header { margin-bottom: 12px; text-align: center; }
+    .company-name { color: #0f172a; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+    .doc-name { margin-top: 3px; color: #334155; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .equipment-details { margin-top: 6px; color: #475569; font-size: 9px; }
+    table.journal-table { width: 100%; margin-top: 5px; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+    .journal-table th, .journal-table td { border: 1px solid #94a3b8; padding: 4px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+    .journal-table th { background: #f1f5f9; color: #0f172a; font-weight: 700; line-height: 1.25; }
+    .journal-table tbody tr:nth-child(even) { background: #f8fafc; }
+    .journal-table tbody tr { height: 28px; }
+    .col-date { width: 8%; }
+    .col-type { width: 15%; }
+    .col-condition { width: 19%; }
+    .col-performer { width: 16%; }
+    .col-signature { width: 13%; }
+    @media print {
+      body { padding: 0; }
+      .cover-page, .journal-page { margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .cover-page { min-height: 255mm; break-after: page; page-break-after: always; }
+      .journal-page { max-width: 100%; min-height: 0; break-after: avoid; page-break-after: avoid; }
+      .journal-table thead { display: table-header-group; }
+      .journal-table tr { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <section class="cover-page">
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_NAME }}</div><div class="cover-label">(įmonės pavadinimas)</div></div>
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_CODE }}</div><div class="cover-label">(įmonės kodas)</div></div>
+    <div class="cover-title-group">
+      <div class="cover-main-title">Gaisrinės automatikos įrenginio techninės priežiūros ir remonto apskaitos</div>
+      <div class="cover-subtitle">Žurnalas</div>
+    </div>
+  </section>
+  <main class="journal-page">
+    <header class="journal-header">
+      <div class="company-name">{{ COMPANY_NAME }}</div>
+      <div class="doc-name">Gaisrinės automatikos įrenginio techninės priežiūros ir remonto apskaitos žurnalas</div>
+      <div class="equipment-details">
+        <span data-journal-setting="equipmentName"></span>
+        <span data-journal-setting="equipmentIdentifier"></span>
+        <span data-journal-setting="equipmentLocation"></span>
+        <span data-journal-setting="documentNumber"></span>
+      </div>
+    </header>
+    <table class="journal-table">
+      <thead>
+        <tr>
+          <th class="col-date" rowspan="2">Data</th>
+          <th class="col-type" rowspan="2">Techninės priežiūros rūšis</th>
+          <th class="col-condition" rowspan="2">Pastabos apie techninę būklę</th>
+          <th colspan="2">Techninę priežiūrą ar remontą atlikusio asmens</th>
+          <th colspan="2">Atsakingo už įrenginio eksploatavimą asmens</th>
+        </tr>
+        <tr>
+          <th class="col-performer">Vardas, pavardė</th>
+          <th class="col-signature">Parašas</th>
+          <th class="col-performer">Vardas, pavardė</th>
+          <th class="col-signature">Parašas</th>
+        </tr>
+        <tr>
+          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>
