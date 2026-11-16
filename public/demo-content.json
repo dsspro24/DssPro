@@ -1440,6 +1440,24 @@
         "recorderPosition": "Įmonės vadovas",
         "incidentEntries": []
       }
+    },
+    {
+      "id": "res-safety-violation-journal",
+      "title": "Darbų saugos pažeidimų registracijos žurnalas",
+      "type": "Žurnalas",
+      "category": "Darbų saugos pažeidimai",
+      "duration": "15 įrašų",
+      "templateKind": "safety-violation-journal",
+      "adminOnly": true,
+      "defaultForOrganizations": true,
+      "requiredSigners": [],
+      "defaultSettings": {
+        "recorderRole": "Vadovas",
+        "recorderName": "",
+        "recorderPosition": "Įmonės vadovas",
+        "resolutionRole": "Vadovas",
+        "violationEntries": []
+      }
     }
   ]
 }

@@ -51,6 +51,8 @@ const defaultDocumentTemplateLoaders = new Map([
   ['res-evacuation-plan-familiarization-journal', () => import('./assets/evacuation-plan-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['res-accident-incident-journal', () => import('./assets/accident-incident-registration-journal.html?raw').then(({ default: html }) => html)],
   ['accident-incident-journal', () => import('./assets/accident-incident-registration-journal.html?raw').then(({ default: html }) => html)],
+  ['res-safety-violation-journal', () => import('./assets/safety-violation-registration-journal.html?raw').then(({ default: html }) => html)],
+  ['safety-violation-journal', () => import('./assets/safety-violation-registration-journal.html?raw').then(({ default: html }) => html)],
   ['res-knowledge-assessment-protocol', () => import('./assets/knowledge-assessment-protocol.html?raw').then(({ default: html }) => html)],
   ['knowledge-assessment-protocol', () => import('./assets/knowledge-assessment-protocol.html?raw').then(({ default: html }) => html)],
   ['res-job-description-journal', () => import('./assets/job-description-familiarization-journal.html?raw').then(({ default: html }) => html)],
@@ -756,8 +758,11 @@ const getEvacuationPlanSignatureFieldRoles = (resource, settings = {}) => ({
 });
 const accidentIncidentJournalResourceId = 'res-accident-incident-journal';
 const accidentIncidentJournalTemplateKind = 'accident-incident-journal';
+const safetyViolationJournalResourceId = 'res-safety-violation-journal';
+const safetyViolationJournalTemplateKind = 'safety-violation-journal';
 const isEmployeeAssignableResource = (resource) => resource?.adminOnly !== true
-  && resource?.templateKind !== accidentIncidentJournalTemplateKind;
+  && resource?.templateKind !== accidentIncidentJournalTemplateKind
+  && resource?.templateKind !== safetyViolationJournalTemplateKind;
 const accidentIncidentTypeOptions = [
   'Nelaimingas atsitikimas darbe',
   'Nelaimingas atsitikimas pakeliui į darbą ar iš darbo',
@@ -801,6 +806,45 @@ const normalizeIncidentJournalEntries = (entries) => (Array.isArray(entries) ? e
     managerSignature: normalizeIncidentSignature(entry.managerSignature),
     employeeSignature: normalizeIncidentSignature(entry.employeeSignature),
   }));
+const normalizeSafetyViolationJournalEntries = (entries) => (Array.isArray(entries) ? entries : [])
+  .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string' && entry.id)
+  .map((entry) => ({
+    id: entry.id.slice(0, 100),
+    detectedDate: String(entry.detectedDate ?? '').slice(0, 10),
+    department: String(entry.department ?? '').slice(0, 200),
+    violation: String(entry.violation ?? '').slice(0, 2000),
+    correctiveAction: String(entry.correctiveAction ?? '').slice(0, 2000),
+    deadline: String(entry.deadline ?? '').slice(0, 10),
+    assignedEmployeeId: String(entry.assignedEmployeeId ?? '').slice(0, 100),
+    inspectorPosition: String(entry.inspectorPosition ?? '').slice(0, 150),
+    inspectorName: String(entry.inspectorName ?? '').slice(0, 150),
+    inspectorSignature: normalizeIncidentSignature(entry.inspectorSignature),
+    employeeSignature: normalizeIncidentSignature(entry.employeeSignature),
+    resolvedDate: String(entry.resolvedDate ?? '').slice(0, 10),
+    resolutionSignature: normalizeIncidentSignature(entry.resolutionSignature),
+  }));
+const hydrateSafetyViolationJournalEntries = async (entries) => {
+  const normalizedEntries = normalizeSafetyViolationJournalEntries(entries);
+  const signatures = normalizedEntries.flatMap((entry) => [
+    entry.inspectorSignature && { ...entry.inspectorSignature, id: `${entry.id}-inspector`, violationEntryId: entry.id },
+    entry.employeeSignature && { ...entry.employeeSignature, id: `${entry.id}-employee`, violationEntryId: entry.id },
+    entry.resolutionSignature && { ...entry.resolutionSignature, id: `${entry.id}-resolution`, violationEntryId: entry.id },
+  ].filter(Boolean));
+  const hydratedSignatures = await hydrateSignatureImages(signatures);
+  const signatureImages = new Map(hydratedSignatures.map((signature) => [signature.id, signature.signatureImage ?? '']));
+  return normalizedEntries.map((entry) => ({
+    ...entry,
+    inspectorSignature: entry.inspectorSignature
+      ? { ...entry.inspectorSignature, signatureImage: signatureImages.get(`${entry.id}-inspector`) ?? entry.inspectorSignature.signatureImage }
+      : null,
+    employeeSignature: entry.employeeSignature
+      ? { ...entry.employeeSignature, signatureImage: signatureImages.get(`${entry.id}-employee`) ?? entry.employeeSignature.signatureImage }
+      : null,
+    resolutionSignature: entry.resolutionSignature
+      ? { ...entry.resolutionSignature, signatureImage: signatureImages.get(`${entry.id}-resolution`) ?? entry.resolutionSignature.signatureImage }
+      : null,
+  }));
+};
 const hydrateIncidentJournalEntries = async (entries) => {
   const normalizedEntries = normalizeIncidentJournalEntries(entries);
   const signatures = normalizedEntries.flatMap((entry) => [
@@ -1058,6 +1102,7 @@ const initialData = {
     { id: 'res-fire-safety-journal', title: 'Gaisrinės saugos instruktavimų darbo vietoje registracijos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', image: '/courses/fire-extinguisher.jpg', duration: '15 įrašų', templateKind: 'fire-safety-journal', requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { instructionNumber: '', instructionTitle: '', approvalDate: '', instructorName: '', instructorPosition: '', changedInstruction: '', signatureFieldRoles: fireSafetySignatureFieldDefaults } },
     { id: 'res-evacuation-plan-familiarization-journal', title: 'Darbuotojų, supažindintų su evakavimo planais, registravimo žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', duration: '15 įrašų', templateKind: 'evacuation-plan-journal', signatures: true, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultForOrganizations: true, defaultSettings: { rowCount: 15, populateEmployees: true, documentNumber: '', signatureFieldRoles: evacuationPlanSignatureFieldDefaults } },
     { id: accidentIncidentJournalResourceId, title: 'Nelaimingų atsitikimų darbe, incidentų ir nelaimingų atsitikimų darbe aktų registravimo žurnalas', type: 'Žurnalas', category: 'Nelaimingi atsitikimai ir incidentai', duration: '15 įrašų', templateKind: accidentIncidentJournalTemplateKind, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { recorderRole: 'Vadovas', recorderName: '', recorderPosition: 'Įmonės vadovas', incidentEntries: [] } },
+    { id: safetyViolationJournalResourceId, title: 'Darbų saugos pažeidimų registracijos žurnalas', type: 'Žurnalas', category: 'Darbų saugos pažeidimai', duration: '15 įrašų', templateKind: safetyViolationJournalTemplateKind, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { recorderRole: 'Vadovas', recorderName: '', recorderPosition: 'Įmonės vadovas', resolutionRole: 'Vadovas', violationEntries: [] } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
     { id: 'res-aap', title: 'AAP išdavimo kortelė', type: 'Kortelė', category: 'Asmeninės apsaugos priemonės', image: '/courses/aap-equipment.jpg', duration: '5 min.', requiredSigners: ['Darbuotojas', 'Vadovas'], signatures: true, validityMonths: 12 },
   ],
@@ -1973,6 +2018,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [incidentJournalSignError, setIncidentJournalSignError] = useState('');
   const [incidentJournalSignSubmitting, setIncidentJournalSignSubmitting] = useState(false);
   const [incidentJournalReviewConfirmed, setIncidentJournalReviewConfirmed] = useState(false);
+  const [safetyViolationJournalTasks, setSafetyViolationJournalTasks] = useState([]);
+  const [safetyViolationSigningTarget, setSafetyViolationSigningTarget] = useState(null);
+  const [safetyViolationSignPin, setSafetyViolationSignPin] = useState('');
+  const [safetyViolationSignError, setSafetyViolationSignError] = useState('');
+  const [safetyViolationSignSubmitting, setSafetyViolationSignSubmitting] = useState(false);
+  const [safetyViolationReviewConfirmed, setSafetyViolationReviewConfirmed] = useState(false);
 
   useEffect(() => {
     if (!previewResource) return undefined;
@@ -2525,6 +2576,130 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       document.removeEventListener('visibilitychange', refreshOnFocus);
     };
   }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id, currentOrg?.name, currentOrg?.companyCode, currentOrg?.resourceSettings]);
+  useEffect(() => {
+    if (userRole !== 'darbuotojas' || !selectedOrgId || !currentEmployee?.id) {
+      setSafetyViolationJournalTasks([]);
+      return undefined;
+    }
+    if (!cloudMode) {
+      const entries = normalizeSafetyViolationJournalEntries(currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries);
+      setSafetyViolationJournalTasks(entries.filter((entry) => entry.assignedEmployeeId === currentEmployee.id
+        && entry.inspectorSignature && !entry.employeeSignature).map((entry) => ({
+        ...entry,
+        organizationName: currentOrg?.name ?? '',
+        organizationCode: currentOrg?.companyCode ?? '',
+      })));
+      return undefined;
+    }
+    let active = true;
+    let requestInFlight = false;
+    let functionUnavailable = false;
+    const refreshTasks = async () => {
+      if (requestInFlight || functionUnavailable || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const { data: tasks, error } = await supabase.rpc('get_employee_safety_violation_tasks', {
+          input_organization_id: selectedOrgId,
+        });
+        if (error?.code === 'PGRST202') {
+          functionUnavailable = true;
+          if (active) setNotice('Darbų saugos pažeidimų parašų darbo eigai pritaikykite naujausią Supabase migraciją.');
+          return;
+        }
+        if (error) throw error;
+        const hydratedTasks = await hydrateSafetyViolationJournalEntries(tasks ?? []);
+        if (active) setSafetyViolationJournalTasks(hydratedTasks);
+      } catch (error) {
+        if (active) setNotice(`Darbuotojui skirtų pažeidimų įrašų įkelti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshTasks();
+    const intervalId = window.setInterval(refreshTasks, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshTasks();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id, currentOrg?.name, currentOrg?.companyCode, currentOrg?.resourceSettings]);
+  useEffect(() => {
+    if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss')
+      || (userRole === 'vadovas' && !canManageSelectedWorkspace)
+      || (userRole === 'dss' && !dssOrganizationIsOpen)) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshEntries = async () => {
+      if (requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const { data: entries, error } = await supabase.rpc('get_safety_violation_journal_entries', {
+          input_organization_id: selectedOrgId,
+        });
+        if (error) throw error;
+        if (!active) return;
+        const normalizedEntries = normalizeSafetyViolationJournalEntries(entries ?? []);
+        setData((current) => {
+          const org = current.organizations.find((organization) => organization.id === selectedOrgId);
+          if (!org) return current;
+          const savedEntries = normalizeSafetyViolationJournalEntries(org.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries);
+          const comparable = (items) => JSON.stringify(normalizeSafetyViolationJournalEntries(items).map((entry) => ({
+            ...entry,
+            inspectorSignature: entry.inspectorSignature ? { ...entry.inspectorSignature, signatureImage: '' } : null,
+            employeeSignature: entry.employeeSignature ? { ...entry.employeeSignature, signatureImage: '' } : null,
+            resolutionSignature: entry.resolutionSignature ? { ...entry.resolutionSignature, signatureImage: '' } : null,
+          })));
+          const nextSignatures = normalizedEntries.flatMap((entry) => [
+            entry.inspectorSignature && { ...entry.inspectorSignature, orgId: selectedOrgId, employeeId: entry.assignedEmployeeId, resourceId: safetyViolationJournalResourceId, violationEntryId: entry.id, signatureMethod: 'PIN' },
+            entry.employeeSignature && { ...entry.employeeSignature, orgId: selectedOrgId, employeeId: entry.assignedEmployeeId, resourceId: safetyViolationJournalResourceId, violationEntryId: entry.id, signatureMethod: 'PIN' },
+            entry.resolutionSignature && { ...entry.resolutionSignature, orgId: selectedOrgId, employeeId: entry.assignedEmployeeId, resourceId: safetyViolationJournalResourceId, violationEntryId: entry.id, signatureMethod: 'PIN' },
+          ].filter(Boolean));
+          const signatures = [
+            ...(current.signatures ?? []).filter((signature) => !nextSignatures.some((item) => item.id && item.id === signature.id)),
+            ...nextSignatures,
+          ];
+          const entriesChanged = comparable(savedEntries) !== comparable(normalizedEntries);
+          const signaturesChanged = JSON.stringify(signatures) !== JSON.stringify(current.signatures ?? []);
+          if (!entriesChanged && !signaturesChanged) return current;
+          return {
+            ...current,
+            organizations: entriesChanged ? current.organizations.map((organization) => organization.id === selectedOrgId
+              ? {
+                ...organization,
+                resourceSettings: {
+                  ...organization.resourceSettings,
+                  [safetyViolationJournalResourceId]: {
+                    ...organization.resourceSettings?.[safetyViolationJournalResourceId],
+                    violationEntries: normalizedEntries,
+                  },
+                },
+              }
+              : organization) : current.organizations,
+            signatures,
+          };
+        });
+      } catch (error) {
+        if (active) setNotice(`Darbų saugos pažeidimų žurnalo įrašų atnaujinti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshEntries();
+    const intervalId = window.setInterval(refreshEntries, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshEntries();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, selectedOrgId, userRole, canManageSelectedWorkspace, dssOrganizationIsOpen]);
   useEffect(() => {
     if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss') || !canManageSelectedWorkspace) return undefined;
     let active = true;
@@ -4241,7 +4416,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const saved = currentOrg?.resourceSettings?.[resource.id] ?? {};
     const defaultRequiredSigners = [...(resource.requiredSigners ?? defaults.requiredSigners ?? ['Darbuotojas'])];
     const isAccidentIncidentJournal = resource.templateKind === accidentIncidentJournalTemplateKind;
-    if (!isAccidentIncidentJournal && !defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
+    const isSafetyViolationJournal = resource.templateKind === safetyViolationJournalTemplateKind;
+    if (!isAccidentIncidentJournal && !isSafetyViolationJournal && !defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
     const savedInstructorRole = saved.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
       ?? (saved.instructorCanManager ? 'Vadovas' : null);
     const defaultInstructorRole = savedInstructorRole
@@ -4286,6 +4462,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : {}),
       validityMonths: saved.validityMonths ?? defaults.validityMonths ?? resource.validityMonths ?? 12,
       requiredSigners: isAccidentIncidentJournal
+        || isSafetyViolationJournal
         ? []
         : resource.templateKind === 'intro-dss-journal'
         ? ['Darbuotojas', defaultInstructorRole]
@@ -4298,6 +4475,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           recorderName: saved.recorderName ?? (defaults.recorderName || defaultRecorderName),
           recorderPosition: saved.recorderPosition ?? defaults.recorderPosition ?? 'Įmonės vadovas',
           incidentEntries: normalizeIncidentJournalEntries(saved.incidentEntries),
+        }
+        : {}),
+      ...(isSafetyViolationJournal
+        ? {
+          recorderRole: saved.recorderRole ?? defaults.recorderRole ?? 'DSS specialistas',
+          recorderName: saved.recorderName || defaults.recorderName || defaultRecorderName,
+          recorderPosition: saved.recorderPosition || defaults.recorderPosition || 'DSS specialistas',
+          resolutionRole: saved.resolutionRole ?? defaults.resolutionRole ?? 'DSS specialistas',
+          violationEntries: normalizeSafetyViolationJournalEntries(saved.violationEntries),
         }
         : {}),
       ...(resource.templateKind === 'fire-safety-journal'
@@ -4327,6 +4513,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const settings = {
       ...resourceSettingsDraft,
       requiredSigners: resourceSettingsTarget.templateKind === accidentIncidentJournalTemplateKind
+        || resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind
         ? []
         : [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])],
       ...(resourceSettingsTarget.templateKind === 'internal-documents-register'
@@ -4347,6 +4534,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       settings.recorderRole = ['Vadovas', 'DSS specialistas', 'Kita'].includes(settings.recorderRole) ? settings.recorderRole : 'Vadovas';
       settings.recorderName = String(settings.recorderName ?? '').trim().slice(0, 150);
       settings.recorderPosition = String(settings.recorderPosition ?? '').trim().slice(0, 150);
+      settings.requiredSigners = [];
+    } else if (resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind) {
+      settings.violationEntries = normalizeSafetyViolationJournalEntries(settings.violationEntries);
+      settings.recorderRole = ['Vadovas', 'DSS specialistas'].includes(settings.recorderRole) ? settings.recorderRole : 'DSS specialistas';
+      settings.recorderName = String(settings.recorderName ?? '').trim().slice(0, 150);
+      settings.recorderPosition = String(settings.recorderPosition ?? '').trim().slice(0, 150);
+      settings.resolutionRole = ['Vadovas', 'DSS specialistas'].includes(settings.resolutionRole) ? settings.resolutionRole : 'DSS specialistas';
       settings.requiredSigners = [];
     } else if (resourceSettingsTarget.templateKind === 'workplace-dss-journal') {
       const fieldRoles = { ...workplaceDssSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
@@ -4560,6 +4754,173 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setIncidentJournalSignError(`Incidento įrašo pasirašyti nepavyko: ${error.message}`);
     } finally {
       setIncidentJournalSignSubmitting(false);
+    }
+  };
+
+  const openSafetyViolationSignDialog = (type, entry, orgId = currentOrg?.id) => {
+    if (!entry || !orgId) return;
+    setSafetyViolationSigningTarget({ type, entry, orgId });
+    setSafetyViolationSignPin('');
+    setSafetyViolationSignError('');
+    setSafetyViolationReviewConfirmed(false);
+    setSignatureInk('');
+  };
+
+  const closeSafetyViolationSignDialog = () => {
+    setSafetyViolationSigningTarget(null);
+    setSafetyViolationSignPin('');
+    setSafetyViolationSignError('');
+    setSafetyViolationReviewConfirmed(false);
+    setSignatureInk('');
+  };
+
+  const confirmSafetyViolationSign = async (event) => {
+    event.preventDefault();
+    if (safetyViolationSignSubmitting || !safetyViolationSigningTarget) return;
+    const { type, entry, orgId } = safetyViolationSigningTarget;
+    if (!/^\d{4}$/.test(safetyViolationSignPin)) {
+      setSafetyViolationSignError('Įveskite 4 skaitmenų PIN kodą.');
+      return;
+    }
+    if (!signatureInk) {
+      setSafetyViolationSignError('Nupieškite parašą.');
+      return;
+    }
+    if (!safetyViolationReviewConfirmed) {
+      setSafetyViolationSignError('Patvirtinkite, kad peržiūrėjote įrašo duomenis.');
+      return;
+    }
+    if (type === 'resolution' && !entry.resolvedDate) {
+      setSafetyViolationSignError('Prieš tvirtindami nurodykite pažeidimo pašalinimo datą ir išsaugokite įrašą.');
+      return;
+    }
+    if (type === 'resolution' && (entry.resolvedDate > toDateInputValue() || entry.resolvedDate < entry.detectedDate)) {
+      setSafetyViolationSignError('Pašalinimo data turi būti ne ankstesnė už pažeidimo nustatymo datą ir ne vėlesnė už šiandieną.');
+      return;
+    }
+    setSafetyViolationSignSubmitting(true);
+    setSafetyViolationSignError('');
+    let uploadedSignature = null;
+    try {
+      let updatedEntry;
+      let signatureRecord;
+      if (cloudMode) {
+        uploadedSignature = await uploadSignatureSvg(orgId, signatureInk);
+        const { data: result, error } = await supabase.rpc('sign_safety_violation_journal_entry', {
+          input_organization_id: orgId,
+          input_entry_id: entry.id,
+          input_stage: type,
+          input_pin: safetyViolationSignPin,
+          input_signature_path: uploadedSignature.path,
+          input_resolution_date: type === 'resolution' ? entry.resolvedDate : null,
+        });
+        if (error) throw error;
+        if (!result?.entry || !result?.signature) {
+          await removeSignatureAsset(uploadedSignature.path);
+          uploadedSignature = null;
+          setSafetyViolationSignError('PIN kodas neteisingas arba įrašo parašo nepavyko patvirtinti.');
+          return;
+        }
+        updatedEntry = normalizeSafetyViolationJournalEntries([result.entry])[0];
+        signatureRecord = result.signature;
+      } else {
+        const organization = data.organizations.find((item) => item.id === orgId);
+        const employee = data.employees.find((item) => item.id === entry.assignedEmployeeId);
+        const isEmployee = type === 'employee';
+        const settings = organization?.resourceSettings?.[safetyViolationJournalResourceId] ?? {};
+        const expectedPin = isEmployee
+          ? currentEmployee?.id === employee?.id ? currentEmployee?.pin : employee?.pin
+          : userRole === 'vadovas' ? organization?.managerPin : currentSpecialist?.pin;
+        const configuredRole = type === 'resolution' ? settings.resolutionRole : settings.recorderRole;
+        const actorRole = userRole === 'vadovas' ? 'Vadovas' : 'DSS specialistas';
+        if (!expectedPin || expectedPin !== safetyViolationSignPin) {
+          setSafetyViolationSignError('PIN kodas neteisingas.');
+          return;
+        }
+        if (isEmployee && currentEmployee?.id !== entry.assignedEmployeeId) {
+          setSafetyViolationSignError('Šis įrašas priskirtas kitam darbuotojui.');
+          return;
+        }
+        if (!isEmployee && (userRole === 'darbuotojas' || configuredRole !== actorRole)) {
+          setSafetyViolationSignError(`Šį veiksmą turi pasirašyti ${configuredRole === 'Vadovas' ? 'įmonės vadovas' : 'DSS specialistas'}.`);
+          return;
+        }
+        if (type === 'inspector' && entry.inspectorSignature
+          || type === 'employee' && (!entry.inspectorSignature || entry.employeeSignature)
+          || type === 'resolution' && (!entry.employeeSignature || entry.resolutionSignature)) {
+          setSafetyViolationSignError('Įrašo pasirašymo būsena pasikeitė. Atnaujinkite žurnalą ir bandykite dar kartą.');
+          return;
+        }
+        const role = isEmployee ? 'Darbuotojas' : actorRole;
+        const signer = isEmployee ? employee?.name ?? '' : userRole === 'vadovas' ? organization?.manager ?? '' : currentSpecialist?.name ?? '';
+        const nestedSignature = {
+          id: `sig-${crypto.randomUUID()}`,
+          signer,
+          role,
+          signedAt: new Date().toISOString(),
+          ip: '127.0.0.1 (demo)',
+          signaturePath: '',
+          signatureImage: signatureInk,
+        };
+        const signatureKey = type === 'inspector' ? 'inspectorSignature'
+          : type === 'employee' ? 'employeeSignature'
+            : 'resolutionSignature';
+        updatedEntry = {
+          ...entry,
+          ...(type === 'resolution' ? { resolvedDate: entry.resolvedDate } : {}),
+          [signatureKey]: nestedSignature,
+        };
+        signatureRecord = {
+          ...nestedSignature,
+          orgId,
+          employeeId: entry.assignedEmployeeId,
+          contractNumber: employee?.contractNumber ?? '',
+          resourceId: safetyViolationJournalResourceId,
+          violationEntryId: entry.id,
+          signatureMethod: 'PIN',
+        };
+      }
+
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((organization) => organization.id === orgId
+          ? {
+            ...organization,
+            resourceSettings: {
+              ...organization.resourceSettings,
+              [safetyViolationJournalResourceId]: {
+                ...organization.resourceSettings?.[safetyViolationJournalResourceId],
+                violationEntries: normalizeSafetyViolationJournalEntries(
+                  organization.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries,
+                ).map((currentEntry) => currentEntry.id === updatedEntry.id ? updatedEntry : currentEntry),
+              },
+            },
+          }
+          : organization),
+        signatures: [
+          ...(current.signatures ?? []).filter((signature) => signature.id !== signatureRecord.id),
+          signatureRecord,
+        ],
+      }));
+      if (type !== 'employee' && resourceSettingsTarget?.id === safetyViolationJournalResourceId) {
+        setResourceSettingsDraft((current) => ({
+          ...current,
+          violationEntries: normalizeSafetyViolationJournalEntries(current.violationEntries)
+            .map((currentEntry) => currentEntry.id === updatedEntry.id ? updatedEntry : currentEntry),
+        }));
+      }
+      if (type === 'employee') setSafetyViolationJournalTasks((current) => current.filter((task) => task.id !== entry.id));
+      closeSafetyViolationSignDialog();
+      setNotice(type === 'employee'
+        ? 'Darbų saugos pažeidimo įrašas pasirašytas ir užfiksuotas.'
+        : type === 'resolution'
+          ? 'Pažeidimo pašalinimas pasirašytas ir užfiksuotas.'
+          : 'Įrašas pasirašytas. Darbuotojas gaus pranešimą savo paskyroje.');
+    } catch (error) {
+      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
+      setSafetyViolationSignError(`Darbų saugos pažeidimo įrašo pasirašyti nepavyko: ${error.message}`);
+    } finally {
+      setSafetyViolationSignSubmitting(false);
     }
   };
 
@@ -4796,7 +5157,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     }
     const defaultTemplateLoader = defaultDocumentTemplateLoaders.get(resource.id)
       ?? defaultDocumentTemplateLoaders.get(resource.templateKind);
-    if (resource.html && !['res-fire-safety-journal', accidentIncidentJournalResourceId].includes(resource.id)) return resource;
+    if (resource.html && !['res-fire-safety-journal', accidentIncidentJournalResourceId, safetyViolationJournalResourceId].includes(resource.id)) return resource;
     if (!resource.htmlUrl && !defaultTemplateLoader) return resource;
     const cached = useCache ? resourceHtmlCacheRef.current.get(resource.id) : null;
     if (cached) return cached;
@@ -5254,7 +5615,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka' && resource.templateKind !== accidentIncidentJournalTemplateKind) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka' && ![accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind].includes(resource.templateKind)) } = {}) => {
     if (!templateOnly && userRole === 'darbuotojas' && normalizeResourceType(resource) === 'Testas') {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const unsignedPassedResult = getUnsignedPassedTestResult(employee, resource.id, data.signatures);
@@ -5312,6 +5673,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         );
       } catch (error) {
         setNotice(`Incidentų žurnalo parašų atvaizdinti nepavyko: ${error.message}`);
+        return;
+      }
+    }
+    if (!templateOnly && resource.templateKind === safetyViolationJournalTemplateKind) {
+      try {
+        configuredResource.defaultSettings.violationEntries = await hydrateSafetyViolationJournalEntries(
+          configuredResource.defaultSettings.violationEntries,
+        );
+      } catch (error) {
+        setNotice(`Darbų saugos pažeidimų žurnalo parašų atvaizdinti nepavyko: ${error.message}`);
         return;
       }
     }
@@ -7400,6 +7771,24 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       }
       : employee),
   }));
+  const safetyViolationDssTasks = userRole === 'dss'
+    ? normalizeSafetyViolationJournalEntries(currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries)
+      .flatMap((entry) => [
+        !entry.inspectorSignature && currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.recorderRole === 'DSS specialistas'
+          ? { entry, stage: 'inspector' }
+          : null,
+        entry.employeeSignature && !entry.resolutionSignature && entry.resolvedDate
+          && currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.resolutionRole === 'DSS specialistas'
+          ? { entry, stage: 'resolution' }
+          : null,
+      ].filter(Boolean).map(({ entry: taskEntry, stage }) => ({
+        id: `safety-violation-journal-${taskEntry.id}-${stage}`,
+        title: stage === 'inspector' ? 'Patvirtinti darbų saugos pažeidimo įrašą' : 'Patvirtinti pažeidimo pašalinimą',
+        description: `${currentOrg?.name ?? 'Įmonė'} · ${taskEntry.department} · ${taskEntry.detectedDate}`,
+        safetyViolationJournalTask: taskEntry,
+        safetyViolationStage: stage,
+      })))
+    : [];
   const notifications = userRole === 'kurejas'
     ? [
       ...creatorSubscriptions
@@ -7431,6 +7820,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         title: 'Peržiūrėti ir pasirašyti incidento įrašą',
         description: `${task.organizationName || currentOrg?.name || 'Įmonė'} · ${task.eventType} · ${task.injuredName}`,
         incidentJournalTask: task,
+      })),
+      ...safetyViolationJournalTasks.map((task) => ({
+        id: `safety-violation-journal-sign-${task.id}`,
+        title: 'Peržiūrėti ir pasirašyti darbų saugos pažeidimo įrašą',
+        description: `${task.organizationName || currentOrg?.name || 'Įmonė'} · ${task.department} · ${task.detectedDate}`,
+        safetyViolationJournalTask: task,
       })),
       ...pendingResourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
@@ -7465,6 +7860,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         description: `${task.signer} · laukia DSS parašo`,
         task,
         })),
+        ...safetyViolationDssTasks,
         ...pendingCommissionInvitations.map((invitation) => ({
           id: `commission-invitation-${invitation.id}`,
           title: 'Kvietimas į DSS komisiją',
@@ -7934,6 +8330,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         openIncidentJournalSignDialog('employee', item.incidentJournalTask, selectedOrgId);
                         return;
                       }
+                      if (item.safetyViolationJournalTask) {
+                        openSafetyViolationSignDialog('employee', item.safetyViolationJournalTask, selectedOrgId);
+                        return;
+                      }
                       if (item.aapIssuance) {
                         setActiveTab('aap');
                         setAapIssueSigningTarget(item.aapIssuance.id);
@@ -7945,6 +8345,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                       setTaskFilter('visos');
                       if (item.resource) openResourcePreview(item.resource);
                     } else if (userRole === 'dss') {
+                      if (item.safetyViolationJournalTask) {
+                        setActiveTab('zurnalai');
+                        openSafetyViolationSignDialog(item.safetyViolationStage, item.safetyViolationJournalTask, selectedOrgId);
+                        return;
+                      }
                       if (item.commissionInvitation) {
                         setCommissionInvitationTarget(item.commissionInvitation);
                         setCommissionConsentChecked(false);
@@ -9161,7 +9566,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
           ? <ProtocolSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />
-          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} resources={data.resources} organization={currentOrg} employees={orgEmployees} specialists={data.specialists} persistedEntries={normalizeIncidentJournalEntries(currentOrg?.resourceSettings?.[accidentIncidentJournalResourceId]?.incidentEntries)} onSignEntry={(entry) => openIncidentJournalSignDialog('manager', entry)} availableResourceIds={currentOrg?.resources ?? []} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
+          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} resources={data.resources} organization={currentOrg} employees={orgEmployees} specialists={data.specialists} persistedEntries={resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? normalizeSafetyViolationJournalEntries(currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries) : normalizeIncidentJournalEntries(currentOrg?.resourceSettings?.[accidentIncidentJournalResourceId]?.incidentEntries)} onSignEntry={(entry, stage) => resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? openSafetyViolationSignDialog(stage, entry) : openIncidentJournalSignDialog('manager', entry)} availableResourceIds={currentOrg?.resources ?? []} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
       </main>
 
       {protocolAccessPopup && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="protocol-access-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 shrink-0 text-amber-600" size={22} /><div><h2 id="protocol-access-title" className="text-lg font-bold">{protocolAccessPopup.startsWith('Testas') ? 'Testas neatliktas' : 'Protokolo atidaryti negalima'}</h2><p className="mt-2 text-sm text-slate-700">{protocolAccessPopup}</p></div></div><div className="mt-5 flex justify-end"><button type="button" autoFocus className={buttonClass} onClick={() => setProtocolAccessPopup('')}>Gerai</button></div></section></div>}
@@ -9218,6 +9623,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <label className="block text-sm font-medium">{incidentJournalSigningTarget.type === 'employee' ? 'Jūsų' : userRole === 'vadovas' ? 'Vadovo' : 'DSS specialisto'} 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={incidentJournalSignPin} onChange={(event) => { setIncidentJournalSignPin(event.target.value); setIncidentJournalSignError(''); }} required disabled={incidentJournalSignSubmitting} /></label>
           {incidentJournalSignError && <p role="alert" className="text-sm text-rose-700">{incidentJournalSignError}</p>}
           <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={incidentJournalSignSubmitting} onClick={closeIncidentJournalSignDialog}>Atšaukti</button><button type="submit" className={buttonClass} disabled={incidentJournalSignSubmitting || !signatureInk || !incidentJournalReviewConfirmed}>{incidentJournalSignSubmitting ? 'Saugoma…' : <><FileSignature size={15} />{incidentJournalSigningTarget.type === 'employee' ? 'Patvirtinti ir pasirašyti' : 'Pasirašyti ir pranešti darbuotojui'}</>}</button></div>
+        </form>
+      </div>}
+      {safetyViolationSigningTarget && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4">
+        <form role="dialog" aria-modal="true" aria-labelledby="safety-violation-sign-title" onSubmit={confirmSafetyViolationSign} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{safetyViolationSigningTarget.entry.organizationName || currentOrg?.name || ''}</p><h2 id="safety-violation-sign-title" className="mt-1 text-lg font-bold">{safetyViolationSigningTarget.type === 'employee' ? 'Peržiūrėti ir pasirašyti darbų saugos pažeidimo įrašą' : safetyViolationSigningTarget.type === 'resolution' ? 'Patvirtinti pažeidimo pašalinimą' : 'Patvirtinti pažeidimo įrašą'}</h2><p className="mt-1 text-sm text-slate-600">{safetyViolationSigningTarget.type === 'employee' ? 'Patikrinkite nurodymus ir terminą prieš pasirašydami.' : safetyViolationSigningTarget.type === 'resolution' ? 'Patvirtinkite, kad pažeidimas pašalintas.' : 'Patvirtinkite parengtą įrašą. Po jūsų parašo darbuotojas gaus pranešimą.'}</p></div><button type="button" aria-label="Uždaryti pažeidimo parašo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" disabled={safetyViolationSignSubmitting} onClick={closeSafetyViolationSignDialog}><X size={20} /></button></div>
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+            <p><strong>Pažeidimo nustatymo data:</strong> {safetyViolationSigningTarget.entry.detectedDate || 'Nenurodyta'}</p>
+            <p><strong>Padalinys / darbo vieta:</strong> {safetyViolationSigningTarget.entry.department}</p>
+            <p><strong>Pažeidimas:</strong> {safetyViolationSigningTarget.entry.violation}</p>
+            <p><strong>Nurodymai pašalinti:</strong> {safetyViolationSigningTarget.entry.correctiveAction}</p>
+            <p><strong>Pašalinimo terminas:</strong> {safetyViolationSigningTarget.entry.deadline || 'Nenurodytas'}</p>
+            {safetyViolationSigningTarget.type === 'resolution' && <p><strong>Pašalinimo data:</strong> {safetyViolationSigningTarget.entry.resolvedDate}</p>}
+            {safetyViolationSigningTarget.entry.inspectorSignature && <div className="border-t border-slate-200 pt-2"><p><strong>Įrašą patvirtino:</strong> {safetyViolationSigningTarget.entry.inspectorSignature.signer} · {safetyViolationSigningTarget.entry.inspectorSignature.role}</p><p><strong>Data, laikas, IP:</strong> {new Date(safetyViolationSigningTarget.entry.inspectorSignature.signedAt).toLocaleString('lt-LT')} · {safetyViolationSigningTarget.entry.inspectorSignature.ip}</p>{safetyViolationSigningTarget.entry.inspectorSignature.signatureImage && <img className="mt-2 max-h-14 max-w-36 object-contain" src={safetyViolationSigningTarget.entry.inspectorSignature.signatureImage} alt="Pažeidimą nustačiusio asmens parašas" />}</div>}
+          </section>
+          <label className="flex items-start gap-2 text-sm"><input className="mt-0.5" type="checkbox" checked={safetyViolationReviewConfirmed} onChange={(event) => { setSafetyViolationReviewConfirmed(event.target.checked); setSafetyViolationSignError(''); }} /><span>{safetyViolationSigningTarget.type === 'employee' ? 'Peržiūrėjau pažeidimo įrašą ir patvirtinu, kad susipažinau su nurodymais.' : safetyViolationSigningTarget.type === 'resolution' ? 'Patvirtinu, kad nurodytas pažeidimas pašalintas.' : 'Peržiūrėjau pažeidimo duomenis ir patvirtinu, kad jie parengti teisingai.'}</span></label>
+          <SignaturePad value={signatureInk} onChange={(value) => { setSignatureInk(value); setSafetyViolationSignError(''); }} />
+          <label className="block text-sm font-medium">{safetyViolationSigningTarget.type === 'employee' ? 'Jūsų' : userRole === 'vadovas' ? 'Vadovo' : 'DSS specialisto'} 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={safetyViolationSignPin} onChange={(event) => { setSafetyViolationSignPin(event.target.value); setSafetyViolationSignError(''); }} required disabled={safetyViolationSignSubmitting} /></label>
+          {safetyViolationSignError && <p role="alert" className="text-sm text-rose-700">{safetyViolationSignError}</p>}
+          <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={safetyViolationSignSubmitting} onClick={closeSafetyViolationSignDialog}>Atšaukti</button><button type="submit" className={buttonClass} disabled={safetyViolationSignSubmitting || !signatureInk || !safetyViolationReviewConfirmed}>{safetyViolationSignSubmitting ? 'Saugoma…' : <><FileSignature size={15} />{safetyViolationSigningTarget.type === 'employee' ? 'Patvirtinti ir pasirašyti' : safetyViolationSigningTarget.type === 'resolution' ? 'Patvirtinti pašalinimą' : 'Pasirašyti ir pranešti darbuotojui'}</>}</button></div>
         </form>
       </div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti vadovo parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · {data.resources.find((resource) => resource.id === employerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
@@ -9510,7 +9934,7 @@ function getResourceWorkflowStatus(employee, resource, signatures, organizations
   return { key: 'todo', label: 'Nepradėta' };
 }
 function getRequiredSigners(resource, org, employee) {
-  if (resource?.templateKind === accidentIncidentJournalTemplateKind) return [];
+  if ([accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind].includes(resource?.templateKind)) return [];
   if (resource?.templateKind === 'intro-dss-journal') {
     const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
     const legacySettings = { ...resource.defaultSettings, ...savedSettings };
@@ -9730,7 +10154,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function populateJournalRows(html, resource, employee, org, signatures, specialists, allResources = []) {
-  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', accidentIncidentJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
+  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -9755,6 +10179,8 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     ? templateRowCount
     : resource.templateKind === accidentIncidentJournalTemplateKind
       ? Math.max(templateRowCount, normalizeIncidentJournalEntries(resource.defaultSettings?.incidentEntries).length)
+      : resource.templateKind === safetyViolationJournalTemplateKind
+        ? Math.max(templateRowCount, normalizeSafetyViolationJournalEntries(resource.defaultSettings?.violationEntries).length)
       : Math.max(templateRowCount, employees.length);
   const tableBody = table?.tBodies[0];
   if (table) table.dataset.pageSize = String(templateRowCount);
@@ -9848,6 +10274,45 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         [entry.recorderPosition, entry.recorderName].filter(Boolean).map(escapeHtml).join('<br>'),
         signatureMarkup(entry.managerSignature ?? entry.recorderSignature, 'Laukia vadovo / DSS parašo'),
         signatureMarkup(entry.employeeSignature ?? entry.injuredSignature, 'Laukia darbuotojo parašo'),
+      ]);
+    });
+  } else if (resource.templateKind === safetyViolationJournalTemplateKind) {
+    const violationEntries = normalizeSafetyViolationJournalEntries(resource.defaultSettings?.violationEntries);
+    const signatureMarkup = (signature, pendingLabel) => {
+      if (!signature) return `<span class="signature-pending">${escapeHtml(pendingLabel)}</span>`;
+      const signatureImage = typeof signature.signatureImage === 'string' ? signature.signatureImage : '';
+      const signedAt = new Date(signature.signedAt);
+      const signedDate = Number.isNaN(signedAt.getTime()) ? '' : `${dateFormatter.format(signedAt)} ${timeFormatter.format(signedAt)}`;
+      const image = signatureImage
+        ? `<img src="${escapeHtml(signatureImage)}" alt="${escapeHtml(signature.signer || 'Pasirašiusio asmens')} parašas" style="display:block;width:90px;height:24px;max-width:100%;object-fit:contain;margin:auto">`
+        : '';
+      return `<span class="signature-proof">${image}<small>${escapeHtml(signature.role)} · ${escapeHtml(signature.signer)}</small><small>${escapeHtml(signedDate)}</small><small>IP / aplinka: ${escapeHtml(signature.ip)}</small></span>`;
+    };
+    rows.forEach((row, index) => {
+      const entry = violationEntries[index];
+      if (!entry) {
+        writeRow(row, ['', '', '', '', '', '', '', '', '']);
+        return;
+      }
+      const employeeName = employees.find((item) => item.id === entry.assignedEmployeeId)?.name
+        ?? entry.employeeSignature?.signer
+        ?? '';
+      writeRow(row, [
+        String(index + 1),
+        escapeHtml(formatDate(entry.detectedDate)),
+        escapeHtml(entry.department),
+        escapeHtml(entry.violation).replace(/\r?\n/g, '<br>'),
+        escapeHtml(entry.correctiveAction).replace(/\r?\n/g, '<br>'),
+        escapeHtml(formatDate(entry.deadline)),
+        [
+          [entry.inspectorPosition, entry.inspectorName].filter(Boolean).map(escapeHtml).join('<br>'),
+          signatureMarkup(entry.inspectorSignature, 'Laukia vadovo / DSS parašo'),
+        ].filter(Boolean).join('<br>'),
+        `<strong>${escapeHtml(employeeName)}</strong><br>${signatureMarkup(entry.employeeSignature, 'Laukia darbuotojo parašo')}`,
+        [
+          entry.resolvedDate && escapeHtml(formatDate(entry.resolvedDate)),
+          signatureMarkup(entry.resolutionSignature, 'Laukia pašalinimo patvirtinimo'),
+        ].filter(Boolean).join('<br>'),
       ]);
     });
   } else if (resource.templateKind === 'fire-safety-journal') {
@@ -10864,10 +11329,165 @@ function LegacyResourceSettingsDialog({ resource, settings, resources = [], orga
 function ResourceSettingsDialog(props) {
   if (normalizeResourceType(props.resource) === 'Testas') return <TestResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === accidentIncidentJournalTemplateKind) return <AccidentIncidentJournalSettingsDialog {...props} />;
+  if (props.resource.templateKind === safetyViolationJournalTemplateKind) return <SafetyViolationJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === 'evacuation-plan-journal') return <EvacuationPlanResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
   return <LegacyResourceSettingsDialog {...props} />;
+}
+
+function SafetyViolationJournalSettingsDialog({ resource, settings, organization, employees = [], specialists = [], persistedEntries = [], onChange, onSignEntry, onSave, onClose }) {
+  const entries = normalizeSafetyViolationJournalEntries(settings.violationEntries);
+  const [entryDraft, setEntryDraft] = useState({
+    detectedDate: toDateInputValue(),
+    department: '',
+    violation: '',
+    correctiveAction: '',
+    deadline: '',
+    assignedEmployeeId: '',
+    inspectorPosition: settings.recorderPosition ?? '',
+    inspectorName: settings.recorderName ?? '',
+  });
+  const [editingEntryId, setEditingEntryId] = useState(null);
+  const [entryError, setEntryError] = useState('');
+  const updateEntryDraft = (key, value) => setEntryDraft((current) => ({ ...current, [key]: value }));
+  const updateRecorderDefault = (key, value) => {
+    onChange({ ...settings, [key]: value });
+    if (!editingEntryId) {
+      const draftKey = key === 'recorderPosition' ? 'inspectorPosition' : 'inspectorName';
+      setEntryDraft((current) => ({ ...current, [draftKey]: value }));
+    }
+  };
+  const selectDefaultRole = (key, role) => {
+    const roleName = role === 'Vadovas'
+      ? organization?.manager ?? ''
+      : organization?.dss?.map((id) => specialists.find((specialist) => specialist.id === id)?.name).find(Boolean) ?? '';
+    const updates = key === 'recorderRole'
+      ? { recorderRole: role, recorderPosition: role === 'Vadovas' ? 'Įmonės vadovas' : 'DSS specialistas', ...(roleName ? { recorderName: roleName } : {}) }
+      : { resolutionRole: role };
+    onChange({ ...settings, ...updates });
+    if (key === 'recorderRole' && !editingEntryId) setEntryDraft((current) => ({
+      ...current,
+      inspectorPosition: role === 'Vadovas' ? 'Įmonės vadovas' : 'DSS specialistas',
+      ...(roleName ? { inspectorName: roleName } : {}),
+    }));
+  };
+  const clearEntryDraft = () => {
+    setEntryDraft({
+      detectedDate: toDateInputValue(),
+      department: '',
+      violation: '',
+      correctiveAction: '',
+      deadline: '',
+      assignedEmployeeId: '',
+      inspectorPosition: settings.recorderPosition ?? '',
+      inspectorName: settings.recorderName ?? '',
+    });
+    setEditingEntryId(null);
+    setEntryError('');
+  };
+  const saveEntry = () => {
+    if (!entryDraft.detectedDate || !entryDraft.department.trim() || !entryDraft.violation.trim()
+      || !entryDraft.correctiveAction.trim() || !entryDraft.deadline || !entryDraft.assignedEmployeeId
+      || !entryDraft.inspectorPosition.trim() || !entryDraft.inspectorName.trim()) {
+      setEntryError('Užpildykite datą, padalinį, pažeidimą, pašalinimo nurodymus ir terminą, darbuotoją bei pažeidimą nustačiusio asmens duomenis.');
+      return;
+    }
+    const updatedEntry = normalizeSafetyViolationJournalEntries([{
+      ...entryDraft,
+      id: editingEntryId ?? `violation-${crypto.randomUUID()}`,
+    }])[0];
+    onChange({
+      ...settings,
+      violationEntries: editingEntryId
+        ? entries.map((entry) => entry.id === editingEntryId ? updatedEntry : entry)
+        : [...entries, updatedEntry],
+    });
+    clearEntryDraft();
+  };
+  const editEntry = (entry) => {
+    setEntryDraft({
+      detectedDate: entry.detectedDate,
+      department: entry.department,
+      violation: entry.violation,
+      correctiveAction: entry.correctiveAction,
+      deadline: entry.deadline,
+      assignedEmployeeId: entry.assignedEmployeeId,
+      inspectorPosition: entry.inspectorPosition,
+      inspectorName: entry.inspectorName,
+    });
+    setEditingEntryId(entry.id);
+    setEntryError('');
+  };
+  const removeEntry = (entryId) => {
+    onChange({ ...settings, violationEntries: entries.filter((entry) => entry.id !== entryId) });
+    if (editingEntryId === entryId) clearEntryDraft();
+  };
+  const entryComparable = (items) => JSON.stringify(normalizeSafetyViolationJournalEntries(items).map((entry) => ({
+    ...entry,
+    inspectorSignature: entry.inspectorSignature ? { ...entry.inspectorSignature, signatureImage: '' } : null,
+    employeeSignature: entry.employeeSignature ? { ...entry.employeeSignature, signatureImage: '' } : null,
+    resolutionSignature: entry.resolutionSignature ? { ...entry.resolutionSignature, signatureImage: '' } : null,
+  })));
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+    <form onSubmit={onSave} className="max-h-[90vh] w-full max-w-4xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės darbų saugos pažeidimų žurnalas</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Įrašai ir pasirašančiųjų vaidmenys taikomi tik šiai įmonei.</p></div>
+        <button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button>
+      </div>
+      <fieldset className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+        <legend className="px-1 text-sm font-semibold">Numatytieji pasirašantieji</legend>
+        <label className="text-sm font-medium">Pažeidimą nustačiusio asmens vaidmuo<select className={`${inputClass} mt-1`} value={settings.recorderRole ?? 'DSS specialistas'} onChange={(event) => selectDefaultRole('recorderRole', event.target.value)}><option value="Vadovas">Įmonės vadovas</option><option value="DSS specialistas">DSS specialistas</option></select></label>
+        <label className="text-sm font-medium">Pažeidimo pašalinimą tvirtinančio asmens vaidmuo<select className={`${inputClass} mt-1`} value={settings.resolutionRole ?? 'DSS specialistas'} onChange={(event) => selectDefaultRole('resolutionRole', event.target.value)}><option value="Vadovas">Įmonės vadovas</option><option value="DSS specialistas">DSS specialistas</option></select></label>
+        <label className="text-sm font-medium">Numatytosios pareigos<input className={`${inputClass} mt-1`} value={settings.recorderPosition ?? ''} maxLength={150} onChange={(event) => updateRecorderDefault('recorderPosition', event.target.value)} /></label>
+        <label className="text-sm font-medium">Numatytasis vardas, pavardė<input className={`${inputClass} mt-1`} value={settings.recorderName ?? ''} maxLength={150} onChange={(event) => updateRecorderDefault('recorderName', event.target.value)} /></label>
+      </fieldset>
+      <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3" onKeyDown={(event) => {
+        if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') event.preventDefault();
+      }}>
+        <legend className="px-1 text-sm font-semibold">{editingEntryId ? 'Redaguoti pažeidimo įrašą' : 'Naujas pažeidimo įrašas'}</legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">Pažeidimo nustatymo data<input className={`${inputClass} mt-1`} type="date" value={entryDraft.detectedDate} onChange={(event) => updateEntryDraft('detectedDate', event.target.value)} /></label>
+          <label className="text-sm font-medium">Padalinys / darbo vieta<input className={`${inputClass} mt-1`} value={entryDraft.department} maxLength={200} onChange={(event) => updateEntryDraft('department', event.target.value)} /></label>
+          <label className="text-sm font-medium sm:col-span-2">Nustatyto pažeidimo esmė<textarea className={`${inputClass} mt-1 min-h-20`} rows={3} maxLength={2000} value={entryDraft.violation} onChange={(event) => updateEntryDraft('violation', event.target.value)} /></label>
+          <label className="text-sm font-medium sm:col-span-2">Nurodymai pažeidimui pašalinti<textarea className={`${inputClass} mt-1 min-h-20`} rows={3} maxLength={2000} value={entryDraft.correctiveAction} onChange={(event) => updateEntryDraft('correctiveAction', event.target.value)} /></label>
+          <label className="text-sm font-medium">Pašalinimo terminas<input className={`${inputClass} mt-1`} type="date" value={entryDraft.deadline} onChange={(event) => updateEntryDraft('deadline', event.target.value)} /></label>
+          <label className="text-sm font-medium">Atsakingas darbuotojas<select className={`${inputClass} mt-1`} value={entryDraft.assignedEmployeeId} onChange={(event) => updateEntryDraft('assignedEmployeeId', event.target.value)}><option value="">Pasirinkite darbuotoją</option>{employees.filter((employee) => employee.status !== 'Archyvuotas').map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.position ? ` · ${employee.position}` : ''}</option>)}</select></label>
+          <label className="text-sm font-medium">Pažeidimą nustačiusio asmens pareigos<input className={`${inputClass} mt-1`} value={entryDraft.inspectorPosition} maxLength={150} onChange={(event) => updateEntryDraft('inspectorPosition', event.target.value)} /></label>
+          <label className="text-sm font-medium">Pažeidimą nustačiusio asmens vardas, pavardė<input className={`${inputClass} mt-1`} value={entryDraft.inspectorName} maxLength={150} onChange={(event) => updateEntryDraft('inspectorName', event.target.value)} /></label>
+        </div>
+        <p className="text-xs text-slate-500">Išsaugojus įrašą, nurodytas vadovas arba DSS specialistas pasirašo PIN kodu. Tuomet darbuotojas gauna pranešimą ir pasirašo savo paskyroje; pažeidimo pašalinimą patvirtina pasirinkto vaidmens atstovas.</p>
+        {entryError && <p role="alert" className="text-sm text-rose-700">{entryError}</p>}
+        <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={saveEntry}><Plus size={16} />{editingEntryId ? 'Išsaugoti įrašo pakeitimus' : 'Pridėti įrašą'}</button>{editingEntryId && <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={clearEntryDraft}>Atšaukti redagavimą</button>}</div>
+      </fieldset>
+      <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold">Žurnalo įrašai ({entries.length})</legend>
+        {entries.length ? entries.map((entry, index) => {
+          const assignedEmployee = employees.find((employee) => employee.id === entry.assignedEmployeeId);
+          const locked = Boolean(entry.inspectorSignature || entry.employeeSignature || entry.resolutionSignature);
+          const persistedEntry = persistedEntries.find((savedEntry) => savedEntry.id === entry.id);
+          const canSign = Boolean(persistedEntry && entryComparable([entry]) === entryComparable([persistedEntry]));
+          const status = entry.resolutionSignature ? 'Pažeidimo pašalinimas patvirtintas'
+            : entry.employeeSignature ? 'Laukia pašalinimo patvirtinimo'
+              : entry.inspectorSignature ? 'Laukia darbuotojo parašo'
+                : 'Laukia vadovo / DSS parašo';
+          return <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-3">
+            <div className="min-w-0"><p className="font-semibold">{index + 1}. {entry.violation || 'Pažeidimo įrašas'}</p><p className="text-xs text-slate-500">{entry.detectedDate || 'Data nenurodyta'} · {assignedEmployee?.name ?? 'Darbuotojas nepasirinktas'} · {status}</p></div>
+            <div className="flex flex-wrap gap-2">
+              {!entry.inspectorSignature && onSignEntry && <button type="button" disabled={!canSign} title={canSign ? 'Pasirašyti išsaugotą įrašą' : 'Pirmiausia išsaugokite pakeitimus'} className="rounded-md border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => onSignEntry(entry, 'inspector')}><FileSignature size={14} />{canSign ? 'Pasirašyti ir pranešti' : 'Išsaugokite prieš pasirašydami'}</button>}
+              {entry.employeeSignature && !entry.resolutionSignature && onSignEntry && <button type="button" disabled={!canSign || !entry.resolvedDate} title={entry.resolvedDate ? 'Patvirtinti pažeidimo pašalinimą' : 'Pirmiausia nurodykite pašalinimo datą ir išsaugokite'} className="rounded-md border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-900 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => onSignEntry(entry, 'resolution')}><FileSignature size={14} />Pasirašyti pašalinimą</button>}
+              {entry.employeeSignature && !entry.resolutionSignature && <label className="text-xs font-medium">Pašalinta<input className="ml-2 rounded border border-slate-300 px-2 py-1" type="date" min={entry.detectedDate || undefined} max={toDateInputValue()} value={entry.resolvedDate} onChange={(event) => onChange({ ...settings, violationEntries: entries.map((item) => item.id === entry.id ? { ...item, resolvedDate: event.target.value } : item) })} /></label>}
+              <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-40" disabled={locked} onClick={() => editEntry(entry)}>Redaguoti</button>
+              <button type="button" aria-label={`Pašalinti pažeidimo įrašą ${index + 1}`} disabled={locked} className="rounded-md border border-rose-200 p-2 text-rose-700 hover:bg-rose-50 disabled:opacity-40" onClick={() => removeEntry(entry.id)}><Trash2 size={16} /></button>
+            </div>
+          </div>;
+        }) : <p className="text-sm text-slate-500">Įrašų dar nėra. Pridėti įrašai bus rodomi žurnalo peržiūroje ir atsisiunčiamame dokumente.</p>}
+      </fieldset>
+      <p className="text-xs text-slate-500">Pasirašyti galima tik išsaugotus įrašus. Pasirašyti įrašai užrakinami, o tęstiniai puslapiai dokumente sukuriami automatiškai kas 15 eilučių.</p>
+      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+    </form>
+  </div>;
 }
 
 function EvacuationPlanResourceSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
