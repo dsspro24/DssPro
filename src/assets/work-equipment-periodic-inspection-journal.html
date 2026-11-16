@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Darbo priemonių (įrenginių) periodinės patikros žurnalas</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* ---------------- PORTRAIT (Viršelis) ---------------- */
+        @page portrait-page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+
+        .cover-page {
+            page: portrait-page;
+            max-width: 800px;
+            min-height: 1050px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .cover-field {
+            width: 80%;
+            margin-bottom: 35px;
+        }
+
+        .cover-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            border-bottom: 2px solid #cbd5e1;
+            padding-bottom: 6px;
+            min-height: 32px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .cover-label {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .cover-title-group {
+            margin-top: 60px;
+            margin-bottom: 40px;
+        }
+
+        .cover-main-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: 0.8px;
+            line-height: 1.5;
+            text-transform: uppercase;
+            max-width: 90%;
+            margin: 0 auto;
+        }
+
+        .cover-subtitle {
+            font-size: 26px;
+            font-weight: 800;
+            color: #2563eb;
+            letter-spacing: 3px;
+            margin-top: 35px;
+            text-transform: uppercase;
+        }
+
+        /* ---------------- LANDSCAPE (Žurnalo lentelė) ---------------- */
+        @page landscape-page {
+            size: A4 landscape;
+            margin: 12mm;
+        }
+
+        .journal-page {
+            page: landscape-page;
+            max-width: 1120px;
+            min-height: 750px;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .journal-header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .journal-header .company-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+
+        .journal-header .doc-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 3px;
+            text-transform: uppercase;
+        }
+
+        .journal-header .document-number {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 3px;
+        }
+
+        table.journal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5px;
+            margin-top: 5px;
+        }
+
+        table.journal-table th, 
+        table.journal-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5px 5px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        table.journal-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .th-num {
+            background-color: #e2e8f0 !important;
+            font-weight: 700;
+            font-size: 10px;
+            color: #475569;
+            padding: 3px !important;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        tbody tr {
+            height: 28px;
+        }
+
+        /* Stulpelių pločiai landscape formatui */
+        .col-1 { width: 4%; }  /* Eil. Nr. */
+        .col-2 { width: 15%; } /* Darbo priemonės (įrenginio) pavadinimas, tipas / markė */
+        .col-3 { width: 10%; } /* Inventorinis / gamyklinis Nr., vieta */
+        .col-4 { width: 8%; }  /* Patikros data */
+        .col-5 { width: 10%; } /* Patikros rūšis (periodinė, neeilinė) */
+        .col-6 { width: 21%; } /* Patikros rezultatai */
+        .col-7 { width: 11%; } /* Išvada */
+        .col-8 { width: 13%; } /* Patikrą atlikusio kompetentingo asmens duomenys ir parašas */
+        .col-9 { width: 8%; }  /* Kitos numatomos patikros data */
+
+        /* Spausdinimo nustatymai naršyklėje */
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+            .cover-page, .journal-page {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+                min-height: auto;
+                page-break-after: always;
+            }
+            .journal-page {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ================= 1 PUSLAPIS: VIRŠELIS (PORTRAIT) ================= -->
+<div class="cover-page">
+    <div class="cover-field">
+        <div class="cover-value">{{ COMPANY_NAME }}</div>
+        <div class="cover-label">(Įmonės pavadinimas)</div>
+    </div>
+
+    <div class="cover-field">
+        <div class="cover-value">{{ COMPANY_CODE }}</div>
+        <div class="cover-label">(Įmonės kodas)</div>
+    </div>
+
+    <div class="cover-title-group">
+        <div class="cover-main-title">
+            Darbo priemonių / įrenginių periodinės patikros
+        </div>
+        <div class="cover-subtitle">
+            Žurnalas
+        </div>
+    </div>
+</div>
+
+<!-- ================= 2 PUSLAPIS: ŽURNALO PILDYMO LENTELĖ (LANDSCAPE) ================= -->
+<div class="journal-page">
+    <div class="journal-header">
+        <div class="company-name">{{ COMPANY_NAME }}</div>
+        <div class="doc-name">DARBO PRIEMONIŲ / ĮRENGINIŲ PERIODINĖS PATIKROS ŽURNALAS</div>
+        <div class="document-number" data-journal-setting="documentNumber"></div>
+    </div>
+
+    <table class="journal-table">
+        <thead>
+            <tr>
+                <th class="col-1" rowspan="2">Eil.<br>Nr.</th>
+                <th class="col-2" rowspan="2">Darbo priemonės (įrenginio)<br>pavadinimas, tipas / markė</th>
+                <th class="col-3" rowspan="2">Inventorinis /<br>gamyklinis Nr.,<br>padalinys</th>
+                <th class="col-4" rowspan="2">Patikros<br>data</th>
+                <th class="col-5" rowspan="2">Patikros rūšis<br>(periodinė,<br>neeilinė)</th>
+                <th class="col-6" rowspan="2">Patikros rezultatai<br>(būklė, nustatyti trūkumai,<br>atlikti remonto darbai)</th>
+                <th class="col-7" rowspan="2">Išvada dėl tolesnio<br>naudojimo<br>(tinkama / netinkama)</th>
+                <th class="col-8" rowspan="2">Patikrą atlikusio kompetentingo<br>asmens pareigos, vardas,<br>pavardė ir parašas</th>
+                <th class="col-9" rowspan="2">Kitos<br>patikros<br>data</th>
+            </tr>
+            <tr></tr>
+            <tr>
+                <th class="th-num">1</th>
+                <th class="th-num">2</th>
+                <th class="th-num">3</th>
+                <th class="th-num">4</th>
+                <th class="th-num">5</th>
+                <th class="th-num">6</th>
+                <th class="th-num">7</th>
+                <th class="th-num">8</th>
+                <th class="th-num">9</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Tuščios eilutės pildymui -->
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

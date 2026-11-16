@@ -51,6 +51,7 @@ const defaultDocumentTemplateLoaders = new Map([
   ['res-evacuation-plan-familiarization-journal', () => import('./assets/evacuation-plan-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['res-fire-automation-maintenance-journal', () => import('./assets/fire-automation-maintenance-journal.html?raw').then(({ default: html }) => html)],
   ['res-first-aid-kit-inspection-journal', () => import('./assets/first-aid-kit-inspection-journal.html?raw').then(({ default: html }) => html)],
+  ['res-work-equipment-periodic-inspection-journal', () => import('./assets/work-equipment-periodic-inspection-journal.html?raw').then(({ default: html }) => html)],
   ['res-accident-incident-journal', () => import('./assets/accident-incident-registration-journal.html?raw').then(({ default: html }) => html)],
   ['accident-incident-journal', () => import('./assets/accident-incident-registration-journal.html?raw').then(({ default: html }) => html)],
   ['res-safety-violation-journal', () => import('./assets/safety-violation-registration-journal.html?raw').then(({ default: html }) => html)],
@@ -72,6 +73,7 @@ const defaultDocumentTemplateLoaders = new Map([
   ['evacuation-plan-journal', () => import('./assets/evacuation-plan-familiarization-journal.html?raw').then(({ default: html }) => html)],
   ['fire-automation-maintenance-journal', () => import('./assets/fire-automation-maintenance-journal.html?raw').then(({ default: html }) => html)],
   ['first-aid-kit-inspection-journal', () => import('./assets/first-aid-kit-inspection-journal.html?raw').then(({ default: html }) => html)],
+  ['work-equipment-periodic-inspection-journal', () => import('./assets/work-equipment-periodic-inspection-journal.html?raw').then(({ default: html }) => html)],
 ]);
 import {
   Archive,
@@ -768,6 +770,8 @@ const fireAutomationMaintenanceJournalResourceId = 'res-fire-automation-maintena
 const fireAutomationMaintenanceJournalTemplateKind = 'fire-automation-maintenance-journal';
 const firstAidKitInspectionJournalResourceId = 'res-first-aid-kit-inspection-journal';
 const firstAidKitInspectionJournalTemplateKind = 'first-aid-kit-inspection-journal';
+const workEquipmentInspectionJournalResourceId = 'res-work-equipment-periodic-inspection-journal';
+const workEquipmentInspectionJournalTemplateKind = 'work-equipment-periodic-inspection-journal';
 const isEmployeeAssignableResource = (resource) => resource?.adminOnly !== true
   && resource?.templateKind !== accidentIncidentJournalTemplateKind
   && resource?.templateKind !== safetyViolationJournalTemplateKind;
@@ -899,6 +903,58 @@ const normalizeFirstAidKitInspectionEntries = (entries) => (Array.isArray(entrie
     notes: String(entry.notes ?? '').slice(0, 1000),
     signature: normalizeFirstAidKitInspectionSignature(entry.signature),
   }));
+const normalizeWorkEquipmentInspectionSignature = (signature) => {
+  if (!signature || typeof signature !== 'object') return null;
+  const signatureImage = typeof signature.signatureImage === 'string'
+    && (isIncidentJournalSignature(signature.signatureImage) || signature.signatureImage.startsWith('https://'))
+    ? signature.signatureImage.slice(0, 2048)
+    : '';
+  return {
+    id: String(signature.id ?? '').slice(0, 100),
+    signer: String(signature.signer ?? '').slice(0, 150),
+    role: ['Darbuotojas', 'Išorinis kompetentingas asmuo'].includes(signature.role) ? signature.role : '',
+    signedAt: String(signature.signedAt ?? '').slice(0, 40),
+    ip: String(signature.ip ?? '').slice(0, 100),
+    signaturePath: String(signature.signaturePath ?? '').slice(0, 256),
+    signatureMethod: String(signature.signatureMethod ?? '').slice(0, 100),
+    signatureImage,
+    ...(signature.recordedBy ? { recordedBy: String(signature.recordedBy).slice(0, 150) } : {}),
+    ...(typeof signature.identityVerified === 'boolean' ? { identityVerified: signature.identityVerified } : {}),
+  };
+};
+const normalizeWorkEquipmentInspectionEntries = (entries) => (Array.isArray(entries) ? entries : [])
+  .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string' && entry.id)
+  .map((entry) => ({
+    id: entry.id.slice(0, 100),
+    inspectionDate: String(entry.inspectionDate ?? '').slice(0, 10),
+    equipmentName: String(entry.equipmentName ?? '').slice(0, 150),
+    equipmentType: String(entry.equipmentType ?? '').slice(0, 150),
+    inventoryNumber: String(entry.inventoryNumber ?? '').slice(0, 100),
+    department: String(entry.department ?? '').slice(0, 200),
+    inspectionType: entry.inspectionType === 'neeilinė' ? 'neeilinė' : 'periodinė',
+    inspectionResults: String(entry.inspectionResults ?? '').slice(0, 2000),
+    conclusion: entry.conclusion === 'netinkama' ? 'netinkama' : 'tinkama',
+    nextInspectionDate: String(entry.nextInspectionDate ?? '').slice(0, 10),
+    inspectorType: entry.inspectorType === 'external' ? 'external' : 'employee',
+    inspectorEmployeeId: String(entry.inspectorEmployeeId ?? '').slice(0, 100),
+    inspectorName: String(entry.inspectorName ?? '').slice(0, 150),
+    inspectorPosition: String(entry.inspectorPosition ?? '').slice(0, 150),
+    signature: normalizeWorkEquipmentInspectionSignature(entry.signature),
+  }));
+const hydrateWorkEquipmentInspectionEntries = async (entries) => {
+  const normalizedEntries = normalizeWorkEquipmentInspectionEntries(entries);
+  const signatures = normalizedEntries
+    .filter((entry) => entry.signature)
+    .map((entry) => ({ ...entry.signature, id: `${entry.id}-inspector`, workEquipmentInspectionEntryId: entry.id }));
+  const hydratedSignatures = await hydrateSignatureImages(signatures);
+  const signatureImages = new Map(hydratedSignatures.map((signature) => [signature.id, signature.signatureImage ?? '']));
+  return normalizedEntries.map((entry) => ({
+    ...entry,
+    signature: entry.signature
+      ? { ...entry.signature, signatureImage: signatureImages.get(`${entry.id}-inspector`) ?? entry.signature.signatureImage }
+      : null,
+  }));
+};
 const hydrateFirstAidKitInspectionEntries = async (entries) => {
   const normalizedEntries = normalizeFirstAidKitInspectionEntries(entries);
   const signatures = normalizedEntries
@@ -1007,6 +1063,7 @@ const dateEnteredPerRecordTemplateKinds = new Set([
   'evacuation-plan-journal',
   'fire-safety-journal',
   fireAutomationMaintenanceJournalTemplateKind,
+  workEquipmentInspectionJournalTemplateKind,
   'work-rules-journal',
   'workplace-dss-journal',
 ]);
@@ -1221,6 +1278,7 @@ const initialData = {
     { id: 'res-evacuation-plan-familiarization-journal', title: 'Darbuotojų, supažindintų su evakavimo planais, registravimo žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', duration: '15 įrašų', templateKind: 'evacuation-plan-journal', signatures: true, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultForOrganizations: true, defaultSettings: { rowCount: 15, populateEmployees: true, documentNumber: '', signatureFieldRoles: evacuationPlanSignatureFieldDefaults } },
     { id: fireAutomationMaintenanceJournalResourceId, title: 'Gaisrinės automatikos įrenginio techninės priežiūros ir remonto apskaitos žurnalas', type: 'Žurnalas', category: 'Priešgaisrinė sauga', duration: '15 įrašų', templateKind: fireAutomationMaintenanceJournalTemplateKind, signatures: true, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { rowCount: 15, documentNumber: '', equipmentName: '', equipmentIdentifier: '', equipmentLocation: '', allowExternalPerformer: true, signatureFieldRoles: fireAutomationMaintenanceSignatureFieldDefaults, maintenanceEntries: [] } },
     { id: firstAidKitInspectionJournalResourceId, title: 'Pirmosios pagalbos rinkinio (vaistinėlės) patikros ir papildymo žurnalas', type: 'Žurnalas', category: 'Pirmoji pagalba', duration: '15 įrašų', templateKind: firstAidKitInspectionJournalTemplateKind, signatures: true, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { rowCount: 15, defaultLocation: '', defaultInspectorEmployeeId: '', inspectionEntries: [] } },
+    { id: workEquipmentInspectionJournalResourceId, title: 'Darbo priemonių / įrenginių periodinės patikros žurnalas', type: 'Žurnalas', category: 'Darbo priemonių patikra', duration: '15 įrašų', templateKind: workEquipmentInspectionJournalTemplateKind, signatures: true, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { rowCount: 15, documentNumber: '', defaultInspectorEmployeeId: '', allowExternalInspector: true, inspectionEntries: [] } },
     { id: accidentIncidentJournalResourceId, title: 'Nelaimingų atsitikimų darbe, incidentų ir nelaimingų atsitikimų darbe aktų registravimo žurnalas', type: 'Žurnalas', category: 'Nelaimingi atsitikimai ir incidentai', duration: '15 įrašų', templateKind: accidentIncidentJournalTemplateKind, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { recorderRole: 'Vadovas', recorderName: '', recorderPosition: 'Įmonės vadovas', incidentEntries: [] } },
     { id: safetyViolationJournalResourceId, title: 'Darbų saugos pažeidimų registracijos žurnalas', type: 'Žurnalas', category: 'Darbų saugos pažeidimai', duration: '15 įrašų', templateKind: safetyViolationJournalTemplateKind, adminOnly: true, defaultForOrganizations: true, requiredSigners: [], defaultSettings: { recorderRole: 'Vadovas', recorderName: '', recorderPosition: 'Įmonės vadovas', resolutionRole: 'Vadovas', violationEntries: [] } },
     { id: chemicalSafetyInstructionCardId, title: 'Darbuotojų saugos ir sveikatos instruktavimų registravimo kortelė', type: 'Kortelė', category: 'Cheminė sauga', duration: '20 darbuotojų', templateKind: 'chemical-safety-instruction-card', relatedTestId: chemicalSafetyTestId, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true } },
@@ -2156,6 +2214,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const [firstAidKitInspectionSignError, setFirstAidKitInspectionSignError] = useState('');
   const [firstAidKitInspectionSignSubmitting, setFirstAidKitInspectionSignSubmitting] = useState(false);
   const [firstAidKitInspectionReviewConfirmed, setFirstAidKitInspectionReviewConfirmed] = useState(false);
+  const [workEquipmentInspectionJournalTasks, setWorkEquipmentInspectionJournalTasks] = useState([]);
+  const [workEquipmentInspectionSigningTarget, setWorkEquipmentInspectionSigningTarget] = useState(null);
+  const [workEquipmentInspectionSignPin, setWorkEquipmentInspectionSignPin] = useState('');
+  const [workEquipmentInspectionSignError, setWorkEquipmentInspectionSignError] = useState('');
+  const [workEquipmentInspectionSignSubmitting, setWorkEquipmentInspectionSignSubmitting] = useState(false);
+  const [workEquipmentInspectionReviewConfirmed, setWorkEquipmentInspectionReviewConfirmed] = useState(false);
 
   useEffect(() => {
     if (!previewResource) return undefined;
@@ -2824,6 +2888,62 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     };
   }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id, currentOrg?.name, currentOrg?.companyCode, currentOrg?.resourceSettings]);
   useEffect(() => {
+    if (userRole !== 'darbuotojas' || !selectedOrgId || !currentEmployee?.id) {
+      setWorkEquipmentInspectionJournalTasks([]);
+      return undefined;
+    }
+    let active = true;
+    let requestInFlight = false;
+    let functionUnavailable = false;
+    const refreshTasks = async () => {
+      if (requestInFlight || functionUnavailable || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        let tasks;
+        if (cloudMode) {
+          const result = await supabase.rpc('get_employee_work_equipment_inspection_tasks', {
+            input_organization_id: selectedOrgId,
+          });
+          if (result.error?.code === 'PGRST202') {
+            functionUnavailable = true;
+            if (active) setNotice('Darbo priemonių patikros žurnalo užduotims pritaikykite naujausią Supabase migraciją.');
+            return;
+          }
+          if (result.error) throw result.error;
+          tasks = result.data ?? [];
+        } else {
+          tasks = normalizeWorkEquipmentInspectionEntries(
+            currentOrg?.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+          ).filter((entry) => entry.inspectorType === 'employee'
+            && entry.inspectorEmployeeId === currentEmployee.id && !entry.signature)
+            .map((entry) => ({
+              ...entry,
+              organizationId: selectedOrgId,
+              organizationName: currentOrg?.name ?? '',
+              organizationCode: currentOrg?.companyCode ?? '',
+            }));
+        }
+        const hydratedTasks = await hydrateWorkEquipmentInspectionEntries(tasks);
+        if (active) setWorkEquipmentInspectionJournalTasks(hydratedTasks);
+      } catch (error) {
+        if (active) setNotice(`Darbo priemonių patikros užduočių įkelti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshTasks();
+    const intervalId = window.setInterval(refreshTasks, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshTasks();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, userRole, selectedOrgId, currentEmployee?.id, currentOrg?.name, currentOrg?.companyCode, currentOrg?.resourceSettings]);
+  useEffect(() => {
     if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss')
       || (userRole === 'vadovas' && !canManageSelectedWorkspace)
       || (userRole === 'dss' && !dssOrganizationIsOpen)) return undefined;
@@ -2881,6 +3001,81 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         });
       } catch (error) {
         if (active) setNotice(`Vaistinėlės patikros žurnalo įrašų įkelti nepavyko: ${error.message}`);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    refreshEntries();
+    const intervalId = window.setInterval(refreshEntries, 30_000);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') refreshEntries();
+    };
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [cloudMode, userRole, selectedOrgId, canManageSelectedWorkspace, dssOrganizationIsOpen, data.employees]);
+  useEffect(() => {
+    if (!cloudMode || !selectedOrgId || !(userRole === 'vadovas' || userRole === 'dss')
+      || (userRole === 'vadovas' && !canManageSelectedWorkspace)
+      || (userRole === 'dss' && !dssOrganizationIsOpen)) return undefined;
+    let active = true;
+    let requestInFlight = false;
+    const refreshEntries = async () => {
+      if (requestInFlight || document.visibilityState === 'hidden') return;
+      requestInFlight = true;
+      try {
+        const { data: entries, error } = await supabase.rpc('get_work_equipment_inspection_journal_entries', {
+          input_organization_id: selectedOrgId,
+        });
+        if (error) throw error;
+        if (!active) return;
+        const normalizedEntries = normalizeWorkEquipmentInspectionEntries(entries ?? []);
+        setData((current) => {
+          const organization = current.organizations.find((item) => item.id === selectedOrgId);
+          if (!organization) return current;
+          const savedEntries = normalizeWorkEquipmentInspectionEntries(
+            organization.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+          );
+          const comparable = (items) => JSON.stringify(normalizeWorkEquipmentInspectionEntries(items).map((entry) => ({
+            ...entry,
+            signature: entry.signature ? { ...entry.signature, signatureImage: '' } : null,
+          })));
+          const nextSignatures = normalizedEntries.flatMap((entry) => entry.signature ? [{
+            ...entry.signature,
+            orgId: selectedOrgId,
+            employeeId: entry.inspectorType === 'employee' ? entry.inspectorEmployeeId : null,
+            contractNumber: current.employees.find((person) => person.id === entry.inspectorEmployeeId)?.contractNumber ?? '',
+            resourceId: workEquipmentInspectionJournalResourceId,
+            workEquipmentInspectionEntryId: entry.id,
+          }] : []);
+          const signatures = [
+            ...(current.signatures ?? []).filter((signature) => signature.resourceId !== workEquipmentInspectionJournalResourceId || signature.orgId !== selectedOrgId),
+            ...nextSignatures,
+          ];
+          if (comparable(savedEntries) === comparable(normalizedEntries)
+            && JSON.stringify(signatures) === JSON.stringify(current.signatures ?? [])) return current;
+          return {
+            ...current,
+            organizations: current.organizations.map((item) => item.id === selectedOrgId
+              ? {
+                ...item,
+                resourceSettings: {
+                  ...item.resourceSettings,
+                  [workEquipmentInspectionJournalResourceId]: {
+                    ...item.resourceSettings?.[workEquipmentInspectionJournalResourceId],
+                    inspectionEntries: normalizedEntries,
+                  },
+                },
+              }
+              : item),
+            signatures,
+          };
+        });
+      } catch (error) {
+        if (active) setNotice(`Darbo priemonių patikros žurnalo įrašų įkelti nepavyko: ${error.message}`);
       } finally {
         requestInFlight = false;
       }
@@ -3476,6 +3671,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     () => normalizeFirstAidKitInspectionEntries(currentOrg?.resourceSettings?.[firstAidKitInspectionJournalResourceId]?.inspectionEntries),
     [currentOrg?.resourceSettings],
   );
+  const reportWorkEquipmentInspectionEntries = useMemo(
+    () => normalizeWorkEquipmentInspectionEntries(currentOrg?.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries),
+    [currentOrg?.resourceSettings],
+  );
   const reportResourceGroups = ['Žurnalas', 'Kortelė', 'Protokolas']
     .filter((type) => reportTypeFilter === type)
     .map((type) => ({
@@ -4002,6 +4201,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const pendingResourceIds = employeeResources
     .filter((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(currentEmployee, resource).key))
     .map((resource) => resource.id);
+  const workEquipmentInspectionTasksForCurrentEmployee = workEquipmentInspectionJournalTasks.filter((task) => (
+    task.inspectorEmployeeId === currentEmployee?.id
+  ));
+  const employeeTaskCount = employeeResources.length + workEquipmentInspectionTasksForCurrentEmployee.length;
+  const employeePendingTaskCount = pendingResourceIds.length + workEquipmentInspectionTasksForCurrentEmployee.length;
   const startedCount = employeeResources.filter((resource) => getTaskStatus(currentEmployee, resource).key === 'started').length;
   const unsignedCount = employeeResources.filter((resource) => getTaskStatus(currentEmployee, resource).key === 'unsigned').length;
   const workerSignedCount = employeeResources.filter((resource) => ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(getTaskStatus(currentEmployee, resource).key)).length;
@@ -4010,6 +4214,13 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const matchesFilter = taskFilter === 'visos' || (taskFilter === 'atliktinos' && !['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status)) || (taskFilter === 'baigtos' && ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(status));
     return matchesFilter && `${resource.title} ${resource.category} ${resource.type}`.toLocaleLowerCase('lt').includes(taskSearch.trim().toLocaleLowerCase('lt'));
   });
+  const visibleWorkEquipmentInspectionTasks = taskFilter !== 'baigtos'
+    ? workEquipmentInspectionTasksForCurrentEmployee.filter((task) => (
+      `${task.equipmentName} ${task.equipmentType} ${task.inspectionDate} ${task.organizationName ?? ''}`
+        .toLocaleLowerCase('lt')
+        .includes(taskSearch.trim().toLocaleLowerCase('lt'))
+    ))
+    : [];
   const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
     || isCompanyCreatedProtocol(resource, currentOrg?.id)
     || creatorManagementContext && resource.organizationId === currentOrg?.id);
@@ -4825,7 +5036,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const isSafetyViolationJournal = resource.templateKind === safetyViolationJournalTemplateKind;
     const isFireAutomationMaintenanceJournal = resource.templateKind === fireAutomationMaintenanceJournalTemplateKind;
     const isFirstAidKitInspectionJournal = resource.templateKind === firstAidKitInspectionJournalTemplateKind;
-    if (!isAccidentIncidentJournal && !isSafetyViolationJournal && !isFireAutomationMaintenanceJournal && !isFirstAidKitInspectionJournal && !defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
+    const isWorkEquipmentInspectionJournal = resource.templateKind === workEquipmentInspectionJournalTemplateKind;
+    if (!isAccidentIncidentJournal && !isSafetyViolationJournal && !isFireAutomationMaintenanceJournal && !isFirstAidKitInspectionJournal && !isWorkEquipmentInspectionJournal && !defaultRequiredSigners.includes('Darbuotojas')) defaultRequiredSigners.unshift('Darbuotojas');
     const savedInstructorRole = saved.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
       ?? (saved.instructorCanManager ? 'Vadovas' : null);
     const defaultInstructorRole = savedInstructorRole
@@ -4873,6 +5085,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         || isSafetyViolationJournal
         || isFireAutomationMaintenanceJournal
         || isFirstAidKitInspectionJournal
+        || isWorkEquipmentInspectionJournal
         ? []
         : resource.templateKind === 'intro-dss-journal'
         ? ['Darbuotojas', defaultInstructorRole]
@@ -4916,6 +5129,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           inspectionEntries: normalizeFirstAidKitInspectionEntries(saved.inspectionEntries),
         }
         : {}),
+      ...(isWorkEquipmentInspectionJournal
+        ? {
+          rowCount: saved.rowCount ?? defaults.rowCount ?? 15,
+          documentNumber: saved.documentNumber ?? defaults.documentNumber ?? '',
+          defaultInspectorEmployeeId: saved.defaultInspectorEmployeeId ?? defaults.defaultInspectorEmployeeId ?? '',
+          allowExternalInspector: saved.allowExternalInspector ?? defaults.allowExternalInspector ?? true,
+          inspectionEntries: normalizeWorkEquipmentInspectionEntries(saved.inspectionEntries),
+        }
+        : {}),
       ...(resource.templateKind === 'fire-safety-journal'
         ? { signatureFieldRoles: getFireSafetySignatureFieldRoles(resource, saved) }
         : {}),
@@ -4946,6 +5168,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         || resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind
         || resourceSettingsTarget.templateKind === fireAutomationMaintenanceJournalTemplateKind
         || resourceSettingsTarget.templateKind === firstAidKitInspectionJournalTemplateKind
+        || resourceSettingsTarget.templateKind === workEquipmentInspectionJournalTemplateKind
         ? []
         : [...new Set(['Darbuotojas', ...(resourceSettingsDraft.requiredSigners ?? [])])],
       ...(resourceSettingsTarget.templateKind === 'internal-documents-register'
@@ -4992,6 +5215,15 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : '';
       settings.rowCount = Math.min(100, Math.max(1, Number.parseInt(settings.rowCount, 10) || 15));
       settings.requiredSigners = [];
+    } else if (resourceSettingsTarget.templateKind === workEquipmentInspectionJournalTemplateKind) {
+      settings.inspectionEntries = normalizeWorkEquipmentInspectionEntries(settings.inspectionEntries);
+      settings.documentNumber = String(settings.documentNumber ?? '').trim().slice(0, 100);
+      settings.defaultInspectorEmployeeId = orgEmployees.some((employee) => employee.id === settings.defaultInspectorEmployeeId)
+        ? settings.defaultInspectorEmployeeId
+        : '';
+      settings.allowExternalInspector = settings.allowExternalInspector !== false;
+      settings.rowCount = Math.min(100, Math.max(1, Number.parseInt(settings.rowCount, 10) || 15));
+      settings.requiredSigners = [];
     } else if (resourceSettingsTarget.templateKind === 'workplace-dss-journal') {
       const fieldRoles = { ...workplaceDssSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
       const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
@@ -5033,7 +5265,8 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       settings.instructorCanManager = instructorRole === 'Vadovas';
       settings.instructorCanDss = instructorRole === 'DSS specialistas';
     }
-    if (resourceSettingsTarget.templateKind !== fireAutomationMaintenanceJournalTemplateKind) delete settings.rowCount;
+    if (resourceSettingsTarget.templateKind !== fireAutomationMaintenanceJournalTemplateKind
+      && resourceSettingsTarget.templateKind !== workEquipmentInspectionJournalTemplateKind) delete settings.rowCount;
     delete settings.populateEmployees;
     if (dateEnteredPerRecordTemplateKinds.has(resourceSettingsTarget.templateKind)) delete settings.date;
     if (settings.validityMonths !== undefined) settings.validityMonths = Math.max(1, Number(settings.validityMonths) || 12);
@@ -5464,6 +5697,221 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       setFirstAidKitInspectionSignError(`Vaistinėlės patikros įrašo pasirašyti nepavyko: ${error.message}`);
     } finally {
       setFirstAidKitInspectionSignSubmitting(false);
+    }
+  };
+
+  const openWorkEquipmentInspectionSignDialog = (entry) => {
+    if (!entry || !currentEmployee?.id || entry.inspectorType !== 'employee'
+      || entry.inspectorEmployeeId !== currentEmployee.id) return;
+    setWorkEquipmentInspectionSigningTarget({ entry, orgId: entry.organizationId ?? selectedOrgId });
+    setWorkEquipmentInspectionSignPin('');
+    setWorkEquipmentInspectionSignError('');
+    setWorkEquipmentInspectionReviewConfirmed(false);
+    setSignatureInk('');
+  };
+
+  const closeWorkEquipmentInspectionSignDialog = () => {
+    setWorkEquipmentInspectionSigningTarget(null);
+    setWorkEquipmentInspectionSignPin('');
+    setWorkEquipmentInspectionSignError('');
+    setWorkEquipmentInspectionReviewConfirmed(false);
+    setSignatureInk('');
+  };
+
+  const confirmWorkEquipmentInspectionSign = async (event) => {
+    event.preventDefault();
+    if (workEquipmentInspectionSignSubmitting || !workEquipmentInspectionSigningTarget) return;
+    const { entry, orgId } = workEquipmentInspectionSigningTarget;
+    if (!/^\d{4}$/.test(workEquipmentInspectionSignPin)) {
+      setWorkEquipmentInspectionSignError('Įveskite 4 skaitmenų PIN kodą.');
+      return;
+    }
+    if (!signatureInk || !workEquipmentInspectionReviewConfirmed) {
+      setWorkEquipmentInspectionSignError('Peržiūrėkite patikros įrašą ir nupieškite parašą.');
+      return;
+    }
+    if (userRole !== 'darbuotojas' || currentEmployee?.id !== entry.inspectorEmployeeId) {
+      setWorkEquipmentInspectionSignError('Šį įrašą gali pasirašyti tik paskirtas kompetentingas darbuotojas.');
+      return;
+    }
+    setWorkEquipmentInspectionSignSubmitting(true);
+    setWorkEquipmentInspectionSignError('');
+    let uploadedSignature = null;
+    try {
+      let updatedEntry;
+      let signatureRecord;
+      if (cloudMode) {
+        uploadedSignature = await uploadSignatureSvg(orgId, signatureInk);
+        const { data: result, error } = await supabase.rpc('sign_work_equipment_inspection_journal_entry', {
+          input_organization_id: orgId,
+          input_entry_id: entry.id,
+          input_pin: workEquipmentInspectionSignPin,
+          input_signature_path: uploadedSignature.path,
+        });
+        if (error) throw error;
+        if (!result?.entry || !result?.signature) {
+          await removeSignatureAsset(uploadedSignature.path);
+          uploadedSignature = null;
+          throw new Error('PIN kodas neteisingas arba įrašo parašas nebuvo patvirtintas.');
+        }
+        updatedEntry = normalizeWorkEquipmentInspectionEntries([result.entry])[0];
+        signatureRecord = result.signature;
+      } else {
+        const employee = data.employees.find((person) => person.id === currentEmployee.id);
+        if (!employee?.pin || employee.pin !== workEquipmentInspectionSignPin) {
+          throw new Error('PIN kodas neteisingas.');
+        }
+        const organization = data.organizations.find((item) => item.id === orgId);
+        const entries = normalizeWorkEquipmentInspectionEntries(
+          organization?.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+        );
+        const savedEntry = entries.find((item) => item.id === entry.id);
+        if (!savedEntry || savedEntry.inspectorType !== 'employee'
+          || savedEntry.inspectorEmployeeId !== employee.id || savedEntry.signature) {
+          throw new Error('Įrašo pasirašymo būsena pasikeitė. Atnaujinkite žurnalą.');
+        }
+        const nestedSignature = {
+          id: `sig-${crypto.randomUUID()}`,
+          signer: employee.name,
+          role: 'Darbuotojas',
+          signatureMethod: 'PIN',
+          signedAt: new Date().toISOString(),
+          ip: '127.0.0.1 (demo)',
+          signatureImage: signatureInk,
+          signaturePath: '',
+        };
+        updatedEntry = { ...savedEntry, signature: nestedSignature };
+        signatureRecord = {
+          ...nestedSignature,
+          orgId,
+          employeeId: employee.id,
+          contractNumber: employee.contractNumber ?? '',
+          resourceId: workEquipmentInspectionJournalResourceId,
+          workEquipmentInspectionEntryId: entry.id,
+        };
+      }
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((organization) => organization.id === orgId
+          ? {
+            ...organization,
+            resourceSettings: {
+              ...organization.resourceSettings,
+              [workEquipmentInspectionJournalResourceId]: {
+                ...organization.resourceSettings?.[workEquipmentInspectionJournalResourceId],
+                inspectionEntries: normalizeWorkEquipmentInspectionEntries(
+                  organization.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+                ).map((currentEntry) => currentEntry.id === updatedEntry.id ? updatedEntry : currentEntry),
+              },
+            },
+          }
+          : organization),
+        signatures: [
+          ...(current.signatures ?? []).filter((signature) => signature.id !== signatureRecord.id),
+          signatureRecord,
+        ],
+      }));
+      setWorkEquipmentInspectionJournalTasks((current) => current.filter((task) => task.id !== entry.id));
+      closeWorkEquipmentInspectionSignDialog();
+      setNotice('Darbo priemonės patikros įrašas pasirašytas ir užfiksuotas.');
+    } catch (error) {
+      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
+      setWorkEquipmentInspectionSignError(`Darbo priemonės patikros įrašo pasirašyti nepavyko: ${error.message}`);
+    } finally {
+      setWorkEquipmentInspectionSignSubmitting(false);
+    }
+  };
+
+  const signWorkEquipmentExternalInspector = async (entry, inspectorName, inspectorPosition, signatureInkValue) => {
+    if (!['vadovas', 'dss'].includes(userRole) || !currentOrg?.id
+      || entry.inspectorType !== 'external' || entry.signature
+      || !inspectorName.trim() || !inspectorPosition.trim() || !signatureInkValue
+      || currentOrg.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.allowExternalInspector === false) {
+      throw new Error('Išorinio tikrintojo parašo užfiksuoti negalima šiame įraše.');
+    }
+    let uploadedSignature = null;
+    try {
+      let updatedEntry;
+      let signatureRecord;
+      if (cloudMode) {
+        uploadedSignature = await uploadSignatureSvg(currentOrg.id, signatureInkValue);
+        const { data: result, error } = await supabase.rpc('record_external_work_equipment_inspection_signature', {
+          input_organization_id: currentOrg.id,
+          input_entry_id: entry.id,
+          input_signer_name: inspectorName.trim(),
+          input_signer_position: inspectorPosition.trim(),
+          input_signature_path: uploadedSignature.path,
+        });
+        if (error) throw error;
+        if (!result?.entry || !result?.signature) throw new Error('Išorinio tikrintojo parašas nebuvo patvirtintas.');
+        updatedEntry = normalizeWorkEquipmentInspectionEntries([result.entry])[0];
+        signatureRecord = result.signature;
+      } else {
+        const latestEntry = normalizeWorkEquipmentInspectionEntries(
+          currentOrg.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+        ).find((item) => item.id === entry.id);
+        if (!latestEntry || latestEntry.inspectorType !== 'external' || latestEntry.signature) {
+          throw new Error('Įrašo pasirašymo būsena pasikeitė. Atnaujinkite žurnalą.');
+        }
+        const recordedBy = userRole === 'vadovas' ? currentOrg.manager : currentSpecialist?.name ?? 'DSS specialistas';
+        const signature = {
+          id: `sig-${crypto.randomUUID()}`,
+          signer: inspectorName.trim().slice(0, 150),
+          role: 'Išorinis kompetentingas asmuo',
+          signatureMethod: 'Onsite · tapatybė nepatvirtinta',
+          identityVerified: false,
+          recordedBy,
+          signedAt: new Date().toISOString(),
+          ip: '127.0.0.1 (demo)',
+          signatureImage: signatureInkValue,
+          signaturePath: '',
+        };
+        updatedEntry = {
+          ...latestEntry,
+          inspectorName: signature.signer,
+          inspectorPosition: inspectorPosition.trim().slice(0, 150),
+          signature,
+        };
+        signatureRecord = {
+          ...signature,
+          orgId: currentOrg.id,
+          employeeId: null,
+          resourceId: workEquipmentInspectionJournalResourceId,
+          workEquipmentInspectionEntryId: entry.id,
+        };
+      }
+      setData((current) => ({
+        ...current,
+        organizations: current.organizations.map((organization) => organization.id === currentOrg.id
+          ? {
+            ...organization,
+            resourceSettings: {
+              ...organization.resourceSettings,
+              [workEquipmentInspectionJournalResourceId]: {
+                ...organization.resourceSettings?.[workEquipmentInspectionJournalResourceId],
+                inspectionEntries: normalizeWorkEquipmentInspectionEntries(
+                  organization.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries,
+                ).map((currentEntry) => currentEntry.id === updatedEntry.id ? updatedEntry : currentEntry),
+              },
+            },
+          }
+          : organization),
+        signatures: [
+          ...(current.signatures ?? []).filter((signature) => signature.id !== signatureRecord.id),
+          signatureRecord,
+        ],
+      }));
+      if (resourceSettingsTarget?.id === workEquipmentInspectionJournalResourceId) {
+        setResourceSettingsDraft((current) => ({
+          ...current,
+          inspectionEntries: normalizeWorkEquipmentInspectionEntries(current.inspectionEntries)
+            .map((currentEntry) => currentEntry.id === updatedEntry.id ? updatedEntry : currentEntry),
+        }));
+      }
+      setNotice('Išorinio tikrintojo parašas išsaugotas. Tapatybė nepatvirtinta DSS Pro paskyra.');
+    } catch (error) {
+      if (uploadedSignature?.path) await removeSignatureAsset(uploadedSignature.path);
+      throw error;
     }
   };
 
@@ -6388,7 +6836,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     setNotice(`Protokolas „${resource.title}“ ištrintas.`);
   };
 
-  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka' && ![accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind].includes(resource.templateKind)) } = {}) => {
+  const openResourcePreview = async (resource, { autoPrint = false, protocolBatchId = null, employeeId = null, previewSignature = null, archivedRecord = null, includeAapIssuances = false, commissionAssignments = data.commissionAssignments ?? [], protocolCommissionSignatures = data.protocolCommissionSignatures ?? [], templateOnly = userRole === 'kurejas' || (['vadovas', 'dss'].includes(userRole) && activeTab === 'biblioteka' && ![accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind, workEquipmentInspectionJournalTemplateKind].includes(resource.templateKind)) } = {}) => {
     if (!templateOnly && userRole === 'darbuotojas' && normalizeResourceType(resource) === 'Testas') {
       const employee = data.employees.find((person) => person.id === employeeId) ?? currentEmployee;
       const unsignedPassedResult = getUnsignedPassedTestResult(employee, resource.id, data.signatures);
@@ -6476,6 +6924,16 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         );
       } catch (error) {
         setNotice(`Vaistinėlės patikros žurnalo parašų atvaizdinti nepavyko: ${error.message}`);
+        return;
+      }
+    }
+    if (!templateOnly && resource.templateKind === workEquipmentInspectionJournalTemplateKind) {
+      try {
+        configuredResource.defaultSettings.inspectionEntries = await hydrateWorkEquipmentInspectionEntries(
+          configuredResource.defaultSettings.inspectionEntries,
+        );
+      } catch (error) {
+        setNotice(`Darbo priemonių patikros žurnalo parašų atvaizdinti nepavyko: ${error.message}`);
         return;
       }
     }
@@ -8634,6 +9092,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         description: `${task.organizationName || currentOrg?.name || 'Įmonė'} · ${task.location} · ${task.inspectionDate}`,
         firstAidKitInspectionTask: task,
       })),
+      ...workEquipmentInspectionJournalTasks.map((task) => ({
+        id: `work-equipment-inspection-sign-${task.id}`,
+        title: 'Pasirašyti darbo priemonės patikros įrašą',
+        description: `${task.equipmentName} · ${task.inspectionDate} · ${task.inspectionType}`,
+        workEquipmentInspectionTask: task,
+      })),
       ...pendingResourceIds.map((resourceId) => {
       const resource = data.resources.find((item) => item.id === resourceId);
       return { id: resourceId, title: resource?.title ?? 'Priskirta užduotis', description: getTaskStatus(currentEmployee, resource).label, resource, employee: currentEmployee };
@@ -9149,6 +9613,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                         openFirstAidKitInspectionSignDialog(item.firstAidKitInspectionTask);
                         return;
                       }
+                      if (item.workEquipmentInspectionTask) {
+                        openWorkEquipmentInspectionSignDialog(item.workEquipmentInspectionTask);
+                        return;
+                      }
                       if (item.aapIssuance) {
                         setActiveTab('aap');
                         setAapIssueSigningTarget(item.aapIssuance.id);
@@ -9287,7 +9755,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           {activeTab === 'skydelis' && (
             <section className="mx-auto w-full max-w-[1400px] space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-extrabold tracking-tight text-slate-900">{userRole === 'darbuotojas' ? 'Mano saugos užduotys' : userRole === 'dss' ? dssOrganizationIsOpen ? currentOrg?.name ?? 'Įmonės darbo vieta' : 'Pasirinkite įmonę' : userRole === 'vadovas' ? 'Darbuotojų apžvalga' : 'Turinio ir paskyrų valdymas'}</h1><p className="mt-1 text-sm text-slate-500">{userRole === 'vadovas' ? `${currentOrg?.name ?? ''} · DSS valdymo skydelis` : userRole === 'dss' && !dssOrganizationIsOpen ? 'Pasirinkite įmonę, kurią norite peržiūrėti ir tvarkyti.' : `${roleLabels[userRole]} darbo vieta · ${cloudMode ? 'duomenys saugomi debesijoje' : sandboxMode ? 'izoliuotas demo, pakeitimai tik šiame skirtuke' : 'vietinis demo, duomenys išsaugomi šioje naršyklėje'}`}</p></div>{userRole === 'dss' && dssOrganizationIsOpen && <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={returnToDssOrganizations}><ChevronLeft size={16} />Grįžti į įmonių sąrašą</button><button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50" disabled={dssOrganizationLeaveSubmitting} onClick={leaveDssOrganization}>{dssOrganizationLeaveSubmitting ? 'Vykdoma…' : 'Nebesu šios įmonės DSS specialistas'}</button></div>}</div>
-              {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeResources.length} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
+              {userRole === 'darbuotojas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeTaskCount} /><Metric accent="amber" label="Laukia mano veiksmo" value={employeePendingTaskCount} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
                 : userRole === 'dss' ? dssOrganizationIsOpen ? <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Įmonės darbuotojai" value={orgEmployees.length} /><Metric accent="amber" label="Laukia DSS parašo" value={dssTasks.filter((task) => task.orgId === currentOrg?.id).length} /><Metric accent="green" label="Darbuotojų parašai" value={signedCount} /></div> : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Prižiūrimos įmonės" value={data.organizations.filter((org) => org.dss.includes(selectedSpecialistId)).length} /></div>
                   : userRole === 'vadovas' ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric accent="blue" label="Iš viso darbuotojų" value={managerDashboardEmployees.length} /><Metric accent="green" label="Aktyvūs darbuotojai" value={currentActiveEmployeeCount} hint={currentSubscriptionPlan ? `Plano limitas: ${currentSubscriptionPlan.employee_limit} aktyvių darbuotojų` : 'Plano darbuotojų limitas nenustatytas'} /><Metric accent="amber" label="Laukia parašų" value={pendingCount} /><Metric accent="rose" label="Pasibaigę med. pažymėjimai" value={orgEmployees.filter((employee) => isDateExpired(employee.medicalCertificateValidUntil, validityCheckTime)).length} /></div>
                     : <div className="grid gap-4 sm:grid-cols-3"><Metric accent="blue" label="Turinio šablonai" value={data.resources.length} /><Metric accent="green" label="Įmonių paskyros" value={data.organizations.length} /><Metric accent="amber" label="Valdomos prenumeratos" value={data.subscriptions.length} /></div>}
@@ -9715,16 +10183,21 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
               <PageTitle title="Mano užduotys" subtitle="Priskirti testai, žurnalai, kortelės ir protokolai." />
               <label className="relative block w-full lg:max-w-xs"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={`${inputClass} pl-9`} value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Ieškoti užduočių..." /></label>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeResources.length} /><Metric accent="amber" label="Laukia mano veiksmo" value={pendingResourceIds.length} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric accent="blue" label="Mano užduotys" value={employeeTaskCount} /><Metric accent="amber" label="Laukia mano veiksmo" value={employeePendingTaskCount} /><Metric accent="blue" label="Pradėta" value={startedCount} /><Metric accent="amber" label="Užbaigta, nepasirašyta" value={unsignedCount} /><Metric accent="green" label={pinSignedStatusLabel} value={workerSignedCount} /></div>
             {currentEmployee?.status !== 'Aktyvus' && !hasSavedAapSizes(currentEmployee) && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">Užpildykite ir išsaugokite AAP dydžius, kad galėtumėte atidaryti AAP kortelę.</div>}
             <div className="flex gap-6 overflow-x-auto border-b border-slate-200 text-sm font-semibold" role="tablist" aria-label="Užduočių filtras">
               {[
-                ['visos', 'Visos užduotys', employeeResources.length],
-                ['atliktinos', 'Mano priskirtos', pendingResourceIds.length],
+                ['visos', 'Visos užduotys', employeeTaskCount],
+                ['atliktinos', 'Mano priskirtos', employeePendingTaskCount],
                 ['baigtos', 'Baigtos', workerSignedCount],
               ].map(([filter, label, count]) => <button key={filter} role="tab" aria-selected={taskFilter === filter} onClick={() => setTaskFilter(filter)} className={`flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 ${taskFilter === filter ? 'border-emerald-700 text-emerald-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{label}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{count}</span></button>)}
             </div>
-            {visibleEmployeeResources.length ? <section className="space-y-3"><div className="flex items-baseline justify-between border-b border-slate-200 pb-2"><h2 className="font-bold">Priskirtos užduotys</h2><span className="text-xs text-slate-500">{visibleEmployeeResources.length} užduotys</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleEmployeeResources.map((resource) => { const aapSizesMissing = resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee); const workflowStatus = aapSizesMissing ? { key: 'needsSizes', label: 'AAP dydžiai nenustatyti' } : getTaskStatus(currentEmployee, resource); const workerHasSigned = ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(workflowStatus.key); return <ResourceCard key={resource.id} resource={resource} workflowStatus={workflowStatus} onPreview={workerHasSigned ? () => openResourcePreview(resource) : undefined} onComplete={workerHasSigned ? undefined : () => openResourcePreview(resource)} />; })}</div></section> : <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">Pagal pasirinktą filtrą užduočių nerasta.</div>}
+            {visibleEmployeeResources.length || visibleWorkEquipmentInspectionTasks.length
+              ? <div className="space-y-6">
+                {visibleEmployeeResources.length > 0 && <section className="space-y-3"><div className="flex items-baseline justify-between border-b border-slate-200 pb-2"><h2 className="font-bold">Priskirtos užduotys</h2><span className="text-xs text-slate-500">{visibleEmployeeResources.length} užduotys</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleEmployeeResources.map((resource) => { const aapSizesMissing = resource.id === 'res-aap' && !hasSavedAapSizes(currentEmployee); const workflowStatus = aapSizesMissing ? { key: 'needsSizes', label: 'AAP dydžiai nenustatyti' } : getTaskStatus(currentEmployee, resource); const workerHasSigned = ['signed', 'awaitingDss', 'awaitingEmployer', 'awaitingCommission', 'awaitingSignatures'].includes(workflowStatus.key); return <ResourceCard key={resource.id} resource={resource} workflowStatus={workflowStatus} onPreview={workerHasSigned ? () => openResourcePreview(resource) : undefined} onComplete={workerHasSigned ? undefined : () => openResourcePreview(resource)} />; })}</div></section>}
+                {visibleWorkEquipmentInspectionTasks.length > 0 && <section className="space-y-3"><div className="flex items-baseline justify-between border-b border-slate-200 pb-2"><h2 className="font-bold">Darbo priemonių patikros, laukiančios mano parašo</h2><span className="text-xs text-slate-500">{visibleWorkEquipmentInspectionTasks.length} įrašai</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleWorkEquipmentInspectionTasks.map((task) => <article key={task.id} className="flex flex-col justify-between rounded-lg border border-amber-200 bg-white p-4 shadow-sm"><div><p className="text-xs font-semibold uppercase text-amber-800">{task.organizationName || currentOrg?.name || 'Įmonė'}</p><h3 className="mt-1 font-semibold">{task.equipmentName}{task.equipmentType ? ` · ${task.equipmentType}` : ''}</h3><p className="mt-1 text-sm text-slate-600">{task.inspectionDate} · {task.inspectionType === 'neeilinė' ? 'Neeilinė patikra' : 'Periodinė patikra'}</p><p className="mt-2 line-clamp-3 text-sm text-slate-600">{task.inspectionResults}</p></div><button type="button" className={`${buttonClass} mt-4`} onClick={() => openWorkEquipmentInspectionSignDialog(task)}><FileSignature size={15} />Peržiūrėti ir pasirašyti</button></article>)}</div></section>}
+              </div>
+              : <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">Pagal pasirinktą filtrą užduočių nerasta.</div>}
           </section>}
 
           {activeTab === 'aap' && userRole === 'darbuotojas' && <section className="max-w-3xl space-y-5">
@@ -10031,7 +10504,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
                 </> : <p className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Šis testas darbuotojams dar nepriskirtas.</p>}
               </Panel>
             </section> : <>
-              {reportTypeFilter === 'Žurnalas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} summaryText={resource.id === firstAidKitInspectionJournalResourceId ? `Patikrų: ${reportFirstAidInspectionEntries.length} · Pasirašyta: ${reportFirstAidInspectionEntries.filter((entry) => entry.signature).length}` : undefined} onFill={resource.id === accidentIncidentJournalResourceId || resource.id === safetyViolationJournalResourceId || resource.id === fireAutomationMaintenanceJournalResourceId || resource.id === firstAidKitInspectionJournalResourceId ? () => openResourceSettings(resource) : undefined} fillLabel={resource.id === safetyViolationJournalResourceId ? 'Pildyti pažeidimą' : resource.id === firstAidKitInspectionJournalResourceId ? 'Pildyti patikrą' : resource.id === fireAutomationMaintenanceJournalResourceId ? 'Pildyti įrašą' : undefined} fillDisabled={isWorkspaceReadOnly || canBrowseReportsReadOnly} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
+              {reportTypeFilter === 'Žurnalas' && <div className="space-y-6">{reportJournalGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} summaryText={resource.id === firstAidKitInspectionJournalResourceId ? `Patikrų: ${reportFirstAidInspectionEntries.length} · Pasirašyta: ${reportFirstAidInspectionEntries.filter((entry) => entry.signature).length}` : resource.id === workEquipmentInspectionJournalResourceId ? `Patikrų: ${reportWorkEquipmentInspectionEntries.length} · Pasirašyta: ${reportWorkEquipmentInspectionEntries.filter((entry) => entry.signature).length}` : undefined} onFill={resource.id === accidentIncidentJournalResourceId || resource.id === safetyViolationJournalResourceId || resource.id === fireAutomationMaintenanceJournalResourceId || resource.id === firstAidKitInspectionJournalResourceId || resource.id === workEquipmentInspectionJournalResourceId ? () => openResourceSettings(resource) : undefined} fillLabel={resource.id === safetyViolationJournalResourceId ? 'Pildyti pažeidimą' : resource.id === firstAidKitInspectionJournalResourceId ? 'Pildyti patikrą' : resource.id === fireAutomationMaintenanceJournalResourceId || resource.id === workEquipmentInspectionJournalResourceId ? 'Pildyti įrašą' : undefined} fillDisabled={isWorkspaceReadOnly || canBrowseReportsReadOnly} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
               {reportTestResources.length > 0 && <section className="space-y-3"><div><h2 className="font-bold">Testai</h2><p className="mt-1 text-sm text-slate-500">Pasirinkite testą ir peržiūrėkite darbuotojų bandymus. Bandymų duomenys įkeliami tik išskleidus darbuotoją.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{reportTestResources.map((resource) => { const attempts = reportTestResults.filter((entry) => entry.resource.id === resource.id); return <ReportTestCard key={resource.id} resource={resource} attemptCount={attempts.length} passedCount={attempts.filter(({ result }) => result.passed).length} onSelect={() => { setReportTestTargetId(resource.id); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }} />; })}</div></section>}
               {reportTypeFilter === 'Testas' && reportTestResources.length === 0 && <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Įmonė testų dar nepriskyrė.</p>}
               {reportTypeFilter === 'Kortelė' && <div className="space-y-6">{reportCardGroups.map(({ type, title, resources }) => <section key={type} className="space-y-3"><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-slate-500">Įmonės {title.toLocaleLowerCase('lt')} ir jų peržiūra.</p></div>{resources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{resources.map((resource) => <ReportResourceCard key={resource.id} resource={resource} employeeCount={reportEmployees.filter((employee) => employee.resourceIds?.includes(resource.id)).length} signatureCount={reportSignatures.filter((signature) => signature.resourceId === resource.id).length} onPreview={() => openResourcePreview(resource)} onDownload={() => openResourcePreview(resource, { autoPrint: true })} />)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Įmonei nepriskirta dokumentų šioje kategorijoje.</p>}</section>)}</div>}
@@ -10381,7 +10854,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         </div>
         {resourceSettingsTarget && (resourceSettingsTarget.templateKind === 'knowledge-assessment-protocol'
           ? <ProtocolSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />
-          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} resources={data.resources} organization={currentOrg} employees={orgEmployees} specialists={data.specialists} persistedEntries={resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? normalizeSafetyViolationJournalEntries(currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries) : resourceSettingsTarget.templateKind === fireAutomationMaintenanceJournalTemplateKind ? normalizeFireAutomationMaintenanceEntries(currentOrg?.resourceSettings?.[fireAutomationMaintenanceJournalResourceId]?.maintenanceEntries) : resourceSettingsTarget.templateKind === firstAidKitInspectionJournalTemplateKind ? normalizeFirstAidKitInspectionEntries(currentOrg?.resourceSettings?.[firstAidKitInspectionJournalResourceId]?.inspectionEntries) : normalizeIncidentJournalEntries(currentOrg?.resourceSettings?.[accidentIncidentJournalResourceId]?.incidentEntries)} onSignEntry={resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? (entry, stage) => openSafetyViolationSignDialog(stage, entry) : resourceSettingsTarget.templateKind === accidentIncidentJournalTemplateKind ? (entry) => openIncidentJournalSignDialog('manager', entry) : userRole === 'darbuotojas' ? (entry) => openFireAutomationMaintenanceSignDialog(entry) : undefined} onSignExternal={userRole === 'vadovas' || userRole === 'dss' ? signFireAutomationExternalPerformer : undefined} availableResourceIds={currentOrg?.resources ?? []} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
+          : <ResourceSettingsDialog resource={resourceSettingsTarget} settings={resourceSettingsDraft} resources={data.resources} organization={currentOrg} employees={orgEmployees} specialists={data.specialists} persistedEntries={resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? normalizeSafetyViolationJournalEntries(currentOrg?.resourceSettings?.[safetyViolationJournalResourceId]?.violationEntries) : resourceSettingsTarget.templateKind === fireAutomationMaintenanceJournalTemplateKind ? normalizeFireAutomationMaintenanceEntries(currentOrg?.resourceSettings?.[fireAutomationMaintenanceJournalResourceId]?.maintenanceEntries) : resourceSettingsTarget.templateKind === firstAidKitInspectionJournalTemplateKind ? normalizeFirstAidKitInspectionEntries(currentOrg?.resourceSettings?.[firstAidKitInspectionJournalResourceId]?.inspectionEntries) : resourceSettingsTarget.templateKind === workEquipmentInspectionJournalTemplateKind ? normalizeWorkEquipmentInspectionEntries(currentOrg?.resourceSettings?.[workEquipmentInspectionJournalResourceId]?.inspectionEntries) : normalizeIncidentJournalEntries(currentOrg?.resourceSettings?.[accidentIncidentJournalResourceId]?.incidentEntries)} onSignEntry={resourceSettingsTarget.templateKind === safetyViolationJournalTemplateKind ? (entry, stage) => openSafetyViolationSignDialog(stage, entry) : resourceSettingsTarget.templateKind === accidentIncidentJournalTemplateKind ? (entry) => openIncidentJournalSignDialog('manager', entry) : userRole === 'darbuotojas' && resourceSettingsTarget.templateKind === workEquipmentInspectionJournalTemplateKind ? (entry) => openWorkEquipmentInspectionSignDialog(entry) : userRole === 'darbuotojas' ? (entry) => openFireAutomationMaintenanceSignDialog(entry) : undefined} onSignExternal={userRole === 'vadovas' || userRole === 'dss' ? resourceSettingsTarget.templateKind === workEquipmentInspectionJournalTemplateKind ? signWorkEquipmentExternalInspector : signFireAutomationExternalPerformer : undefined} availableResourceIds={currentOrg?.resources ?? []} onChange={setResourceSettingsDraft} onSave={saveResourceSettings} onClose={() => setResourceSettingsTarget(null)} />)}
       </main>
 
       {protocolAccessPopup && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4"><section role="alertdialog" aria-modal="true" aria-labelledby="protocol-access-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><CircleAlert className="mt-0.5 shrink-0 text-amber-600" size={22} /><div><h2 id="protocol-access-title" className="text-lg font-bold">{protocolAccessPopup.startsWith('Testas') ? 'Testas neatliktas' : 'Protokolo atidaryti negalima'}</h2><p className="mt-2 text-sm text-slate-700">{protocolAccessPopup}</p></div></div><div className="mt-5 flex justify-end"><button type="button" autoFocus className={buttonClass} onClick={() => setProtocolAccessPopup('')}>Gerai</button></div></section></div>}
@@ -10490,6 +10963,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           <label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={firstAidKitInspectionSignPin} onChange={(event) => { setFirstAidKitInspectionSignPin(event.target.value); setFirstAidKitInspectionSignError(''); }} required disabled={firstAidKitInspectionSignSubmitting} /></label>
           {firstAidKitInspectionSignError && <p role="alert" className="text-sm text-rose-700">{firstAidKitInspectionSignError}</p>}
           <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={firstAidKitInspectionSignSubmitting} onClick={closeFirstAidKitInspectionSignDialog}>Atšaukti</button><button type="submit" className={buttonClass} disabled={firstAidKitInspectionSignSubmitting || !signatureInk || !firstAidKitInspectionReviewConfirmed}>{firstAidKitInspectionSignSubmitting ? 'Saugoma…' : <><FileSignature size={15} />Pasirašyti patikrą</>}</button></div>
+        </form>
+      </div>}
+      {workEquipmentInspectionSigningTarget && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4">
+        <form role="dialog" aria-modal="true" aria-labelledby="work-equipment-inspection-sign-title" onSubmit={confirmWorkEquipmentInspectionSign} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-emerald-800">{workEquipmentInspectionSigningTarget.entry.organizationName || currentOrg?.name || ''}</p><h2 id="work-equipment-inspection-sign-title" className="mt-1 text-lg font-bold">Pasirašyti darbo priemonės patikros įrašą</h2><p className="mt-1 text-sm text-slate-600">Peržiūrėkite patikros duomenis ir patvirtinkite kompetentingo asmens parašą PIN kodu.</p></div><button type="button" aria-label="Uždaryti pasirašymo langą" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" disabled={workEquipmentInspectionSignSubmitting} onClick={closeWorkEquipmentInspectionSignDialog}><X size={20} /></button></div>
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+            <p><strong>Patikros data / rūšis:</strong> {workEquipmentInspectionSigningTarget.entry.inspectionDate} · {workEquipmentInspectionSigningTarget.entry.inspectionType}</p>
+            <p><strong>Darbo priemonė:</strong> {workEquipmentInspectionSigningTarget.entry.equipmentName}{workEquipmentInspectionSigningTarget.entry.equipmentType ? ` · ${workEquipmentInspectionSigningTarget.entry.equipmentType}` : ''}</p>
+            <p><strong>Inventorinis / gamyklinis Nr. ir vieta:</strong> {[workEquipmentInspectionSigningTarget.entry.inventoryNumber, workEquipmentInspectionSigningTarget.entry.department].filter(Boolean).join(' · ') || 'Nenurodyta'}</p>
+            <p><strong>Patikros rezultatai:</strong><br />{workEquipmentInspectionSigningTarget.entry.inspectionResults}</p>
+            <p><strong>Išvada:</strong> {workEquipmentInspectionSigningTarget.entry.conclusion === 'netinkama' ? 'Netinkama naudoti' : 'Tinkama naudoti'}</p>
+            {workEquipmentInspectionSigningTarget.entry.nextInspectionDate && <p><strong>Kita numatoma patikra:</strong> {workEquipmentInspectionSigningTarget.entry.nextInspectionDate}</p>}
+            <p className="border-t border-slate-200 pt-2"><strong>Kompetentingas asmuo:</strong> {workEquipmentInspectionSigningTarget.entry.inspectorPosition} · {workEquipmentInspectionSigningTarget.entry.inspectorName}</p>
+          </section>
+          <label className="flex items-start gap-2 text-sm"><input className="mt-0.5" type="checkbox" checked={workEquipmentInspectionReviewConfirmed} onChange={(event) => { setWorkEquipmentInspectionReviewConfirmed(event.target.checked); setWorkEquipmentInspectionSignError(''); }} /><span>Patvirtinu, kad atlikau šią patikrą ir nurodyti duomenys teisingi.</span></label>
+          <SignaturePad value={signatureInk} onChange={(value) => { setSignatureInk(value); setWorkEquipmentInspectionSignError(''); }} />
+          <label className="block text-sm font-medium">Jūsų 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="current-password" value={workEquipmentInspectionSignPin} onChange={(event) => { setWorkEquipmentInspectionSignPin(event.target.value); setWorkEquipmentInspectionSignError(''); }} required disabled={workEquipmentInspectionSignSubmitting} /></label>
+          {workEquipmentInspectionSignError && <p role="alert" className="text-sm text-rose-700">{workEquipmentInspectionSignError}</p>}
+          <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={workEquipmentInspectionSignSubmitting} onClick={closeWorkEquipmentInspectionSignDialog}>Atšaukti</button><button type="submit" className={buttonClass} disabled={workEquipmentInspectionSignSubmitting || !signatureInk || !workEquipmentInspectionReviewConfirmed}>{workEquipmentInspectionSignSubmitting ? 'Saugoma…' : <><FileSignature size={15} />Pasirašyti patikrą</>}</button></div>
         </form>
       </div>}
       {employerSigningTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={confirmEmployerSign} className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl bg-white p-6"><h2 className="text-lg font-bold">Patvirtinti vadovo parašą</h2><p className="text-sm text-slate-600">{data.organizations.find((org) => org.id === employerSigningTarget.orgId)?.manager} · {data.resources.find((resource) => resource.id === employerSigningTarget.resourceId)?.title}</p><SignaturePad value={signatureInk} onChange={setSignatureInk} /><label className="block text-sm font-medium">Įmonės vadovo 4 skaitmenų PIN<input className={`${inputClass} mt-1`} type="password" inputMode="numeric" maxLength={4} value={employerSignPin} onChange={(event) => setEmployerSignPin(event.target.value)} required /></label>{employerSignError && <p role="alert" className="text-sm text-rose-700">{employerSignError}</p>}<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setEmployerSigningTarget(null); setSignatureInk(''); }}>Atšaukti</button><button className={buttonClass}><FileSignature size={15} />Pasirašyti</button></div></form></div>}
@@ -11002,7 +11494,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function populateJournalRows(html, resource, employee, org, signatures, specialists, allResources = []) {
-  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
+  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind, workEquipmentInspectionJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -11019,6 +11511,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
       const value = String(settings[key] ?? '').trim();
       element.textContent = value ? `${labels[key] ?? ''}${value}` : '';
     });
+  }
+  if (resource.templateKind === workEquipmentInspectionJournalTemplateKind) {
+    const numberElement = parsed.querySelector('[data-journal-setting="documentNumber"]');
+    if (numberElement) numberElement.textContent = resource.defaultSettings?.documentNumber
+      ? `Žurnalo Nr. ${String(resource.defaultSettings.documentNumber).trim()}`
+      : '';
   }
   const journalTables = parsed.querySelectorAll('.journal-page .journal-table');
   const table = resource.templateKind === 'familiarization-card' ? parsed.querySelector('.card-container table') : resource.templateKind === 'knowledge-assessment-protocol' ? parsed.querySelector('.protocol-table') : resource.templateKind === 'chemical-safety-instruction-card' ? parsed.querySelector('.card-page .card-table') : resource.templateKind === 'medical-examination-schedule' ? parsed.querySelector('.document-page .journal-table') : journalTables[0];
@@ -11047,6 +11545,11 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           ? Math.max(templateRowCount, Number(resource.defaultSettings?.rowCount) || templateRowCount, normalizeFireAutomationMaintenanceEntries(resource.defaultSettings?.maintenanceEntries).length)
             : resource.templateKind === firstAidKitInspectionJournalTemplateKind
               ? Math.max(templateRowCount, Number(resource.defaultSettings?.rowCount) || templateRowCount, normalizeFirstAidKitInspectionEntries(resource.defaultSettings?.inspectionEntries).length)
+                  : resource.templateKind === workEquipmentInspectionJournalTemplateKind
+                        ? Math.max(
+                          Number(resource.defaultSettings?.rowCount) || templateRowCount,
+                          normalizeWorkEquipmentInspectionEntries(resource.defaultSettings?.inspectionEntries).length,
+                        )
       : Math.max(templateRowCount, employees.length);
   const tableBody = table?.tBodies[0];
   if (table) table.dataset.pageSize = String(templateRowCount);
@@ -11127,6 +11630,45 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
         entry ? [entry.inspectorPosition, entry.inspectorName].filter(Boolean).map(escapeHtml).join('<br>') : '',
         entry ? renderSignature(entry.signature) : '',
         entry ? escapeHtml(entry.notes).replace(/\r?\n/g, '<br>') : '',
+      ]);
+    });
+    return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+  }
+
+  if (resource.templateKind === workEquipmentInspectionJournalTemplateKind) {
+    const inspectionEntries = normalizeWorkEquipmentInspectionEntries(resource.defaultSettings?.inspectionEntries);
+    const renderSignature = (signature) => {
+      if (!signature) return '<span class="signature-pending">Laukia parašo</span>';
+      const signatureImage = typeof signature.signatureImage === 'string'
+        && (isIncidentJournalSignature(signature.signatureImage) || signature.signatureImage.startsWith('https://'))
+        ? `<img class="signature-image" src="${escapeHtml(signature.signatureImage)}" alt="Parašas">`
+        : '';
+      const signedAt = signature.signedAt ? new Date(signature.signedAt) : null;
+      const signedDate = signedAt && !Number.isNaN(signedAt.getTime())
+        ? new Intl.DateTimeFormat('lt-LT', { dateStyle: 'short', timeStyle: 'short' }).format(signedAt)
+        : '';
+      const identityNote = signature.identityVerified === false
+        ? `<small>Tapatybė nepatvirtinta DSS Pro paskyra; vietoje užfiksavo ${escapeHtml(signature.recordedBy ?? '')}</small>`
+        : '';
+      return `<span class="signature-proof">${signatureImage}<strong>${escapeHtml(signature.signer || '')}</strong><small>${escapeHtml(signature.role || 'Darbuotojas')} · ${escapeHtml(signedDate)}</small><small>IP / aplinka: ${escapeHtml(signature.ip || 'Nenurodyta')}</small>${identityNote}</span>`;
+    };
+    rows.forEach((row, index) => {
+      const entry = inspectionEntries[index];
+      if (!entry) {
+        writeRow(row, [String(index + 1), '', '', '', '', '', '', '', '']);
+        return;
+      }
+      const inspector = [entry.inspectorPosition, entry.inspectorName].filter(Boolean).map(escapeHtml).join('<br>');
+      writeRow(row, [
+        String(index + 1),
+        [entry.equipmentName, entry.equipmentType].filter(Boolean).map(escapeHtml).join('<br>'),
+        [entry.inventoryNumber, entry.department].filter(Boolean).map(escapeHtml).join('<br>'),
+        escapeHtml(formatDate(entry.inspectionDate)),
+        entry.inspectionType === 'neeilinė' ? 'Neeilinė' : 'Periodinė',
+        escapeHtml(entry.inspectionResults).replace(/\r?\n/g, '<br>'),
+        entry.conclusion === 'netinkama' ? 'Netinkama naudoti' : 'Tinkama naudoti',
+        `${inspector}${inspector ? '<br>' : ''}${renderSignature(entry.signature)}`,
+        escapeHtml(formatDate(entry.nextInspectionDate)),
       ]);
     });
     return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
@@ -12264,6 +12806,7 @@ function ResourceSettingsDialog(props) {
   if (props.resource.templateKind === safetyViolationJournalTemplateKind) return <SafetyViolationJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === fireAutomationMaintenanceJournalTemplateKind) return <FireAutomationMaintenanceJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === firstAidKitInspectionJournalTemplateKind) return <FirstAidKitInspectionJournalSettingsDialog {...props} />;
+  if (props.resource.templateKind === workEquipmentInspectionJournalTemplateKind) return <WorkEquipmentInspectionJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === 'evacuation-plan-journal') return <EvacuationPlanResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
@@ -12473,6 +13016,165 @@ function FirstAidKitInspectionJournalSettingsDialog({ resource, settings, employ
       </fieldset>}
       <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
     </form>
+  </div>;
+}
+
+function WorkEquipmentInspectionJournalSettingsDialog({ resource, settings, employees = [], persistedEntries = [], onChange, onSignEntry, onSignExternal, onSave, onClose }) {
+  const entries = normalizeWorkEquipmentInspectionEntries(settings.inspectionEntries);
+  const activeEmployees = employees.filter((employee) => employee.status !== 'archived');
+  const [draft, setDraft] = useState(null);
+  const [entryError, setEntryError] = useState('');
+  const [externalTarget, setExternalTarget] = useState(null);
+  const [externalName, setExternalName] = useState('');
+  const [externalPosition, setExternalPosition] = useState('');
+  const [externalInk, setExternalInk] = useState('');
+  const [externalSubmitting, setExternalSubmitting] = useState(false);
+  const [externalError, setExternalError] = useState('');
+  const updateSetting = (key, value) => onChange({ ...settings, [key]: value });
+  const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+  const employeeFor = (id) => activeEmployees.find((employee) => employee.id === id);
+  const beginEntry = (entry = null) => {
+    setEntryError('');
+    setDraft(entry ? { ...entry } : {
+      inspectionDate: toDateInputValue(),
+      equipmentName: '',
+      equipmentType: '',
+      inventoryNumber: '',
+      department: '',
+      inspectionType: 'periodinė',
+      inspectionResults: '',
+      conclusion: 'tinkama',
+      nextInspectionDate: '',
+      inspectorType: 'employee',
+      inspectorEmployeeId: settings.defaultInspectorEmployeeId ?? '',
+      inspectorName: '',
+      inspectorPosition: '',
+      signature: null,
+    });
+  };
+  const saveEntry = () => {
+    const inspector = draft?.inspectorType === 'employee' ? employeeFor(draft.inspectorEmployeeId) : null;
+    if (!draft?.inspectionDate || !draft.equipmentName.trim() || !draft.inspectionResults.trim()) {
+      setEntryError('Nurodykite patikros datą, darbo priemonės pavadinimą ir patikros rezultatus.');
+      return;
+    }
+    if (draft.nextInspectionDate && draft.nextInspectionDate < draft.inspectionDate) {
+      setEntryError('Kitos patikros data negali būti ankstesnė už atliktos patikros datą.');
+      return;
+    }
+    if (draft.conclusion === 'tinkama' && !draft.nextInspectionDate) {
+      setEntryError('Tinkamai naudoti pripažintai priemonei nurodykite kitos patikros datą.');
+      return;
+    }
+    if (draft.inspectorType === 'employee' && !inspector) {
+      setEntryError('Pasirinkite kompetentingą darbuotoją, kuris pasirašys įrašą.');
+      return;
+    }
+    if (draft.inspectorType === 'external' && !settings.allowExternalInspector) {
+      setEntryError('Išorinio tikrintojo pasirašymas šio žurnalo nustatymuose išjungtas.');
+      return;
+    }
+    if (draft.inspectorType === 'external' && (!draft.inspectorName.trim() || !draft.inspectorPosition.trim())) {
+      setEntryError('Nurodykite išorinio tikrintojo vardą, pavardę ir pareigas.');
+      return;
+    }
+    const savedEntries = normalizeWorkEquipmentInspectionEntries([
+      ...entries.filter((entry) => entry.id !== draft.id),
+      {
+        ...draft,
+        id: draft.id || `work-equipment-inspection-${crypto.randomUUID()}`,
+        inspectorName: inspector?.name ?? draft.inspectorName.trim(),
+        inspectorPosition: inspector?.position ?? draft.inspectorPosition.trim(),
+        signature: null,
+      },
+    ]);
+    onChange({ ...settings, inspectionEntries: savedEntries });
+    setDraft(null);
+    setEntryError('');
+  };
+  const saveExternalSignature = async () => {
+    if (externalSubmitting) return;
+    if (!externalTarget || !externalName.trim() || !externalPosition.trim() || !externalInk) {
+      setExternalError('Įrašykite tikrintojo vardą, pareigas ir nupieškite parašą.');
+      return;
+    }
+    setExternalSubmitting(true);
+    try {
+      await onSignExternal(externalTarget, externalName.trim(), externalPosition.trim(), externalInk);
+      setExternalTarget(null);
+      setExternalName('');
+      setExternalPosition('');
+      setExternalInk('');
+      setExternalError('');
+    } catch (error) {
+      setExternalError(`Parašo išsaugoti nepavyko: ${error.message}`);
+    } finally {
+      setExternalSubmitting(false);
+    }
+  };
+  const isLocked = (entry) => Boolean(entry.signature)
+    || persistedEntries.some((saved) => saved.id === entry.id && saved.signature);
+  const signatureDate = (signature) => {
+    const date = signature?.signedAt ? new Date(signature.signedAt) : null;
+    return date && !Number.isNaN(date.getTime())
+      ? new Intl.DateTimeFormat('lt-LT', { dateStyle: 'short', timeStyle: 'short' }).format(date)
+      : '';
+  };
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+    <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės žurnalo nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Kiekvieną įrašą pasirašo paskirtas kompetentingas darbuotojas savo PIN kodu. Galima leisti ir išorinio tikrintojo parašą vietoje; jo tapatybė DSS Pro paskyra nepatvirtinama.</p></div>
+        <button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button>
+      </div>
+      <fieldset className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <legend className="px-1 text-sm font-semibold">Numatytieji nustatymai</legend>
+        <label className="text-sm font-medium">Žurnalo Nr.<input className={`${inputClass} mt-1`} maxLength={100} value={settings.documentNumber ?? ''} onChange={(event) => updateSetting('documentNumber', event.target.value)} /></label>
+        <label className="text-sm font-medium">Numatytasis kompetentingas darbuotojas<select className={`${inputClass} mt-1`} value={settings.defaultInspectorEmployeeId ?? ''} onChange={(event) => updateSetting('defaultInspectorEmployeeId', event.target.value)}><option value="">Pasirinkite darbuotoją</option>{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.position ? ` · ${employee.position}` : ''}</option>)}</select></label>
+        <label className="text-sm font-medium">Žurnalo eilučių skaičius<input className={`${inputClass} mt-1`} type="number" min="1" max="100" value={settings.rowCount ?? 15} onChange={(event) => updateSetting('rowCount', event.target.value)} /></label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={settings.allowExternalInspector !== false} onChange={(event) => updateSetting('allowExternalInspector', event.target.checked)} />Leisti išoriniam kompetentingam asmeniui pasirašyti vietoje</label>
+      </fieldset>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">Patikros įrašai</h3><p className="text-xs text-slate-500">Pasirašyti įrašai užrakinami. Parašas, pasirašymo laikas ir kitos patikros data pateikiami žurnalo peržiūroje bei PDF.</p></div><button type="button" className="inline-flex items-center gap-2 rounded-md border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50" onClick={() => beginEntry()}><Plus size={16} />Pridėti patikrą</button></div>
+      {entries.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Patikrų įrašų dar nėra.</p> : <div className="mt-3 space-y-3">{entries.map((entry, index) => {
+        const inspector = employeeFor(entry.inspectorEmployeeId);
+        const savedEntry = persistedEntries.find((saved) => saved.id === entry.id);
+        const canSign = Boolean(savedEntry)
+          && JSON.stringify(normalizeWorkEquipmentInspectionEntries([savedEntry])[0])
+            === JSON.stringify(normalizeWorkEquipmentInspectionEntries([entry])[0]);
+        const locked = isLocked(entry);
+        return <article key={entry.id} className="rounded-lg border border-slate-200 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="font-semibold">{index + 1}. {entry.inspectionDate} · {entry.equipmentName}{entry.equipmentType ? ` · ${entry.equipmentType}` : ''}</p><p className="mt-1 text-sm text-slate-600">{entry.inspectionType} · {entry.conclusion === 'tinkama' ? 'Tinkama naudoti' : 'Netinkama naudoti'}{entry.nextInspectionDate ? ` · kita patikra ${entry.nextInspectionDate}` : ''}</p><p className="mt-1 whitespace-pre-line text-sm text-slate-600">{entry.inspectionResults}</p><p className="mt-2 text-xs text-slate-500">Tikrina: {entry.inspectorType === 'external' ? `${entry.inspectorPosition} · ${entry.inspectorName}` : `${entry.inspectorPosition || inspector?.position || 'Darbuotojas'} · ${entry.inspectorName || inspector?.name || 'Nepasirinktas'}`}{entry.signature ? ` · pasirašė ${entry.signature.signer} (${signatureDate(entry.signature)})` : ' · laukia parašo'}</p>{entry.signature?.identityVerified === false && <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-900">Tikrintojo tapatybė nepatvirtinta DSS Pro paskyra; parašą vietoje užfiksavo {entry.signature.recordedBy || 'įmonės atstovas'}.</p>}</div>
+            <div className="flex flex-wrap gap-2">
+              {entry.inspectorType === 'employee' && !entry.signature && onSignEntry && <button type="button" disabled={!canSign} title={canSign ? undefined : 'Prieš pasirašant darbuotojui išsaugokite žurnalo nustatymus'} className="rounded-md border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50 disabled:opacity-50" onClick={() => onSignEntry(entry)}>Pasirašyti darbuotojui</button>}
+              {entry.inspectorType === 'external' && !entry.signature && onSignExternal && settings.allowExternalInspector !== false && <button type="button" disabled={!canSign} title={canSign ? undefined : 'Prieš fiksuodami parašą išsaugokite žurnalo nustatymus'} className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-50" onClick={() => { setExternalTarget(entry); setExternalName(entry.inspectorName); setExternalPosition(entry.inspectorPosition); setExternalInk(''); setExternalError(''); }}>Išorinio tikrintojo parašas vietoje</button>}
+              <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-40" disabled={locked} onClick={() => beginEntry(entry)}>Redaguoti</button>
+              <button type="button" className="rounded-md border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 disabled:opacity-40" disabled={locked} onClick={() => updateSetting('inspectionEntries', entries.filter((item) => item.id !== entry.id))}>Pašalinti</button>
+            </div>
+          </div>
+          {!savedEntry && !entry.signature && <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-900">Pirmiausia išsaugokite žurnalo nustatymus, kad darbuotojui būtų sukurta pasirašymo užduotis.</p>}
+        </article>;
+      })}</div>}
+      {draft && <fieldset className="mt-5 grid gap-3 rounded-lg border border-sky-200 bg-sky-50/50 p-4 sm:grid-cols-2"><legend className="px-1 text-sm font-semibold">{draft.id ? 'Redaguoti patikros įrašą' : 'Nauja patikra'}</legend>
+        <label className="text-sm font-medium">Patikros data<input className={`${inputClass} mt-1`} type="date" value={draft.inspectionDate} onChange={(event) => updateDraft('inspectionDate', event.target.value)} required /></label>
+        <label className="text-sm font-medium">Patikros rūšis<select className={`${inputClass} mt-1`} value={draft.inspectionType} onChange={(event) => updateDraft('inspectionType', event.target.value)}><option value="periodinė">Periodinė</option><option value="neeilinė">Neeilinė</option></select></label>
+        <label className="text-sm font-medium">Darbo priemonės pavadinimas<input className={`${inputClass} mt-1`} maxLength={150} value={draft.equipmentName} onChange={(event) => updateDraft('equipmentName', event.target.value)} required /></label>
+        <label className="text-sm font-medium">Tipas / markė<input className={`${inputClass} mt-1`} maxLength={150} value={draft.equipmentType} onChange={(event) => updateDraft('equipmentType', event.target.value)} /></label>
+        <label className="text-sm font-medium">Inventorinis / gamyklinis Nr.<input className={`${inputClass} mt-1`} maxLength={100} value={draft.inventoryNumber} onChange={(event) => updateDraft('inventoryNumber', event.target.value)} /></label>
+        <label className="text-sm font-medium">Padalinys / vieta<input className={`${inputClass} mt-1`} maxLength={200} value={draft.department} onChange={(event) => updateDraft('department', event.target.value)} /></label>
+        <label className="text-sm font-medium sm:col-span-2">Patikros rezultatai, trūkumai ir atlikti remonto darbai<textarea className={`${inputClass} mt-1 min-h-24`} maxLength={2000} value={draft.inspectionResults} onChange={(event) => updateDraft('inspectionResults', event.target.value)} required /></label>
+        <label className="text-sm font-medium">Išvada<select className={`${inputClass} mt-1`} value={draft.conclusion} onChange={(event) => updateDraft('conclusion', event.target.value)}><option value="tinkama">Tinkama naudoti</option><option value="netinkama">Netinkama naudoti</option></select></label>
+        <label className="text-sm font-medium">Kitos numatomos patikros data<input className={`${inputClass} mt-1`} type="date" min={draft.inspectionDate} value={draft.nextInspectionDate} onChange={(event) => updateDraft('nextInspectionDate', event.target.value)} required={draft.conclusion === 'tinkama'} /></label>
+        <label className="text-sm font-medium">Tikrinęs asmuo<select className={`${inputClass} mt-1`} value={draft.inspectorType} onChange={(event) => updateDraft('inspectorType', event.target.value)}><option value="employee">Įmonės darbuotojas</option>{settings.allowExternalInspector !== false && <option value="external">Išorinis kompetentingas asmuo</option>}</select></label>
+        {draft.inspectorType === 'employee' ? <label className="text-sm font-medium">Kompetentingas darbuotojas<select className={`${inputClass} mt-1`} value={draft.inspectorEmployeeId} onChange={(event) => updateDraft('inspectorEmployeeId', event.target.value)} required><option value="">Pasirinkite darbuotoją</option>{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.position ? ` · ${employee.position}` : ''}</option>)}</select></label> : <>
+          <label className="text-sm font-medium">Išorinio tikrintojo vardas, pavardė<input className={`${inputClass} mt-1`} maxLength={150} value={draft.inspectorName} onChange={(event) => updateDraft('inspectorName', event.target.value)} required /></label>
+          <label className="text-sm font-medium">Išorinio tikrintojo pareigos<input className={`${inputClass} mt-1`} maxLength={150} value={draft.inspectorPosition} onChange={(event) => updateDraft('inspectorPosition', event.target.value)} required /></label>
+          <p className="rounded bg-amber-50 p-3 text-xs text-amber-950 sm:col-span-2">Išorinis asmuo pasirašo vietoje įmonės įrenginyje. Jo tapatybė nėra patvirtinama DSS Pro paskyra.</p>
+        </>}
+        {entryError && <p role="alert" className="text-sm text-rose-700 sm:col-span-2">{entryError}</p>}
+        <div className="flex gap-2 sm:col-span-2"><button type="button" className={buttonClass} onClick={saveEntry}>Išsaugoti įrašą</button><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm" onClick={() => { setDraft(null); setEntryError(''); }}>Atšaukti</button></div>
+      </fieldset>}
+      <div className="mt-5 flex justify-end gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+    </form>
+    {externalTarget && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4"><section role="dialog" aria-modal="true" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl"><h2 className="text-lg font-bold">Išorinio tikrintojo parašas</h2><p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">Tikrintojas pasirašo įmonės įrenginyje. Tapatybė nėra patvirtinama DSS Pro paskyra; šis apribojimas bus pažymėtas žurnale.</p><label className="block text-sm font-medium">Vardas, pavardė<input className={`${inputClass} mt-1`} maxLength={150} value={externalName} onChange={(event) => setExternalName(event.target.value)} required disabled={externalSubmitting} /></label><label className="block text-sm font-medium">Pareigos<input className={`${inputClass} mt-1`} maxLength={150} value={externalPosition} onChange={(event) => setExternalPosition(event.target.value)} required disabled={externalSubmitting} /></label><SignaturePad value={externalInk} onChange={setExternalInk} />{externalError && <p role="alert" className="text-sm text-rose-700">{externalError}</p>}<div className="flex justify-end gap-2"><button type="button" disabled={externalSubmitting} className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" onClick={() => setExternalTarget(null)}>Atšaukti</button><button type="button" disabled={externalSubmitting} className={buttonClass} onClick={saveExternalSignature}><FileSignature size={15} />{externalSubmitting ? 'Saugoma…' : 'Užfiksuoti parašą'}</button></div></section></div>}
   </div>;
 }
 
