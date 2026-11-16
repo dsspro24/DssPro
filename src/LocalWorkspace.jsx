@@ -8735,9 +8735,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
             <ReportCategoryFilters resources={selectedOrgResources} selectedType={reportTypeFilter} onTypeChange={(type) => { setReportTypeFilter(type); setReportTestTargetId(null); setReportTestEmployeePage(1); setExpandedReportTestEmployeeId(null); }} />
             {currentOrg?.resources?.includes(accidentIncidentJournalResourceId) && accidentIncidentJournalResource && <Panel title="Nelaimingų atsitikimų ir incidentų žurnalas">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-slate-600">Žurnalo įrašus pildo vadovas arba DSS specialistas. Pasirašius įrašą, paskirtas darbuotojas gauna pranešimą ir pasirašo savo paskyroje.</p>
+                <p className="text-sm text-slate-600">Čia galite pildyti naujus įvykio įrašus ir nelaimingo atsitikimo aktų duomenis, jų neieškodami bibliotekoje. Pasirašius įrašą, paskirtas darbuotojas gauna pranešimą ir pasirašo savo paskyroje.</p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={isWorkspaceReadOnly || canBrowseReportsReadOnly} onClick={() => openResourceSettings(accidentIncidentJournalResource)}><Settings2 size={15} />Pildyti žurnalą</button>
+                  <button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={isWorkspaceReadOnly || canBrowseReportsReadOnly} onClick={() => openResourceSettings(accidentIncidentJournalResource)}><Plus size={15} />Pildyti įvykio įrašą / aktą</button>
                   <button type="button" className={buttonClass} onClick={() => openResourcePreview(accidentIncidentJournalResource)}><Download size={15} />Peržiūrėti / atsisiųsti</button>
                 </div>
               </div>
