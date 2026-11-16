@@ -1423,6 +1423,23 @@
           "employee": "Darbuotojas"
         }
       }
+    },
+    {
+      "id": "res-accident-incident-journal",
+      "title": "Nelaimingų atsitikimų darbe, incidentų ir nelaimingų atsitikimų darbe aktų registravimo žurnalas",
+      "type": "Žurnalas",
+      "category": "Nelaimingi atsitikimai ir incidentai",
+      "duration": "15 įrašų",
+      "templateKind": "accident-incident-journal",
+      "adminOnly": true,
+      "defaultForOrganizations": true,
+      "requiredSigners": [],
+      "defaultSettings": {
+        "recorderRole": "Vadovas",
+        "recorderName": "",
+        "recorderPosition": "Įmonės vadovas",
+        "incidentEntries": []
+      }
     }
   ]
 }
