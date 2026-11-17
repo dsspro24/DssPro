@@ -166,9 +166,9 @@ function DemoApp({ cloudMode = false }) {
       }
       setSandboxContent(content);
       setSandboxMode(true);
-      setUserRole('darbuotojas');
+      setUserRole('vadovas');
       setCurrentPage('app');
-      setActiveTab('uzduotys');
+      setActiveTab('skydelis');
     } catch (error) {
       setSandboxStartError(error instanceof Error ? error.message : String(error));
     } finally {
