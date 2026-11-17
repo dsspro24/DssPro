@@ -33,6 +33,7 @@ function toDateInputValue(value) {
   return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
 }
 const defaultTestTemplateLoaders = new Map([
+  ['res-computer-ergonomics-test', () => import('./assets/computer-ergonomics-test.html?raw').then(({ default: html }) => html)],
   ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
   ['res-fire-knowledge-test', () => import('./assets/fire-knowledge-test.html?raw').then(({ default: html }) => html)],
@@ -42,6 +43,8 @@ const defaultTestTemplateLoaders = new Map([
   ['res-workplace-conduct-test', () => import('./assets/workplace-conduct-test.html?raw').then(({ default: html }) => html)],
 ]);
 const defaultDocumentTemplateLoaders = new Map([
+  ['res-computer-ergonomics-journal', () => import('./assets/computer-ergonomics-journal.html?raw').then(({ default: html }) => html)],
+  ['computer-ergonomics-journal', () => import('./assets/computer-ergonomics-journal.html?raw').then(({ default: html }) => html)],
   ['res-aap', () => import('./assets/aap-template.html?raw').then(({ default: html }) => html)],
   ['res-familiarization-card', () => import('./assets/employee-familiarization-card.html?raw').then(({ default: html }) => html)],
   ['res-medical-examination-schedule', () => import('./assets/medical-examination-schedule.html?raw').then(({ default: html }) => html)],
@@ -746,6 +749,10 @@ const civilSafetyTrainingSignatureFieldDefaults = {
   instructor: 'DSS specialistas',
   employee: 'Darbuotojas',
 };
+const computerErgonomicsSignatureFieldDefaults = { ...civilSafetyTrainingSignatureFieldDefaults };
+const computerErgonomicsTestId = 'res-computer-ergonomics-test';
+const computerErgonomicsJournalResourceId = 'res-computer-ergonomics-journal';
+const computerErgonomicsJournalTemplateKind = 'computer-ergonomics-journal';
 const fireSafetySignatureFieldDefaults = {
   instructor: 'DSS specialistas',
   employee: 'Darbuotojas',
@@ -1067,6 +1074,7 @@ function getFireSafetyInstructionRows(settings = {}) {
 }
 const chemicalSafetyInstructionCardId = 'res-chemical-safety-instruction-card';
 const dateEnteredPerRecordTemplateKinds = new Set([
+  computerErgonomicsJournalTemplateKind,
   'civil-safety-training-journal',
   'evacuation-plan-journal',
   'fire-safety-journal',
@@ -1078,6 +1086,7 @@ const dateEnteredPerRecordTemplateKinds = new Set([
 const knowledgeAssessmentProtocolId = 'res-knowledge-assessment-protocol';
 const defaultCompanyProtocolTemplates = [
   { id: 'res-protocol-fire-safety', title: 'Gaisrinės saugos žinių patikrinimo protokolas', testId: 'res-fire-knowledge-test' },
+  { id: 'res-protocol-computer-ergonomics', title: 'Darbo kompiuteriu (ergonomikos ir VDU) žinių patikrinimo protokolas', testId: computerErgonomicsTestId, category: 'Ergonomika ir VDU', image: '/courses/computer-ergonomics.svg', defaultForOrganizations: true },
   { id: 'res-protocol-civil-safety-training', title: 'Civilinės saugos mokymai – žinių patikrinimo protokolas', testId: 'res-civil-safety-training-test', category: 'Civilinė sauga', defaultForOrganizations: true },
   { id: 'res-protocol-workplace-conduct', title: 'Prieš psichologinį ir fizinį smurtą, diskriminaciją ir priekabiavimą nukreipta mokymo programos žinių patikrinimo protokolas', testId: 'res-workplace-conduct-test' },
   { id: 'res-protocol-cargo-handling', title: 'Darbuotojų, atliekančių krovimo darbus, atestavimo, mokymo darbo vietoje protokolas', testId: 'res-manual-handling-test' },
@@ -1097,6 +1106,18 @@ const civilSafetyTrainingQuestions = [
   { prompt: 'Kaip elgtis pastebėjus įtartiną be priežiūros paliktą daiktą ar galimą sprogmenį įmonės teritorijoje?', options: ['Patikrinti, kas yra viduje, ir nunešti į apsaugos postą.', 'Neliesti, nejudinti daikto, pasitraukti saugiu atstumu, įspėti aplinkinius ir informuoti vadovą bei skambinti 112.', 'Užpilti vandeniu arba uždengti striuke.'], correctIndex: 1 },
   { prompt: 'Ką reikėtų daryti kilus žemės drebėjimui ar stipriai pastato konstrukcijų griūčiai, jei esate patalpoje?', options: ['Atsistoti prie didelio lango ir stebėti, kas vyksta lauke.', 'Pasislėpti po tvirtu stalu ar prie kapitalinės vidinės sienos, toliau nuo langų, stiklinių pertvarų ir krintančių daiktų.', 'Naudotis elektros prietaisais ir atvira ugnimi.'], correctIndex: 1 },
   { prompt: 'Kas įmonėje organizuoja darbuotojų civilinės saugos mokymus, pratybas ir užtikrina pasirengimą ekstremaliosioms situacijoms?', options: ['Įmonės vadovas arba jo paskirtas atsakingas asmuo (civilinės saugos specialistas).', 'Kiekvienas darbuotojas savarankiškai savo atostogų metu.', 'Tik Priešgaisrinės apsaugos ir gelbėjimo departamentas.'], correctIndex: 0 },
+];
+const computerErgonomicsQuestions = [
+  { prompt: 'Koks turi būti atstumas nuo darbuotojo akių iki kompiuterio ekrano (vaizduoklio)?', options: ['Apie 20–30 cm (labai arti, kad mažiau vargtų akys).', 'Apie 50–70 cm (priklausomai nuo ekrano dydžio).', 'Atstumas neturi jokios reikšmės.'], correctIndex: 1 },
+  { prompt: 'Kaip turėtų būti nustatytas kompiuterio ekrano viršutinis kraštas akių lygio atžvilgiu?', options: ['Ekrano viršutinis kraštas turi būti ties akių lygiu arba šiek tiek žemiau (žiūrint į ekraną šiek tiek žemyn).', 'Ekrano apačia turi būti aukščiau akių lygio.', 'Ekrano padėtis priklauso tik nuo stalo aukščio.'], correctIndex: 0 },
+  { prompt: 'Kokia turi būti taisyklinga sėdėsena dirbant su kompiuteriu biure?', options: ['Kojos sulenktos per kelio sąnarį 90 laipsnių kampu, pėdos tvirtai remiasi į grindis (arba į kojų atramą), nugara atremta į kėdės atlošą.', 'Kojos užmestos viena ant kitos, nugara palinkusi į priekį.', 'Pusiau gulomis kėdėje, kad ilsėtųsi stuburas.'], correctIndex: 0 },
+  { prompt: 'Ką rekomenduoja darbuotojų saugos ir sveikatos taisyklės dirbantiems ilgas valandas prie kompiuterio (VDU)?', options: ['Dirbti neatsitraukiant visą darbo dieną, kad greičiau baigtumėte darbus.', 'Daryti trumpas pertraukėles (pvz., 5–10 min. kas valandą) arba keisti veiklos pobūdį, mankštinti akis ir kūną.', 'Pertraukėles daryti tik kas 4 valandas.'], correctIndex: 1 },
+  { prompt: 'Kaip turėtų būti nukreiptas langas darbo vietos ir kompiuterio ekrano atžvilgiu, kad būtų išvengta atspindžių ir akių nuovargio?', options: ['Ekranas turi būti tiesiogiai atsuktas į langą, o darbuotojas sėdi nugara į langą.', 'Langas turi būti šone (iš kairės arba dešinės pusės) darbo vietos atžvilgiu.', 'Šviesos šaltinio padėtis neturi jokios įtakos ekrano matomumui.'], correctIndex: 1 },
+  { prompt: 'Koks turi būti klaviatūros ir pelės naudojimo aukštis bei rankų padėtis?', options: ['Rankos per alkūnės sąnarį turi būti sulenktos maždaug 90 laipsnių kampu, riešai tiesūs, neįtempti (patartina naudoti riešo atramas).', 'Rankos turi būti visiškai ištiestos į priekį, o riešai stipriai užversti.', 'Klaviatūra turi stovėti ant labai aukšto stalo, kad pečiai būtų pakelti prie ausų.'], correctIndex: 0 },
+  { prompt: 'Ar darbdavys privalo užtikrinti darbuotojui, dirbančiam su kompiuteriu, periodinį sveikatos patikrinimą (ypač regos)?', options: ['Ne, tai yra tik paties darbuotojo asmeninis reikalas.', 'Taip, pagal nustatytą tvarką darbuotojams, dirbantiems su VDU, organizuojami sveikatos patikrinimai (įskaitant regos tikrinimą).', 'Tik tuo atveju, jei darbuotojas pats susimoka už gydytojo vizitą.'], correctIndex: 1 },
+  { prompt: 'Ką daryti pajutus akių perštėjimą, sausumą ar nuovargį ilgai žiūrint į monitorių?', options: ['Pavalyti akis rankomis ir tęsti darbą didesniu greičiu.', 'Atitraukti žvilgsnį nuo ekrano, pažiūrėti į tolimą objektą, dažniau mirksėti, atlikti akių mankštą.', 'Išjungti šviesas visame biure.'], correctIndex: 1 },
+  { prompt: 'Kokie reikalavimai keliami kompiuterio stalui ir kėdei ergonomikos požiūriu?', options: ['Kėdė turi būti stabili, reguliuojamo aukščio ir su atlošu, o stalas – pakankamai didelis, kad patogiai išsidėstytų ekranas, klaviatūra ir dokumentai.', 'Tinka bet kokia sena kėdė be atlošo ir nedidelis staliukas.', 'Svarbu tik dizainas ir spalva, o reguliavimo funkcijos nereikalingos.'], correctIndex: 0 },
+  { prompt: 'Kas atsakingas už saugios ir ergonomiškos darbo vietos su kompiuteriu įrengimą įmonėje?', options: ['Darbdavys privalo užtikrinti tinkamas darbo sąlygas, o darbuotojas – teisingai jomis naudotis ir laikytis ergonomikos taisyklių.', 'Tik pats darbuotojas, perkantis savo asmeninius baldus biurui.', 'Valstybinė darbo inspekcija.'], correctIndex: 0 },
 ];
 const workplaceConductTestId = 'res-workplace-conduct-test';
 const workplaceConductQuestions = [
@@ -1243,7 +1264,7 @@ const initialData = {
       dssInvitations: [],
       commission: ['Tomas Vaitkus', 'Rasa Kazlauskienė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
+      resources: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', computerErgonomicsTestId, computerErgonomicsJournalResourceId, 'res-protocol-computer-ergonomics', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
     },
     {
       id: 'org-logistika',
@@ -1256,14 +1277,14 @@ const initialData = {
       dssInvitations: [],
       commission: ['Aistė Rimkutė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-chemical', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
+      resources: ['res-fire', 'res-chemical', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', computerErgonomicsTestId, computerErgonomicsJournalResourceId, 'res-protocol-computer-ergonomics', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
     },
   ],
   employees: [
-    { id: 'emp-jonas', orgId: 'org-statybu', name: 'Jonas Petraitis', email: 'jonas@imone.lt', position: 'Operatorius', contractNumber: 'DS-2026-001', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test'], progressByResource: { 'res-height': 'started', 'res-aap': 'completed' }, sizes: { shoes: '43', clothes: 'L', pants: '50', jacket: 'L', height: '182', weight: '80', helmet: 'M' }, pin: '' },
-    { id: 'emp-petras', orgId: 'org-statybu', name: 'Petras Petraitis', email: 'petras@imone.lt', position: 'Vairuotojas', contractNumber: 'DS-2026-002', status: 'Pakviestas', resourceIds: ['res-fire', 'res-aap', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '' },
-    { id: 'emp-rasa', orgId: 'org-statybu', name: 'Rasa Kazlauskienė', email: 'rasa@imone.lt', position: 'Sandėlininkė', contractNumber: 'DS-2025-018', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '38', clothes: 'M', pants: '40', jacket: 'M', height: '168', weight: '62', helmet: 'S' }, pin: '' },
-    { id: 'emp-mantas', orgId: 'org-logistika', name: 'Mantas Jankauskas', email: 'mantas@logistika.lt', position: 'Sandėlininkas', contractNumber: 'DS-2024-007', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '42', clothes: 'L', pants: '48', jacket: 'L', height: '178', weight: '76', helmet: 'M' }, pin: '' },
+    { id: 'emp-jonas', orgId: 'org-statybu', name: 'Jonas Petraitis', email: 'jonas@imone.lt', position: 'Operatorius', contractNumber: 'DS-2026-001', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test', computerErgonomicsTestId], progressByResource: { 'res-height': 'started', 'res-aap': 'completed' }, sizes: { shoes: '43', clothes: 'L', pants: '50', jacket: 'L', height: '182', weight: '80', helmet: 'M' }, pin: '' },
+    { id: 'emp-petras', orgId: 'org-statybu', name: 'Petras Petraitis', email: 'petras@imone.lt', position: 'Vairuotojas', contractNumber: 'DS-2026-002', status: 'Pakviestas', resourceIds: ['res-fire', 'res-aap', 'res-civil-safety-training-test', computerErgonomicsTestId], progressByResource: {}, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '' },
+    { id: 'emp-rasa', orgId: 'org-statybu', name: 'Rasa Kazlauskienė', email: 'rasa@imone.lt', position: 'Sandėlininkė', contractNumber: 'DS-2025-018', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test', computerErgonomicsTestId], progressByResource: {}, sizes: { shoes: '38', clothes: 'M', pants: '40', jacket: 'M', height: '168', weight: '62', helmet: 'S' }, pin: '' },
+    { id: 'emp-mantas', orgId: 'org-logistika', name: 'Mantas Jankauskas', email: 'mantas@logistika.lt', position: 'Sandėlininkas', contractNumber: 'DS-2024-007', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test', computerErgonomicsTestId], progressByResource: {}, sizes: { shoes: '42', clothes: 'L', pants: '48', jacket: 'L', height: '178', weight: '76', helmet: 'M' }, pin: '' },
   ],
   archivedEmployees: [],
   protocolBatches: [],
@@ -1286,10 +1307,12 @@ const initialData = {
     { id: excavationSafetyTestId, title: 'Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose – mokymų testas', type: 'Testas', category: 'Darbai iškasose ir pylimuose', image: '/courses/construction-ppe.jpg', duration: '12 klausimų', html: '<h2>Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose</h2><p>Atsakykite į visus 12 klausimų. Kiekviename klausime yra vienas teisingas variantas. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: excavationSafetyQuestions },
     { id: fireKnowledgeTestId, title: 'Gaisrinės saugos žinių patikrinimo testas', type: 'Testas', category: 'Priešgaisrinė sauga', image: '/courses/fire-response.jpg', duration: '20 klausimų', html: '<h2>Gaisrinės saugos žinių patikrinimo testas</h2><p>Atsakykite į visus 20 klausimų pasirinkdami po vieną variantą. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: fireKnowledgeQuestions },
     { id: civilSafetyTrainingTestId, title: 'Civilinės saugos mokymai – žinių patikrinimo testas', type: 'Testas', category: 'Civilinė sauga', image: '/courses/safety-training.jpg', duration: '10 klausimų', html: '<h2>Civilinės saugos mokymai – žinių patikrinimo testas</h2><p>Atsakykite į visus 10 klausimų pasirinkdami po vieną variantą. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, defaultForOrganizations: true, questions: civilSafetyTrainingQuestions },
+    { id: computerErgonomicsTestId, title: 'Darbo kompiuteriu (ergonomikos ir VDU) žinių patikrinimo testas', type: 'Testas', category: 'Ergonomika ir VDU', image: '/courses/computer-ergonomics.svg', duration: '10 klausimų', html: '<h2>Darbo kompiuteriu (ergonomikos ir VDU) žinių patikrinimo testas</h2><p>Atsakykite į visus 10 klausimų pasirinkdami po vieną variantą. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: computerErgonomicsQuestions },
     { id: manualHandlingTestId, title: 'Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programos testas', type: 'Testas', category: 'Krovinių kėlimas rankomis', image: '/courses/construction-ppe.jpg', duration: '19 klausimų', html: '<h2>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programa</h2><p>Atsakykite į visus 19 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: manualHandlingQuestions },
     { id: knowledgeAssessmentProtocolId, title: 'Mokymo programos žinių patikrinimo protokolas', type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true },
-    ...defaultCompanyProtocolTemplates.map(({ id, title, testId, category, defaultForOrganizations }) => ({ id, title, type: 'Protokolas', category: category ?? 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true, ...(defaultForOrganizations ? { defaultForOrganizations } : {}) })),
+    ...defaultCompanyProtocolTemplates.map(({ id, title, testId, category, image, defaultForOrganizations }) => ({ id, title, type: 'Protokolas', category: category ?? 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true, ...(image ? { image } : {}), ...(defaultForOrganizations ? { defaultForOrganizations } : {}) })),
     { id: 'res-civil-safety-training-journal', title: 'Civilinės saugos mokymai – registravimo žurnalas', type: 'Žurnalas', category: 'Civilinė sauga', duration: '15 įrašų', templateKind: 'civil-safety-training-journal', signatures: true, validityMonths: 12, defaultForOrganizations: true, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, documentNumber: '', instructionTitle: 'Civilinės saugos mokymai ir instruktavimai', instructorPosition: '', instructorName: '', signatureFieldRoles: civilSafetyTrainingSignatureFieldDefaults } },
+    { id: computerErgonomicsJournalResourceId, title: 'Darbo kompiuteriu (su vaizduokliais) ir ergonomikos mokymų bei instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Ergonomika ir VDU', image: '/courses/computer-ergonomics.svg', duration: '15 įrašų', templateKind: computerErgonomicsJournalTemplateKind, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, documentNumber: '', instructionTitle: 'Darbo kompiuteriu (su vaizduokliais) ir ergonomikos mokymai bei instruktavimai', instructorPosition: '', instructorName: '', signatureFieldRoles: computerErgonomicsSignatureFieldDefaults } },
     { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, regulationNumber: '' } },
@@ -1500,6 +1523,8 @@ const preservedUserResourceIds = new Set([
   excavationSafetyTestId,
   fireKnowledgeTestId,
   civilSafetyTrainingTestId,
+  computerErgonomicsTestId,
+  computerErgonomicsJournalResourceId,
   'res-civil-safety-training-journal',
   manualHandlingTestId,
   knowledgeAssessmentProtocolId,
@@ -5261,8 +5286,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         fieldRoles.employee,
         fieldRoles.independentWorkPermit,
       ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
-    } else if (resourceSettingsTarget.templateKind === 'civil-safety-training-journal') {
-      const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+    } else if (['civil-safety-training-journal', computerErgonomicsJournalTemplateKind].includes(resourceSettingsTarget.templateKind)) {
+      const signatureFieldDefaults = resourceSettingsTarget.templateKind === computerErgonomicsJournalTemplateKind
+        ? computerErgonomicsSignatureFieldDefaults
+        : civilSafetyTrainingSignatureFieldDefaults;
+      const fieldRoles = { ...signatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
       const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
         ? settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
           ?? resourceSettingsTarget.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
@@ -12000,9 +12028,12 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           proof(item, instructed),
           proof(item, independentWorkPermit),
         ]);
-      } else if (resource.templateKind === 'civil-safety-training-journal') {
+      } else if (['civil-safety-training-journal', computerErgonomicsJournalTemplateKind].includes(resource.templateKind)) {
         const settings = resource.defaultSettings ?? {};
-        const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+        const signatureFieldDefaults = resource.templateKind === computerErgonomicsJournalTemplateKind
+          ? computerErgonomicsSignatureFieldDefaults
+          : civilSafetyTrainingSignatureFieldDefaults;
+        const fieldRoles = { ...signatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
         const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
           ? settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
             ?? resource.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
@@ -12416,6 +12447,8 @@ function buildResourcePreviewHtml(resource, employee, org, signatures, resources
       DIRECTOR_NAME: escapeHtml(resource.defaultSettings?.directorName ?? org?.manager ?? ''),
       DOCUMENT_DATE: escapeHtml(documentDate),
       DOCUMENT_NUMBER: escapeHtml(resource.defaultSettings?.documentNumber ?? ''),
+      RESOURCE_TITLE: escapeHtml(resource.title ?? ''),
+      INSTRUCTION_TITLE: escapeHtml(resource.defaultSettings?.instructionTitle || resource.title || ''),
       PROTOCOL_TITLE: escapeHtml(resource.title ?? ''),
       PROTOCOL_DATE: escapeHtml(resource.protocolDateText ?? ''),
       PROTOCOL_NUMBER: escapeHtml(resource.protocolNumber ?? ''),
@@ -12893,7 +12926,12 @@ function ResourceSettingsDialog(props) {
   if (props.resource.templateKind === workEquipmentInspectionJournalTemplateKind) return <WorkEquipmentInspectionJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === 'evacuation-plan-journal') return <EvacuationPlanResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
-  if (props.resource.templateKind === 'civil-safety-training-journal') return <CivilSafetyTrainingJournalSettingsDialog {...props} />;
+  if (['civil-safety-training-journal', computerErgonomicsJournalTemplateKind].includes(props.resource.templateKind)) {
+    const signatureFieldDefaults = props.resource.templateKind === computerErgonomicsJournalTemplateKind
+      ? computerErgonomicsSignatureFieldDefaults
+      : civilSafetyTrainingSignatureFieldDefaults;
+    return <TrainingRegistrationJournalSettingsDialog {...props} signatureFieldDefaults={signatureFieldDefaults} />;
+  }
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
   return <LegacyResourceSettingsDialog {...props} />;
 }
@@ -13755,8 +13793,8 @@ function WorkplaceDssResourceSettingsDialog({ resource, settings, onChange, onSa
   </div>;
 }
 
-function CivilSafetyTrainingJournalSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
-  const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+function TrainingRegistrationJournalSettingsDialog({ resource, settings, signatureFieldDefaults, onChange, onSave, onClose }) {
+  const fieldRoles = { ...signatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
   const updateInstructorRole = (role) => onChange({
     ...settings,
     signatureFieldRoles: { ...fieldRoles, instructor: role },

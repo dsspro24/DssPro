@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title description">
+  <title id="title">Ergonomiška darbo vieta prie kompiuterio</title>
+  <desc id="description">Darbuotojas sėdi prie reguliuojamo ekrano, tiesia nugara ir pėdomis ant grindų.</desc>
+  <rect width="640" height="420" rx="28" fill="#eaf4f1"/>
+  <circle cx="542" cy="82" r="44" fill="#d2e8e1"/>
+  <path d="M66 321h508" stroke="#71998e" stroke-width="8" stroke-linecap="round"/>
+  <path d="M118 316h404l-24 18H142z" fill="#174f46"/>
+  <path d="M170 332v48m308-48v48" stroke="#174f46" stroke-width="10" stroke-linecap="round"/>
+  <rect x="362" y="106" width="157" height="112" rx="12" fill="#153d3c"/>
+  <rect x="373" y="117" width="135" height="88" rx="6" fill="#d9efe8"/>
+  <path d="M440 218v30m-39 4h78" stroke="#153d3c" stroke-width="9" stroke-linecap="round"/>
+  <path d="M390 143h94M390 160h65" stroke="#77a99a" stroke-width="7" stroke-linecap="round"/>
+  <rect x="204" y="291" width="115" height="19" rx="9" fill="#b5d6cc"/>
+  <path d="M112 244h91v74h-91z" fill="#d2e8e1"/>
+  <path d="M122 253h71v51h-71z" fill="#fff"/>
+  <path d="M106 240h103v11H106z" fill="#397968"/>
+  <circle cx="278" cy="139" r="30" fill="#e7ad85"/>
+  <path d="M248 140c2-29 17-44 41-40 19 3 26 19 21 37-8-10-19-15-34-15-8 9-17 15-28 18z" fill="#244c49"/>
+  <path d="M232 180c12-14 28-21 48-21 28 0 47 17 51 44l-9 68h-98z" fill="#2c8271"/>
+  <path d="M268 184h34l14 44-34 25-32-26z" fill="#f3c9aa"/>
+  <path d="M281 238l-26 35 25 36m7-69 45 34" fill="none" stroke="#e7ad85" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M258 267l-18 51m56-20 19 20" fill="none" stroke="#244c49" stroke-width="17" stroke-linecap="round"/>
+  <path d="M227 380h52m45 0h44" stroke="#153d3c" stroke-width="12" stroke-linecap="round"/>
+  <path d="M366 82v20m-10-10h20" stroke="#397968" stroke-width="6" stroke-linecap="round"/>
+  <path d="M550 155v16m-8-8h16" stroke="#397968" stroke-width="5" stroke-linecap="round"/>
+  <rect x="435" y="357" width="126" height="34" rx="17" fill="#fff"/>
+  <text x="498" y="379" fill="#174f46" font-family="system-ui, sans-serif" font-size="15" font-weight="700" text-anchor="middle">VDU ergonomika</text>
+</svg>

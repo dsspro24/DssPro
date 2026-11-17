@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Darbo kompiuteriu ir ergonomikos mokymų registravimo žurnalas</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; color: #1e293b; background: #f8fafc; font: 11px/1.4 Inter, system-ui, sans-serif; }
+    @page portrait-page { size: A4 portrait; margin: 15mm; }
+    @page landscape-page { size: A4 landscape; margin: 12mm; }
+    .cover-page { page: portrait-page; display: flex; min-height: 1050px; max-width: 800px; margin: 0 auto 30px; padding: 40px; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; text-align: center; }
+    .cover-field { width: 80%; margin-bottom: 35px; }
+    .cover-value { min-height: 32px; padding-bottom: 6px; border-bottom: 2px solid #cbd5e1; color: #0f172a; font-size: 18px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .cover-label { margin-top: 6px; color: #64748b; font-size: 11px; font-style: italic; }
+    .cover-title-group { margin: 60px 0 40px; }
+    .cover-main-title { max-width: 90%; margin: 0 auto; color: #0f172a; font-size: 18px; font-weight: 700; letter-spacing: .8px; line-height: 1.5; text-transform: uppercase; }
+    .cover-subtitle { margin-top: 35px; color: #2563eb; font-size: 26px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+    .journal-page { page: landscape-page; display: flex; min-height: 750px; max-width: 1120px; margin: 0 auto 30px; padding: 25px 30px; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+    .journal-header { margin-bottom: 15px; text-align: center; }
+    .company-name { color: #0f172a; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+    .company-code, .doc-number { margin-top: 3px; color: #475569; font-size: 9px; }
+    .doc-name { margin-top: 5px; color: #334155; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .journal-table { width: 100%; margin-top: 8px; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+    .journal-table th, .journal-table td { overflow-wrap: anywhere; border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center; vertical-align: middle; }
+    .journal-table th { background: #f1f5f9; color: #0f172a; font-weight: 600; line-height: 1.25; }
+    .journal-table tbody tr:nth-child(even) { background: #f8fafc; }
+    .journal-table tbody tr { height: 30px; }
+    .col-number { width: 5%; }
+    .col-date { width: 9%; }
+    .col-name { width: 16%; }
+    .col-position { width: 14%; }
+    .col-topic { width: 17%; }
+    .col-instructor { width: 18%; }
+    .col-signature { width: 10.5%; }
+    .th-num { background: #e2e8f0; }
+    @media print {
+      body { padding: 0; background: none; }
+      .cover-page, .journal-page { max-width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .cover-page { min-height: 255mm; padding: 0; break-after: page; page-break-after: always; }
+      .journal-page { min-height: 0; padding: 0; break-after: avoid; page-break-after: avoid; }
+      .journal-table thead { display: table-header-group; }
+      .journal-table tr { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <section class="cover-page">
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_NAME }}</div><div class="cover-label">(įmonės pavadinimas)</div></div>
+    <div class="cover-field"><div class="cover-value">{{ COMPANY_CODE }}</div><div class="cover-label">(įmonės kodas)</div></div>
+    <div class="cover-title-group">
+      <div class="cover-main-title">{{ RESOURCE_TITLE }}</div>
+      <div class="cover-subtitle">Žurnalas</div>
+    </div>
+  </section>
+  <main class="journal-page">
+    <header class="journal-header">
+      <div class="company-name">{{ COMPANY_NAME }}</div>
+      <div class="company-code">Įmonės kodas: {{ COMPANY_CODE }}</div>
+      <div class="doc-name">{{ RESOURCE_TITLE }}</div>
+      <div class="doc-number">Mokymo / instruktavimo tema: {{ INSTRUCTION_TITLE }}</div>
+      <div class="doc-number">Dokumento Nr.: {{ DOCUMENT_NUMBER }}</div>
+    </header>
+    <table class="journal-table">
+      <thead>
+        <tr>
+          <th class="col-number" rowspan="2">Eil.<br>Nr.</th>
+          <th class="col-date" rowspan="2">Data</th>
+          <th class="col-name" rowspan="2">Darbuotojo<br>vardas, pavardė</th>
+          <th class="col-position" rowspan="2">Darbuotojo pareigos<br>/ darbo vieta</th>
+          <th class="col-topic" rowspan="2">Mokymo / instruktavimo<br>tema (VDU ergonomika)</th>
+          <th class="col-instructor" rowspan="2">Mokymą atlikusio asmens<br>pareigos, vardas, pavardė</th>
+          <th colspan="2">Parašai</th>
+        </tr>
+        <tr>
+          <th class="col-signature">Instruktavusio</th>
+          <th class="col-signature">Darbuotojo</th>
+        </tr>
+        <tr>
+          <th class="th-num">1</th><th class="th-num">2</th><th class="th-num">3</th><th class="th-num">4</th>
+          <th class="th-num">5</th><th class="th-num">6</th><th class="th-num">7</th><th class="th-num">8</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

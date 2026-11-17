@@ -197,6 +197,52 @@ const lessons = [
     ],
   },
   {
+    id: 'res-computer-ergonomics-test',
+    category: 'Ergonomika ir VDU',
+    title: 'Darbas kompiuteriu, vaizduokliai ir ergonomika',
+    pages: [
+      {
+        title: '1. Nustatykite ekraną ir apšvietimą',
+        paragraphs: [
+          'Pastatykite vaizduoklį tiesiai priešais save, kad nereikėtų nuolat sukti kaklo. Mokymo teste nurodomas apytikris 50–70 cm atstumas nuo akių iki ekrano; jį pritaikykite pagal vaizduoklio dydį, matomumą ir darbuotojo regą. Viršutinį ekrano kraštą nustatykite akių lygyje arba šiek tiek žemiau, kad žvilgsnis būtų nukreiptas nežymiai žemyn.',
+          'Langas ir kiti ryškūs šviesos šaltiniai turėtų būti darbo vietos šone. Taip paprasčiau sumažinti atspindžius ekrane. Jei vaizdas blizga, pakeiskite ekrano ar darbo vietos padėtį, sureguliuokite užuolaidas ir ekrano ryškumą – nekompensuokite atspindžių įtempdami akis.',
+        ],
+        bullets: [
+          'Ekraną laikykite priešais save, o svarbiausius dokumentus – panašiame aukštyje ir atstume.',
+          'Pasirinkite tokį šrifto dydį ir kontrastą, kad tekstą galėtumėte skaityti nepalinkę į priekį.',
+          'Pastebėję atspindžius ar prastą matomumą, informuokite vadovą ir kartu pritaikykite darbo vietą.',
+        ],
+        takeaway: 'Ekranas turi būti tiesiai priešais, o langas – šone; testo 50–70 cm atstumas yra apytikris ir pritaikomas darbo vietai.',
+      },
+      {
+        title: '2. Pritaikykite kėdę, stalą ir rankų padėtį',
+        paragraphs: [
+          'Sėdėkite taip, kad nugara remtųsi į kėdės atlošą, pėdos stabiliai stovėtų ant grindų arba atramos, o keliai būtų sulenkti patogiai. Teste pateiktas maždaug 90 laipsnių kampas – orientyras, o ne reikalavimas išlaikyti vieną nekintamą pozą visą dieną. Sureguliuokite kėdę ir stalą pagal savo ūgį bei atliekamą darbą.',
+          'Klaviatūrą ir pelę laikykite arti, kad pečiai būtų atpalaiduoti, alkūnės – prie kūno, o riešai – tiesūs ir neįtempti. Ant stalo turi užtekti vietos ekranui, įvesties įrenginiams ir reikalingiems dokumentams. Ilgai dirbant su nešiojamuoju kompiuteriu gali prireikti atskiros klaviatūros, pelės ar ekrano pakėlimo.',
+        ],
+        bullets: [
+          'Nesėdėkite susikūprinę ar pasisukę į ekraną; keiskite padėtį ir venkite ilgai išlaikyti tą pačią pozą.',
+          'Nesiremkite riešais į aštrų stalo kraštą ir nelaikykite pečių pakeltų.',
+          'Jei įranga netinkama arba jos negalima sureguliuoti, praneškite vadovui ar DSS specialistui.',
+        ],
+        takeaway: 'Pritaikykite darbo vietą kūnui, o ne verskite kūną prisitaikyti prie netinkamos įrangos.',
+      },
+      {
+        title: '3. Darykite pertraukas ir reaguokite į diskomfortą',
+        paragraphs: [
+          'Ilgai nepertraukiamai žiūrint į ekraną gali pavargti akys, kaklas, pečiai ar nugara. Teste minimos trumpos 5–10 minučių pertraukos maždaug kas valandą arba veiklos keitimas; laikykitės jūsų darbo vietai nustatytos tvarkos ir atsakingo DSS specialisto rekomendacijų. Per pertrauką atsistokite, pajudėkite ir, kai įmanoma, trumpam pažvelkite į tolį.',
+          'Pajutę akių sausumą ar nuovargį, dažniau mirksėkite, nukreipkite žvilgsnį nuo ekrano ir praneškite, jei simptomai kartojasi. Darbdavys organizuoja saugias darbo sąlygas ir pagal nustatytą tvarką darbuotojų sveikatos patikrinimus, o darbuotojas laikosi instrukcijų ir praneša apie pastebėtas problemas.',
+        ],
+        bullets: [
+          'Pertraukų metu atlikite lengvus judesius, neversdami sąnarių į skausmingą padėtį.',
+          'Nekoreguokite akių ar kitų sveikatos sutrikimų savarankiškai – dėl pasikartojančių simptomų kreipkitės į sveikatos priežiūros specialistą.',
+          'Skaitines rekomendacijas pritaikykite pagal darbo vietos rizikos vertinimą, įmonės instrukcijas ir galiojančius reikalavimus.',
+        ],
+        takeaway: 'Keiskite veiklą, pailsinkite akis ir laiku praneškite apie pasikartojantį diskomfortą.',
+      },
+    ],
+  },
+  {
     id: 'res-excavation-safety-test',
     category: 'Darbai iškasose ir pylimuose',
     title: 'Saugus darbas iškasose',
