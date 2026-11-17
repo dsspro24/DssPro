@@ -12291,10 +12291,7 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
     parsed.head.append(style);
   }
 
-  const populatedHtml = `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
-  return resource.templateKind === computerErgonomicsJournalTemplateKind
-    ? appendSignatureAudit(populatedHtml, resource, employee, org, signatures, specialists)
-    : populatedHtml;
+  return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function prepareResourcePrintHtml(html, title) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
