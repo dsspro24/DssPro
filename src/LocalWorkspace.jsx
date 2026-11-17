@@ -1351,7 +1351,7 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
       ...resource,
       id,
       defaultSettings,
-      imageUrl: resource.image || undefined,
+      imageUrl: resource.imageUrl || resource.image || undefined,
       ...(resource.relatedTestId ? { relatedTestId: relatedTestId ?? null } : {}),
       ...(resource.relatedJournalId ? { relatedJournalId: relatedJournalId ?? null } : {}),
     };
@@ -6461,8 +6461,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         const html = completeResource.html
           ? await inlineDemoHtmlAssets(completeResource.html, completeResource.htmlUrl || window.location.href)
           : '';
-        const imageSource = completeResource.imageUrl
-          ?? (typeof completeResource.image === 'string' ? completeResource.image : '');
+        const imageSource = completeResource.imageUrl || completeResource.image || '';
         const image = await assetUrlToDataUrl(imageSource);
         const questions = (completeResource.questions ?? []).map((question) => ({
           prompt: question.prompt,
