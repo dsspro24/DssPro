@@ -1260,10 +1260,10 @@ const initialData = {
     },
   ],
   employees: [
-    { id: 'emp-jonas', orgId: 'org-statybu', name: 'Jonas Petraitis', email: 'jonas@imone.lt', position: 'Operatorius', contractNumber: 'DS-2026-001', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-height', 'res-aap'], progressByResource: { 'res-height': 'started', 'res-aap': 'completed' }, sizes: { shoes: '43', clothes: 'L', pants: '50', jacket: 'L', height: '182', weight: '80', helmet: 'M' }, pin: '' },
-    { id: 'emp-petras', orgId: 'org-statybu', name: 'Petras Petraitis', email: 'petras@imone.lt', position: 'Vairuotojas', contractNumber: 'DS-2026-002', status: 'Pakviestas', resourceIds: ['res-fire', 'res-aap'], progressByResource: {}, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '' },
-    { id: 'emp-rasa', orgId: 'org-statybu', name: 'Rasa Kazlauskienė', email: 'rasa@imone.lt', position: 'Sandėlininkė', contractNumber: 'DS-2025-018', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical'], progressByResource: {}, sizes: { shoes: '38', clothes: 'M', pants: '40', jacket: 'M', height: '168', weight: '62', helmet: 'S' }, pin: '' },
-    { id: 'emp-mantas', orgId: 'org-logistika', name: 'Mantas Jankauskas', email: 'mantas@logistika.lt', position: 'Sandėlininkas', contractNumber: 'DS-2024-007', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical'], progressByResource: {}, sizes: { shoes: '42', clothes: 'L', pants: '48', jacket: 'L', height: '178', weight: '76', helmet: 'M' }, pin: '' },
+    { id: 'emp-jonas', orgId: 'org-statybu', name: 'Jonas Petraitis', email: 'jonas@imone.lt', position: 'Operatorius', contractNumber: 'DS-2026-001', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test'], progressByResource: { 'res-height': 'started', 'res-aap': 'completed' }, sizes: { shoes: '43', clothes: 'L', pants: '50', jacket: 'L', height: '182', weight: '80', helmet: 'M' }, pin: '' },
+    { id: 'emp-petras', orgId: 'org-statybu', name: 'Petras Petraitis', email: 'petras@imone.lt', position: 'Vairuotojas', contractNumber: 'DS-2026-002', status: 'Pakviestas', resourceIds: ['res-fire', 'res-aap', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '', clothes: '', pants: '', jacket: '', height: '', weight: '', helmet: '' }, pin: '' },
+    { id: 'emp-rasa', orgId: 'org-statybu', name: 'Rasa Kazlauskienė', email: 'rasa@imone.lt', position: 'Sandėlininkė', contractNumber: 'DS-2025-018', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '38', clothes: 'M', pants: '40', jacket: 'M', height: '168', weight: '62', helmet: 'S' }, pin: '' },
+    { id: 'emp-mantas', orgId: 'org-logistika', name: 'Mantas Jankauskas', email: 'mantas@logistika.lt', position: 'Sandėlininkas', contractNumber: 'DS-2024-007', status: 'Aktyvus', aapCompleted: true, resourceIds: ['res-fire', 'res-chemical', 'res-civil-safety-training-test'], progressByResource: {}, sizes: { shoes: '42', clothes: 'L', pants: '48', jacket: 'L', height: '178', weight: '76', helmet: 'M' }, pin: '' },
   ],
   archivedEmployees: [],
   protocolBatches: [],
@@ -4224,6 +4224,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const paginatedOrgEmployees = sortedOrgEmployees.slice((currentEmployeePage - 1) * employeePageSize, currentEmployeePage * employeePageSize);
   const employeeSignatures = data.signatures.filter((signature) => signature.employeeId === currentEmployee?.id && signature.role === 'Darbuotojas');
   const employeeResources = (currentEmployee?.resourceIds ?? []).map((id) => data.resources.find((resource) => resource.id === id)).filter(isEmployeeAssignableResource);
+  const employeeTrainingTests = employeeResources.filter((resource) => normalizeResourceType(resource) === 'Testas');
   const pendingResourceIds = employeeResources
     .filter((resource) => ['todo', 'started', 'unsigned', 'expired'].includes(getTaskStatus(currentEmployee, resource).key))
     .map((resource) => resource.id);
@@ -10203,7 +10204,10 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'mokomoji' && userRole === 'darbuotojas' && <TrainingMaterials
             reviewedLessonIds={currentEmployee?.trainingMaterialsRead ?? []}
-            assignedTestIds={(currentEmployee?.resourceIds ?? []).filter((resourceId) => data.resources.some((resource) => resource.id === resourceId && normalizeResourceType(resource) === 'Testas'))}
+            assignedTestIds={employeeTrainingTests.map((resource) => resource.id)}
+            assignedTestImages={Object.fromEntries(employeeTrainingTests
+              .map((resource) => [resource.id, resource.imageUrl ?? resource.image])
+              .filter(([, image]) => typeof image === 'string' && image.length > 0))}
             onMarkReviewed={(lessonId) => {
               if (!currentEmployee) return;
               setData((current) => ({

@@ -338,10 +338,11 @@ const lessons = [
   },
 ];
 
-export default function TrainingMaterials({ reviewedLessonIds = [], assignedTestIds = [], onMarkReviewed, onStartTest }) {
+export default function TrainingMaterials({ reviewedLessonIds = [], assignedTestIds = [], assignedTestImages = {}, onMarkReviewed, onStartTest }) {
   const [selectedLessonId, setSelectedLessonId] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
-  const selectedLesson = lessons.find((lesson) => lesson.id === selectedLessonId);
+  const visibleLessons = lessons.filter((lesson) => assignedTestIds.includes(lesson.id));
+  const selectedLesson = visibleLessons.find((lesson) => lesson.id === selectedLessonId);
   const reviewedIds = new Set(reviewedLessonIds);
 
   const openLesson = (lesson) => {
@@ -359,6 +360,7 @@ export default function TrainingMaterials({ reviewedLessonIds = [], assignedTest
           <ArrowLeft size={16} />Visos temos
         </button>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          {assignedTestImages[selectedLesson.id] && <img src={assignedTestImages[selectedLesson.id]} alt="" className="mb-5 max-h-56 w-full rounded-lg object-cover" />}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-emerald-800">{selectedLesson.category}</p>
@@ -415,14 +417,17 @@ export default function TrainingMaterials({ reviewedLessonIds = [], assignedTest
         </div>
         <p className="mt-1 text-sm text-slate-600">Pasirinkite temą ir peržiūrėkite trumpą trijų puslapių medžiagą. Testą galite spręsti ir jos neperskaitę.</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {lessons.map((lesson) => {
+      {visibleLessons.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {visibleLessons.map((lesson) => {
           const isReviewed = reviewedIds.has(lesson.id);
-          const hasAssignedTest = assignedTestIds.includes(lesson.id);
           return (
             <article key={lesson.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              {assignedTestImages[lesson.id]
+                ? <img src={assignedTestImages[lesson.id]} alt="" className="mb-3 h-36 w-full rounded-lg object-cover" />
+                : <div className="flex items-start justify-between gap-2">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800"><BookOpen size={20} /></span>
+                </div>}
               <div className="flex items-start justify-between gap-2">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800"><BookOpen size={20} /></span>
                 {isReviewed && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"><CircleCheck size={14} />Peržiūrėta</span>}
               </div>
               <p className="mt-4 text-xs font-semibold text-emerald-800">{lesson.category}</p>
@@ -432,16 +437,14 @@ export default function TrainingMaterials({ reviewedLessonIds = [], assignedTest
                 <button type="button" className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => openLesson(lesson)}>
                   <BookOpen size={15} />Skaityti
                 </button>
-                {hasAssignedTest
-                  ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => onStartTest(lesson.id)}>
+                <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => onStartTest(lesson.id)}>
                     <GraduationCap size={15} />Testas
-                  </button>
-                  : <span className="self-center text-xs text-slate-500">Testas nepriskirtas</span>}
+                </button>
               </div>
             </article>
           );
         })}
-      </div>
+      </div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">Mokomoji medžiaga atsiras, kai vadovas jums priskirs atitinkamą testą.</p>}
       <p className="text-xs leading-5 text-slate-500">Perskaitymo žymėjimas nėra privalomas, o testas lieka pasiekiamas iš užduočių ir čia, jei jis jums priskirtas. Esant tiesioginiam pavojui, pirmiausia vadovaukitės darbo vietos avarine tvarka.</p>
       <p className="text-xs leading-5 text-slate-500">Skaitinės ribos pateiktos pagal šiuo metu sistemoje esantį testą. Prieš naudojant mokymuose, jas turi patvirtinti atsakingas DSS specialistas pagal galiojančius teisės aktus, darbo vietos rizikos vertinimą ir įmonės instrukcijas.</p>
     </section>

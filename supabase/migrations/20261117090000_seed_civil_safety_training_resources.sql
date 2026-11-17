@@ -35,7 +35,11 @@ set data = jsonb_set(
         {"prompt":"Kas įmonėje organizuoja darbuotojų civilinės saugos mokymus, pratybas ir užtikrina pasirengimą ekstremaliosioms situacijoms?","options":["Įmonės vadovas arba jo paskirtas atsakingas asmuo (civilinės saugos specialistas).","Kiekvienas darbuotojas savarankiškai savo atostogų metu.","Tik Priešgaisrinės apsaugos ir gelbėjimo departamentas."],"correctIndex":0}
       ]$questions$::jsonb,
       'isProtocolTemplate', false
-    ),
+    ) || coalesce((
+      select item.value from jsonb_array_elements(coalesce(data -> 'resources', '[]'::jsonb)) as item(value)
+      where item.value ->> 'id' = 'res-civil-safety-training-test'
+      limit 1
+    ), '{}'::jsonb) || jsonb_build_object('defaultForOrganizations', true),
     jsonb_build_object(
       'id', 'res-civil-safety-training-journal',
       'title', 'Darbuotojų civilinės saugos mokymų ir instruktavimų registravimo žurnalas',
@@ -59,7 +63,11 @@ set data = jsonb_set(
         )
       ),
       'isProtocolTemplate', false
-    ),
+    ) || coalesce((
+      select item.value from jsonb_array_elements(coalesce(data -> 'resources', '[]'::jsonb)) as item(value)
+      where item.value ->> 'id' = 'res-civil-safety-training-journal'
+      limit 1
+    ), '{}'::jsonb) || jsonb_build_object('defaultForOrganizations', true),
     jsonb_build_object(
       'id', 'res-protocol-civil-safety-training',
       'title', 'Darbuotojų civilinės saugos mokymų žinių patikrinimo protokolas',
@@ -73,6 +81,13 @@ set data = jsonb_set(
       'defaultForOrganizations', true,
       'requiredSigners', jsonb_build_array('Darbuotojas', 'DSS specialistas'),
       'isProtocolTemplate', true
+    ) || coalesce((
+      select item.value from jsonb_array_elements(coalesce(data -> 'resources', '[]'::jsonb)) as item(value)
+      where item.value ->> 'id' = 'res-protocol-civil-safety-training'
+      limit 1
+    ), '{}'::jsonb) || jsonb_build_object(
+      'defaultForOrganizations', true,
+      'relatedTestId', 'res-civil-safety-training-test'
     )
   ),
   true
