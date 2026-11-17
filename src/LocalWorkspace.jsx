@@ -11583,7 +11583,7 @@ function appendSignatureAudit(html, resource, employee, org, signatures, special
   return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }
 function populateJournalRows(html, resource, employee, org, signatures, specialists, allResources = []) {
-  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', computerErgonomicsJournalTemplateKind, accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind, workEquipmentInspectionJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
+  const supportedKinds = ['familiarization-card', 'workplace-dss-journal', 'intro-dss-journal', 'work-rules-journal', 'fire-safety-journal', 'evacuation-plan-journal', 'civil-safety-training-journal', computerErgonomicsJournalTemplateKind, accidentIncidentJournalTemplateKind, safetyViolationJournalTemplateKind, fireAutomationMaintenanceJournalTemplateKind, firstAidKitInspectionJournalTemplateKind, workEquipmentInspectionJournalTemplateKind, 'knowledge-assessment-protocol', 'job-description-journal', 'internal-documents-register', 'chemical-safety-instruction-card', 'medical-examination-schedule'];
   if (!supportedKinds.includes(resource.templateKind)) return appendSignatureAudit(html, resource, employee, org, signatures, specialists);
 
   const parsed = new DOMParser().parseFromString(html, 'text/html');
