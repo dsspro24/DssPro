@@ -13,7 +13,7 @@ set data = jsonb_set(
   ), '[]'::jsonb) || jsonb_build_array(
     jsonb_build_object(
       'id', 'res-civil-safety-training-test',
-      'title', 'Darbuotojų civilinės saugos mokymų žinių patikrinimo testas',
+      'title', 'Civilinės saugos mokymai – žinių patikrinimo testas',
       'type', 'Testas',
       'category', 'Civilinė sauga',
       'image', '/courses/safety-training.jpg',
@@ -39,10 +39,14 @@ set data = jsonb_set(
       select item.value from jsonb_array_elements(coalesce(data -> 'resources', '[]'::jsonb)) as item(value)
       where item.value ->> 'id' = 'res-civil-safety-training-test'
       limit 1
-    ), '{}'::jsonb) || jsonb_build_object('defaultForOrganizations', true),
+    ), '{}'::jsonb) || jsonb_build_object(
+      'title', 'Civilinės saugos mokymai – žinių patikrinimo testas',
+      'category', 'Civilinė sauga',
+      'defaultForOrganizations', true
+    ),
     jsonb_build_object(
       'id', 'res-civil-safety-training-journal',
-      'title', 'Darbuotojų civilinės saugos mokymų ir instruktavimų registravimo žurnalas',
+      'title', 'Civilinės saugos mokymai – registravimo žurnalas',
       'type', 'Žurnalas',
       'category', 'Civilinė sauga',
       'duration', '15 įrašų',
@@ -54,7 +58,7 @@ set data = jsonb_set(
       'defaultSettings', jsonb_build_object(
         'populateEmployees', true,
         'documentNumber', '',
-        'instructionTitle', 'Darbuotojų civilinės saugos mokymai ir instruktavimai',
+        'instructionTitle', 'Civilinės saugos mokymai ir instruktavimai',
         'instructorPosition', '',
         'instructorName', '',
         'signatureFieldRoles', jsonb_build_object(
@@ -67,10 +71,14 @@ set data = jsonb_set(
       select item.value from jsonb_array_elements(coalesce(data -> 'resources', '[]'::jsonb)) as item(value)
       where item.value ->> 'id' = 'res-civil-safety-training-journal'
       limit 1
-    ), '{}'::jsonb) || jsonb_build_object('defaultForOrganizations', true),
+    ), '{}'::jsonb) || jsonb_build_object(
+      'title', 'Civilinės saugos mokymai – registravimo žurnalas',
+      'category', 'Civilinė sauga',
+      'defaultForOrganizations', true
+    ),
     jsonb_build_object(
       'id', 'res-protocol-civil-safety-training',
-      'title', 'Darbuotojų civilinės saugos mokymų žinių patikrinimo protokolas',
+      'title', 'Civilinės saugos mokymai – žinių patikrinimo protokolas',
       'type', 'Protokolas',
       'category', 'Mokymo programos',
       'duration', 'A4 formatas',
@@ -87,7 +95,9 @@ set data = jsonb_set(
       limit 1
     ), '{}'::jsonb) || jsonb_build_object(
       'defaultForOrganizations', true,
-      'relatedTestId', 'res-civil-safety-training-test'
+      'relatedTestId', 'res-civil-safety-training-test',
+      'title', 'Civilinės saugos mokymai – žinių patikrinimo protokolas',
+      'category', 'Civilinė sauga'
     )
   ),
   true
