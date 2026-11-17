@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Darbuotojų civilinės saugos žinių patikrinimo testas</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; color: #1e293b; background: #f8fafc; font: 11px/1.45 Inter, system-ui, sans-serif; }
+    @page { size: A4 portrait; margin: 15mm; }
+    .document-page { max-width: 800px; margin: 0 auto 30px; padding: 35px 40px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+    .doc-header { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; text-align: center; }
+    .company-name { color: #0f172a; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+    .doc-title { margin-top: 8px; color: #2563eb; font-size: 16px; font-weight: 800; text-transform: uppercase; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-bottom: 18px; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+    .meta-label { color: #64748b; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+    .meta-value { min-height: 22px; padding: 4px 0 2px; border-bottom: 1px dashed #94a3b8; color: #0f172a; font-size: 11px; font-weight: 600; }
+    .instructions { margin-bottom: 18px; padding: 10px 14px; border-left: 3px solid #2563eb; border-radius: 0 6px 6px 0; background: #eff6ff; color: #1e3a8a; font-size: 10.5px; }
+    .question { margin-bottom: 13px; padding-bottom: 9px; border-bottom: 1px solid #f1f5f9; break-inside: avoid; }
+    .question-title { margin-bottom: 5px; color: #0f172a; font-weight: 700; }
+    .options { margin: 0; padding: 0; list-style: none; }
+    .options li { display: flex; gap: 8px; margin: 3px 0; color: #334155; font-size: 10.5px; }
+    .box { width: 13px; height: 13px; flex: 0 0 13px; margin-top: 1px; border: 1.5px solid #64748b; border-radius: 3px; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; padding-top: 15px; border-top: 2px solid #e2e8f0; break-inside: avoid; }
+    .sign-line { height: 25px; border-bottom: 1px solid #475569; }
+    .sign-caption { margin-top: 6px; color: #64748b; font-size: 9px; text-align: center; }
+    @media print { body { padding: 0; background: none; } .document-page { max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main class="document-page">
+    <header class="doc-header">
+      <div class="company-name">{{ COMPANY_NAME }} (įm. kodas: {{ COMPANY_CODE }})</div>
+      <div class="doc-title">Darbuotojų civilinės saugos žinių patikrinimo testas</div>
+    </header>
+    <section class="meta-grid">
+      <div><div class="meta-label">Darbuotojo vardas, pavardė</div><div class="meta-value">{{ EMPLOYEE_NAME }}</div></div>
+      <div><div class="meta-label">Pareigos / padalinys</div><div class="meta-value">{{ EMPLOYEE_POSITION }}</div></div>
+      <div><div class="meta-label">Testo atlikimo data</div><div class="meta-value">{{ TEST_DATE }}</div></div>
+      <div><div class="meta-label">Surinkti balai / įvertinimas</div><div class="meta-value">{{ SCORE }} / 10 (išlaikyta / neišlaikyta)</div></div>
+    </section>
+    <p class="instructions"><strong>Instrukcija:</strong> Pažymėkite vieną teisingą atsakymo variantą. Testas išlaikomas teisingai atsakius į ne mažiau kaip 8 iš 10 klausimų (80 %).</p>
+    <section class="question"><div class="question-title">1. Koks yra vieningas skubios pagalbos telefono numeris Lietuvoje, kuriuo reikia skambinti įvykus ekstremaliajam įvykiui ar nelaimei?</div><ul class="options"><li><span class="box"></span>a) 112</li><li><span class="box"></span>b) 011</li><li><span class="box"></span>c) 911</li></ul></section>
+    <section class="question"><div class="question-title">2. Ką privalote padaryti pirmiausia, išgirdę kaukiančias perspėjimo sirenas (signalą „Dėmesio visiems“)?</div><ul class="options"><li><span class="box"></span>a) Nedelsiant bėgti į lauką ir sėsti į asmeninį automobilį.</li><li><span class="box"></span>b) Įsijungti Lietuvos nacionalinį radiją ar televiziją (LRT), patikrinti pranešimus telefone (GPIS) ir vykdyti nurodymus.</li><li><span class="box"></span>c) Skambinti visais įmanomais telefono numeriais artimiesiems ir užimti ryšio linijas.</li></ul></section>
+    <section class="question"><div class="question-title">3. Kur privaloma rinktis darbuotojams evakavusis iš pastato kilus pavojui?</div><ul class="options"><li><span class="box"></span>a) Bet kurioje aikštelėje šalia išėjimo durų.</li><li><span class="box"></span>b) Iš anksto nustatytoje ir ženklu pažymėtoje saugioje žmonių susirinkimo vietoje, nurodytoje evakavimo plane.</li><li><span class="box"></span>c) Artimiausioje kavinėje ar parduotuvėje.</li></ul></section>
+    <section class="question"><div class="question-title">4. Ar leidžiama naudotis liftu evakuacijos iš pastato metu?</div><ul class="options"><li><span class="box"></span>a) Taip, jei liftas tuo metu veikia ir nėra dūmų.</li><li><span class="box"></span>b) Taip, bet tik administracijos darbuotojams.</li><li><span class="box"></span>c) Griežtai draudžiama – evakuotis galima tik evakuaciniais laiptais.</li></ul></section>
+    <section class="question"><div class="question-title">5. Kaip reikia elgtis, jei paskelbta apie cheminę avariją ar oro užterštumą ir nurodyta likti patalpose?</div><ul class="options"><li><span class="box"></span>a) Plačiai atidaryti langus, kad patalpos vėdintųsi.</li><li><span class="box"></span>b) Sandariai uždaryti langus, duris, orlaides, išjungti vėdinimo ir kondicionavimo sistemas, užsandarinti plyšius.</li><li><span class="box"></span>c) Nusileisti į rūsį ir įjungti visus šildymo prietaisus.</li></ul></section>
+    <section class="question"><div class="question-title">6. Ką būtina pasiimti su savimi gavus nurodymą skubiai evakuotis iš gyvenamosios ar darbo vietos ilgesniam laikui?</div><ul class="options"><li><span class="box"></span>a) Asmens dokumentus, būtiniausius vaistus, geriamojo vandens, negendančio maisto, žibintuvėlį, radijo imtuvą su elementais (išvykimo krepšį).</li><li><span class="box"></span>b) Tik stambią buitinę techniką ir baldus.</li><li><span class="box"></span>c) Nieko imti negalima, nes viskuo pasirūpins gelbėtojai per 10 minučių.</li></ul></section>
+    <section class="question"><div class="question-title">7. Kur galima rasti informaciją apie kolektyvinės apsaugos statinius (KAS) ar priedangas savivaldybėje?</div><ul class="options"><li><span class="box"></span>a) Lietuvos pasirengimo ekstremaliosioms situacijoms svetainėje LT72.lt bei savivaldybės interneto svetainėje.</li><li><span class="box"></span>b) Tik užsienio naujienų portaluose.</li><li><span class="box"></span>c) Tokia informacija yra įslaptinta ir gyventojams neteikiama.</li></ul></section>
+    <section class="question"><div class="question-title">8. Kaip elgtis pastebėjus įtartiną be priežiūros paliktą daiktą ar galimą sprogmenį įmonės teritorijoje?</div><ul class="options"><li><span class="box"></span>a) Patikrinti, kas yra viduje, ir nunešti į apsaugos postą.</li><li><span class="box"></span>b) Neliesti, nejudinti daikto, pasitraukti saugiu atstumu, įspėti aplinkinius ir informuoti vadovą bei skambinti 112.</li><li><span class="box"></span>c) Užpilti vandeniu arba uždengti striuke.</li></ul></section>
+    <section class="question"><div class="question-title">9. Ką reikėtų daryti kilus žemės drebėjimui ar stipriai pastato konstrukcijų griūčiai, jei esate patalpoje?</div><ul class="options"><li><span class="box"></span>a) Atsistoti prie didelio lango ir stebėti, kas vyksta lauke.</li><li><span class="box"></span>b) Pasislėpti po tvirtu stalu ar prie kapitalinės vidinės sienos, toliau nuo langų, stiklinių pertvarų ir krintančių daiktų.</li><li><span class="box"></span>c) Naudotis elektros prietaisais ir atvira ugnimi.</li></ul></section>
+    <section class="question"><div class="question-title">10. Kas įmonėje organizuoja darbuotojų civilinės saugos mokymus, pratybas ir užtikrina pasirengimą ekstremaliosioms situacijoms?</div><ul class="options"><li><span class="box"></span>a) Įmonės vadovas arba jo paskirtas atsakingas asmuo (civilinės saugos specialistas).</li><li><span class="box"></span>b) Kiekvienas darbuotojas savarankiškai savo atostogų metu.</li><li><span class="box"></span>c) Tik Priešgaisrinės apsaugos ir gelbėjimo departamentas.</li></ul></section>
+    <section class="signatures"><div><div class="sign-line"></div><div class="sign-caption">Darbuotojo parašas, vardas, pavardė</div></div><div><div class="sign-line"></div><div class="sign-caption">Patikrinusio atsakingo asmens parašas, pareigos, vardas, pavardė</div></div></section>
+  </main>
+</body>
+</html>

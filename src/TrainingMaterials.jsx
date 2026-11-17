@@ -149,6 +149,54 @@ const lessons = [
     ],
   },
   {
+    id: 'res-civil-safety-training-test',
+    category: 'Civilinė sauga',
+    title: 'Pasirengimas ekstremaliosioms situacijoms',
+    pages: [
+      {
+        title: '1. Perspėjimas ir informacijos tikrinimas',
+        paragraphs: [
+          'Išgirdę signalą „Dėmesio visiems“ ar gavę perspėjimą telefonu, pirmiausia išlikite ramūs ir patikrinkite oficialią informaciją per LRT, Gyventojų perspėjimo ir informavimo sistemą (GPIS), LT72.lt arba savivaldybės kanalus. Vykdykite nurodymus ir informuokite atsakingą asmenį pagal įmonės tvarką. Skubios pagalbos numeris Lietuvoje – 112; skambinkite esant realiai grėsmei ar nelaimei.',
+          'Įmonės evakavimo plane nurodyti išėjimai, veiksmai ir saugi susirinkimo vieta. Evakuodamiesi naudokite laiptus, ne liftą, ir eikite į plane nurodytą susirinkimo vietą. Ten likite, kol atsakingi asmenys patikrins darbuotojų buvimą ir bus pateikti tolesni nurodymai.',
+        ],
+        bullets: [
+          'Iš anksto sužinokite, kur yra evakuaciniai išėjimai ir susirinkimo vieta.',
+          'Neužstatykite evakuacijos kelių ir nevykite atgal į pavojingą zoną daiktų.',
+          'Padėkite kitiems tik nekeliamas pavojus sau; vykdykite gelbėtojų nurodymus.',
+        ],
+        takeaway: 'Patikrinkite oficialų perspėjimą, skambinkite 112 esant pavojui ir evakuokitės pagal įmonės planą.',
+      },
+      {
+        title: '2. Slėpimasis patalpose ir išvykimo krepšys',
+        paragraphs: [
+          'Jei dėl cheminės avarijos ar oro taršos oficialiai nurodyta likti patalpose, uždarykite langus, duris ir orlaides. Išjunkite vėdinimo ar kondicionavimo sistemas, jei taip nurodo institucijos ar įmonės planas, ir sandarinkite plyšius pagal pateiktas rekomendacijas. Sekite oficialius pranešimus; savarankiškai neevakuokitės, jei nurodyta slėptis.',
+          'Išvykimo krepšyje laikykite asmens dokumentus, būtiniausius vaistus, vandens, negendančio maisto, žibintuvėlį ir radijo imtuvą su baterijomis. Krepšio turinį pritaikykite savo poreikiams ir periodiškai patikrinkite galiojimo datas.',
+          'Informacijos apie kolektyvinės apsaugos statinius ir priedangas ieškokite LT72.lt bei savivaldybės interneto svetainėje. Įmonėje laikykitės paskirto vadovo ir patvirtinto pasirengimo plano nurodymų.',
+        ],
+        bullets: [
+          'Nesiremkite nepatikrintais pranešimais socialiniuose tinkluose.',
+          'Laikykite telefoną įkrautą ir taupykite ryšį, kad linijos liktų prieinamos skubiai pagalbai.',
+          'Nurodytą saugų elgesį derinkite su oficialiais, konkrečiai situacijai skirtais nurodymais.',
+        ],
+        takeaway: 'Slėpkitės arba evakuokitės taip, kaip nurodo atsakingos institucijos, ir iš anksto pasiruoškite būtiniausius reikmenis.',
+      },
+      {
+        title: '3. Įtartini daiktai ir pastato pažeidimai',
+        paragraphs: [
+          'Pastebėję neprižiūrimą įtartiną daiktą ar galimą sprogmenį, jo nelieskite ir nejudinkite. Atsitraukite, perspėkite aplinkinius, iš saugios vietos informuokite vadovą ir skambinkite 112. Negrįžkite prie daikto ir laikykitės tarnybų nurodymų.',
+          'Drebant pastatui ar girdint konstrukcijų griūties požymius, pasitraukite nuo langų, stiklinių pertvarų ir krintančių daiktų. Jei saugu, prisidenkite po tvirtu stalu ar prie vidinės laikančiosios sienos. Pavojui praėjus, evakuokitės tik saugiu keliu, nenaudokite lifto ir vykdykite gelbėtojų nurodymus.',
+          'Civilinės saugos mokymus, pratybas ir pasirengimo priemones įmonėje organizuoja vadovas arba jo paskirtas atsakingas asmuo. Kiekvienas darbuotojas turi susipažinti su jam aktualia tvarka, dalyvauti mokymuose ir pranešti apie pastebėtus pavojus.',
+        ],
+        bullets: [
+          'Niekada nebandykite patys apžiūrėti ar perkelti galimai pavojingo daikto.',
+          'Žinokite, kas jūsų įmonėje atsakingas už civilinę saugą ir kur rasti vietos planą.',
+          'Bendroji mokomoji medžiaga nepakeičia konkrečios įmonės plano ar oficialių nurodymų.',
+        ],
+        takeaway: 'Neliesti įtartinų daiktų, saugiai atsitraukti ir informuoti 112 bei atsakingus asmenis.',
+      },
+    ],
+  },
+  {
     id: 'res-excavation-safety-test',
     category: 'Darbai iškasose ir pylimuose',
     title: 'Saugus darbas iškasose',

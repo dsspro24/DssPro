@@ -36,6 +36,7 @@ const defaultTestTemplateLoaders = new Map([
   ['res-chemical-safety-test', () => import('./assets/chemical-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-work-at-height-test', () => import('./assets/work-at-height-test.html?raw').then(({ default: html }) => html)],
   ['res-fire-knowledge-test', () => import('./assets/fire-knowledge-test.html?raw').then(({ default: html }) => html)],
+  ['res-civil-safety-training-test', () => import('./assets/civil-safety-training-test.html?raw').then(({ default: html }) => html)],
   ['res-excavation-safety-test', () => import('./assets/excavation-safety-test.html?raw').then(({ default: html }) => html)],
   ['res-manual-handling-test', () => import('./assets/manual-handling-test.html?raw').then(({ default: html }) => html)],
   ['res-workplace-conduct-test', () => import('./assets/workplace-conduct-test.html?raw').then(({ default: html }) => html)],
@@ -44,6 +45,8 @@ const defaultDocumentTemplateLoaders = new Map([
   ['res-aap', () => import('./assets/aap-template.html?raw').then(({ default: html }) => html)],
   ['res-familiarization-card', () => import('./assets/employee-familiarization-card.html?raw').then(({ default: html }) => html)],
   ['res-medical-examination-schedule', () => import('./assets/medical-examination-schedule.html?raw').then(({ default: html }) => html)],
+  ['res-civil-safety-training-journal', () => import('./assets/civil-safety-training-journal.html?raw').then(({ default: html }) => html)],
+  ['civil-safety-training-journal', () => import('./assets/civil-safety-training-journal.html?raw').then(({ default: html }) => html)],
   ['res-workplace-dss-journal', () => import('./assets/workplace-dss-instructions-journal.html?raw').then(({ default: html }) => html)],
   ['res-intro-dss-journal', () => import('./assets/intro-dss-instructions-journal.html?raw').then(({ default: html }) => html)],
   ['res-work-rules-journal', () => import('./assets/work-rules-familiarization-journal.html?raw').then(({ default: html }) => html)],
@@ -739,6 +742,10 @@ const workplaceDssSignatureFieldDefaults = {
   employee: 'Darbuotojas',
   independentWorkPermit: 'niekas',
 };
+const civilSafetyTrainingSignatureFieldDefaults = {
+  instructor: 'DSS specialistas',
+  employee: 'Darbuotojas',
+};
 const fireSafetySignatureFieldDefaults = {
   instructor: 'DSS specialistas',
   employee: 'Darbuotojas',
@@ -1060,6 +1067,7 @@ function getFireSafetyInstructionRows(settings = {}) {
 }
 const chemicalSafetyInstructionCardId = 'res-chemical-safety-instruction-card';
 const dateEnteredPerRecordTemplateKinds = new Set([
+  'civil-safety-training-journal',
   'evacuation-plan-journal',
   'fire-safety-journal',
   fireAutomationMaintenanceJournalTemplateKind,
@@ -1070,11 +1078,25 @@ const dateEnteredPerRecordTemplateKinds = new Set([
 const knowledgeAssessmentProtocolId = 'res-knowledge-assessment-protocol';
 const defaultCompanyProtocolTemplates = [
   { id: 'res-protocol-fire-safety', title: 'Gaisrinės saugos žinių patikrinimo protokolas', testId: 'res-fire-knowledge-test' },
+  { id: 'res-protocol-civil-safety-training', title: 'Darbuotojų civilinės saugos mokymų žinių patikrinimo protokolas', testId: 'res-civil-safety-training-test', defaultForOrganizations: true },
   { id: 'res-protocol-workplace-conduct', title: 'Prieš psichologinį ir fizinį smurtą, diskriminaciją ir priekabiavimą nukreipta mokymo programos žinių patikrinimo protokolas', testId: 'res-workplace-conduct-test' },
   { id: 'res-protocol-cargo-handling', title: 'Darbuotojų, atliekančių krovimo darbus, atestavimo, mokymo darbo vietoje protokolas', testId: 'res-manual-handling-test' },
   { id: 'res-protocol-chemical-safety', title: 'Darbuotojų, atliekančių darbus su pavojingomis cheminėmis medžiagomis, mokymo darbo vietoje protokolas', testId: 'res-chemical-safety-test' },
   { id: 'res-protocol-work-at-height', title: 'Darbuotojų, atliekančių darbus aukštyje atestavimo, mokymo darbo vietoje protokolas', testId: 'res-work-at-height-test' },
   { id: 'res-protocol-excavation', title: 'Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose mokymo programos protokolas', testId: 'res-excavation-safety-test' },
+];
+const civilSafetyTrainingTestId = 'res-civil-safety-training-test';
+const civilSafetyTrainingQuestions = [
+  { prompt: 'Koks yra vieningas skubios pagalbos telefono numeris Lietuvoje, kuriuo reikia skambinti įvykus ekstremaliajam įvykiui ar nelaimei?', options: ['112', '011', '911'], correctIndex: 0 },
+  { prompt: 'Ką privalote padaryti pirmiausia, išgirdę kaukiančias perspėjimo sirenas (signalą „Dėmesio visiems“)?', options: ['Nedelsiant bėgti į lauką ir sėsti į asmeninį automobilį.', 'Įsijungti Lietuvos nacionalinį radiją ar televiziją (LRT), patikrinti pranešimus telefone (GPIS) ir vykdyti nurodymus.', 'Skambinti visais įmanomais telefono numeriais artimiesiems ir užimti ryšio linijas.'], correctIndex: 1 },
+  { prompt: 'Kur privaloma rinktis darbuotojams evakavusis iš pastato kilus pavojui?', options: ['Bet kurioje aikštelėje šalia išėjimo durų.', 'Iš anksto nustatytoje ir ženklu pažymėtoje saugioje žmonių susirinkimo vietoje, nurodytoje evakavimo plane.', 'Artimiausioje kavinėje ar parduotuvėje.'], correctIndex: 1 },
+  { prompt: 'Ar leidžiama naudotis liftu evakuacijos iš pastato metu?', options: ['Taip, jei liftas tuo metu veikia ir nėra dūmų.', 'Taip, bet tik administracijos darbuotojams.', 'Griežtai draudžiama – evakuotis galima tik evakuaciniais laiptais.'], correctIndex: 2 },
+  { prompt: 'Kaip reikia elgtis, jei paskelbta apie cheminę avariją ar oro užterštumą ir nurodyta likti patalpose?', options: ['Plačiai atidaryti langus, kad patalpos vėdintųsi.', 'Sandariai uždaryti langus, duris, orlaides, išjungti vėdinimo ir kondicionavimo sistemas, užsandarinti plyšius.', 'Nusileisti į rūsį ir įjungti visus šildymo prietaisus.'], correctIndex: 1 },
+  { prompt: 'Ką būtina pasiimti su savimi gavus nurodymą skubiai evakuotis iš gyvenamosios ar darbo vietos ilgesniam laikui?', options: ['Asmens dokumentus, būtiniausius vaistus, geriamojo vandens, negendančio maisto, žibintuvėlį, radijo imtuvą su elementais (išvykimo krepšį).', 'Tik stambią buitinę techniką ir baldus.', 'Nieko imti negalima, nes viskuo pasirūpins gelbėtojai per 10 minučių.'], correctIndex: 0 },
+  { prompt: 'Kur galima rasti informaciją apie kolektyvinės apsaugos statinius (KAS) ar priedangas savivaldybėje?', options: ['Lietuvos pasirengimo ekstremaliosioms situacijoms svetainėje LT72.lt bei savivaldybės interneto svetainėje.', 'Tik užsienio naujienų portaluose.', 'Tokia informacija yra įslaptinta ir gyventojams neteikiama.'], correctIndex: 0 },
+  { prompt: 'Kaip elgtis pastebėjus įtartiną be priežiūros paliktą daiktą ar galimą sprogmenį įmonės teritorijoje?', options: ['Patikrinti, kas yra viduje, ir nunešti į apsaugos postą.', 'Neliesti, nejudinti daikto, pasitraukti saugiu atstumu, įspėti aplinkinius ir informuoti vadovą bei skambinti 112.', 'Užpilti vandeniu arba uždengti striuke.'], correctIndex: 1 },
+  { prompt: 'Ką reikėtų daryti kilus žemės drebėjimui ar stipriai pastato konstrukcijų griūčiai, jei esate patalpoje?', options: ['Atsistoti prie didelio lango ir stebėti, kas vyksta lauke.', 'Pasislėpti po tvirtu stalu ar prie kapitalinės vidinės sienos, toliau nuo langų, stiklinių pertvarų ir krintančių daiktų.', 'Naudotis elektros prietaisais ir atvira ugnimi.'], correctIndex: 1 },
+  { prompt: 'Kas įmonėje organizuoja darbuotojų civilinės saugos mokymus, pratybas ir užtikrina pasirengimą ekstremaliosioms situacijoms?', options: ['Įmonės vadovas arba jo paskirtas atsakingas asmuo (civilinės saugos specialistas).', 'Kiekvienas darbuotojas savarankiškai savo atostogų metu.', 'Tik Priešgaisrinės apsaugos ir gelbėjimo departamentas.'], correctIndex: 0 },
 ];
 const workplaceConductTestId = 'res-workplace-conduct-test';
 const workplaceConductQuestions = [
@@ -1221,7 +1243,7 @@ const initialData = {
       dssInvitations: [],
       commission: ['Tomas Vaitkus', 'Rasa Kazlauskienė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-height', 'res-aap', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
+      resources: ['res-fire', 'res-height', 'res-aap', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
     },
     {
       id: 'org-logistika',
@@ -1234,7 +1256,7 @@ const initialData = {
       dssInvitations: [],
       commission: ['Aistė Rimkutė'],
       commissionPins: {},
-      resources: ['res-fire', 'res-chemical', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
+      resources: ['res-fire', 'res-chemical', 'res-civil-safety-training-test', 'res-civil-safety-training-journal', 'res-protocol-civil-safety-training', 'res-evacuation-plan-familiarization-journal', 'res-accident-incident-journal'],
     },
   ],
   employees: [
@@ -1263,9 +1285,11 @@ const initialData = {
     { id: workAtHeightTestId, title: 'Darbuotojo, atliekančio darbus aukštyje mokymo programos testas', type: 'Testas', category: 'Darbas aukštyje', image: '/courses/work-at-height.jpg', duration: '18 klausimų', html: '<h2>Darbuotojo, atliekančio darbus aukštyje mokymo programa</h2><p>Atsakykite į visus 18 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: workAtHeightQuestions },
     { id: excavationSafetyTestId, title: 'Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose – mokymų testas', type: 'Testas', category: 'Darbai iškasose ir pylimuose', image: '/courses/construction-ppe.jpg', duration: '12 klausimų', html: '<h2>Grunto kasimo, tvirtinimo ir kiti darbai iškasose ir pylimuose</h2><p>Atsakykite į visus 12 klausimų. Kiekviename klausime yra vienas teisingas variantas. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: excavationSafetyQuestions },
     { id: fireKnowledgeTestId, title: 'Gaisrinės saugos žinių patikrinimo testas', type: 'Testas', category: 'Priešgaisrinė sauga', image: '/courses/fire-response.jpg', duration: '20 klausimų', html: '<h2>Gaisrinės saugos žinių patikrinimo testas</h2><p>Atsakykite į visus 20 klausimų pasirinkdami po vieną variantą. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: fireKnowledgeQuestions },
+    { id: civilSafetyTrainingTestId, title: 'Darbuotojų civilinės saugos mokymų žinių patikrinimo testas', type: 'Testas', category: 'Civilinė sauga', image: '/courses/safety-training.jpg', duration: '10 klausimų', html: '<h2>Darbuotojų civilinės saugos mokymų žinių patikrinimo testas</h2><p>Atsakykite į visus 10 klausimų pasirinkdami po vieną variantą. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, defaultForOrganizations: true, questions: civilSafetyTrainingQuestions },
     { id: manualHandlingTestId, title: 'Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programos testas', type: 'Testas', category: 'Krovinių kėlimas rankomis', image: '/courses/construction-ppe.jpg', duration: '19 klausimų', html: '<h2>Darbuotojų, atliekančių krovinių kėlimo rankomis darbus, mokymo programa</h2><p>Atsakykite į visus 19 klausimų. Kai kuriuose klausimuose gali būti keli teisingi variantai. Testas išlaikomas surinkus ne mažiau kaip 80 %.</p>', signatures: true, validityMonths: 12, questions: manualHandlingQuestions },
     { id: knowledgeAssessmentProtocolId, title: 'Mokymo programos žinių patikrinimo protokolas', type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true },
-    ...defaultCompanyProtocolTemplates.map(({ id, title, testId }) => ({ id, title, type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true })),
+    ...defaultCompanyProtocolTemplates.map(({ id, title, testId, defaultForOrganizations }) => ({ id, title, type: 'Protokolas', category: 'Mokymo programos', duration: 'A4 formatas', templateKind: 'knowledge-assessment-protocol', relatedTestId: testId, signatures: true, validityMonths: 12, requiredSigners: ['Darbuotojas', 'DSS specialistas'], isProtocolTemplate: true, ...(defaultForOrganizations ? { defaultForOrganizations } : {}) })),
+    { id: 'res-civil-safety-training-journal', title: 'Darbuotojų civilinės saugos mokymų ir instruktavimų registravimo žurnalas', type: 'Žurnalas', category: 'Civilinė sauga', duration: '15 įrašų', templateKind: 'civil-safety-training-journal', signatures: true, validityMonths: 12, defaultForOrganizations: true, requiredSigners: ['Darbuotojas', 'DSS specialistas'], defaultSettings: { populateEmployees: true, documentNumber: '', instructionTitle: 'Darbuotojų civilinės saugos mokymai ir instruktavimai', instructorPosition: '', instructorName: '', signatureFieldRoles: civilSafetyTrainingSignatureFieldDefaults } },
     { id: 'res-medical-examination-schedule', title: 'Darbuotojų periodinių medicinos apžiūrų grafikas', type: 'Žurnalas', category: 'Sveikatos patikrinimai', duration: '20 darbuotojų', templateKind: 'medical-examination-schedule', signatures: true, validityMonths: 24, requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, periodicity: '1 kartą per 2 metus', directorName: '', date: '' } },
     { id: 'res-journal', title: 'Įvadinio instruktavimo žurnalas', type: 'Žurnalas', category: 'DSS dokumentai', image: '/courses/employee-orientation.jpg', duration: '10 min.', html: '<h2>Įvadinis instruktavimas</h2><p>Darbuotojas patvirtina, kad susipažino su įmonės saugos reikalavimais.</p>', signatures: true, validityMonths: 12 },
     { id: jobDescriptionJournalId, title: 'Darbuotojų, supažindintų su pareiginiais nuostatais, registracijos žurnalas', type: 'Žurnalas', category: 'Darbuotojų supažindinimas', duration: '15 įrašų', templateKind: 'job-description-journal', requiredSigners: ['Darbuotojas'], defaultSettings: { populateEmployees: true, regulationNumber: '' } },
@@ -1475,6 +1499,8 @@ const preservedUserResourceIds = new Set([
   workAtHeightTestId,
   excavationSafetyTestId,
   fireKnowledgeTestId,
+  civilSafetyTrainingTestId,
+  'res-civil-safety-training-journal',
   manualHandlingTestId,
   knowledgeAssessmentProtocolId,
   ...defaultCompanyProtocolTemplates.map(({ id }) => id),
@@ -5234,6 +5260,25 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         fieldRoles.employee,
         fieldRoles.independentWorkPermit,
       ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
+    } else if (resourceSettingsTarget.templateKind === 'civil-safety-training-journal') {
+      const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+      const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
+        ? settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+          ?? resourceSettingsTarget.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+          ?? 'DSS specialistas'
+        : fieldRoles.instructor;
+      settings.signatureFieldRoles = {
+        instructor: ['Vadovas', 'DSS specialistas', 'niekas'].includes(configuredInstructor) ? configuredInstructor : 'DSS specialistas',
+        employee: 'Darbuotojas',
+      };
+      settings.requiredSigners = [...new Set([
+        settings.signatureFieldRoles.instructor,
+        settings.signatureFieldRoles.employee,
+      ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
+      settings.instructionTitle = String(settings.instructionTitle ?? '').trim().slice(0, 250);
+      settings.instructorPosition = String(settings.instructorPosition ?? '').trim().slice(0, 150);
+      settings.instructorName = String(settings.instructorName ?? '').trim().slice(0, 150);
+      settings.documentNumber = String(settings.documentNumber ?? '').trim().slice(0, 100);
     } else if (resourceSettingsTarget.templateKind === 'fire-safety-journal') {
       const instructionRows = getFireSafetyInstructionRows(settings);
       settings.fireSafetyInstructions = instructionRows;
@@ -11305,6 +11350,19 @@ function getRequiredSigners(resource, org, employee) {
       fieldRoles.independentWorkPermit,
     ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
   }
+  if (resource?.templateKind === 'civil-safety-training-journal') {
+    const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
+    const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(savedSettings.signatureFieldRoles ?? {}) };
+    const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
+      ? savedSettings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+        ?? resource.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+        ?? 'DSS specialistas'
+      : fieldRoles.instructor;
+    return [...new Set([
+      configuredInstructor,
+      fieldRoles.employee,
+    ].filter((role) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(role)))];
+  }
   const organizationRequiredSigners = org?.resourceSettings?.[resource?.id]?.requiredSigners;
   if (resource?.templateKind === 'fire-safety-journal') {
     const savedSettings = org?.resourceSettings?.[resource.id] ?? {};
@@ -11938,6 +11996,29 @@ function populateJournalRows(html, resource, employee, org, signatures, speciali
           proof(item, instructor),
           proof(item, instructed),
           proof(item, independentWorkPermit),
+        ]);
+      } else if (resource.templateKind === 'civil-safety-training-journal') {
+        const settings = resource.defaultSettings ?? {};
+        const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+        const configuredInstructor = fieldRoles.instructor === 'instruktavęs'
+          ? settings.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+            ?? resource.requiredSigners?.find((role) => ['Vadovas', 'DSS specialistas'].includes(role))
+            ?? 'DSS specialistas'
+          : fieldRoles.instructor;
+        const instructor = configuredInstructor === 'niekas'
+          ? null
+          : entries.find((entry) => entry.role === configuredInstructor);
+        const instructed = entries.find((entry) => entry.role === fieldRoles.employee);
+        const instructorName = instructor ? nameFor(instructor) : settings.instructorName;
+        writeRow(row, [
+          String(item.sequenceNumber ?? index + 1),
+          formatDate(instructed?.signedAt ?? instructor?.signedAt),
+          escapeHtml(item.name),
+          escapeHtml(positionFor(item)),
+          escapeHtml(settings.instructionTitle || resource.title),
+          [settings.instructorPosition, instructorName].filter(Boolean).map(escapeHtml).join('<br>'),
+          proof(item, instructor),
+          proof(item, instructed),
         ]);
       } else if (resource.templateKind === 'job-description-journal') {
         const settings = resource.defaultSettings ?? {};
@@ -12809,6 +12890,7 @@ function ResourceSettingsDialog(props) {
   if (props.resource.templateKind === workEquipmentInspectionJournalTemplateKind) return <WorkEquipmentInspectionJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === 'evacuation-plan-journal') return <EvacuationPlanResourceSettingsDialog {...props} />;
   if (props.resource.templateKind === 'workplace-dss-journal') return <WorkplaceDssResourceSettingsDialog {...props} />;
+  if (props.resource.templateKind === 'civil-safety-training-journal') return <CivilSafetyTrainingJournalSettingsDialog {...props} />;
   if (props.resource.templateKind === 'fire-safety-journal') return <FireSafetyResourceSettingsDialog {...props} />;
   return <LegacyResourceSettingsDialog {...props} />;
 }
@@ -13664,6 +13746,45 @@ function WorkplaceDssResourceSettingsDialog({ resource, settings, onChange, onSa
             {renderRoleOptions(field)}
           </select>
         </label>)}
+      </fieldset>
+      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
+    </form>
+  </div>;
+}
+
+function CivilSafetyTrainingJournalSettingsDialog({ resource, settings, onChange, onSave, onClose }) {
+  const fieldRoles = { ...civilSafetyTrainingSignatureFieldDefaults, ...(settings.signatureFieldRoles ?? {}) };
+  const updateInstructorRole = (role) => onChange({
+    ...settings,
+    signatureFieldRoles: { ...fieldRoles, instructor: role },
+    requiredSigners: [...new Set(['Darbuotojas', role].filter((value) => ['Darbuotojas', 'Vadovas', 'DSS specialistas'].includes(value)))],
+  });
+  const fields = [
+    ['documentNumber', 'Dokumento Nr.'],
+    ['instructionTitle', 'Mokymo / instruktavimo tema'],
+    ['instructorPosition', 'Mokymą vedusio asmens pareigos'],
+    ['instructorName', 'Mokymą vedusio asmens vardas, pavardė'],
+  ];
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+    <form onSubmit={onSave} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs font-semibold uppercase text-emerald-800">Įmonės šablono nustatymai</p><h2 className="mt-1 text-xl font-bold">{resource.title}</h2><p className="mt-1 text-sm text-slate-500">Šie nustatymai taikomi tik šiai įmonei.</p></div>
+        <button type="button" aria-label="Uždaryti nustatymus" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={onClose}><X size={20} /></button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {fields.map(([key, label]) => <label key={key} className="text-sm font-medium">{label}<input className={`${inputClass} mt-1`} value={settings[key] ?? ''} onChange={(event) => onChange({ ...settings, [key]: event.target.value })} /></label>)}
+      </div>
+      <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold">Kas turi pasirašyti</legend>
+        <label className="block text-sm font-medium">Mokymą vedusio asmens parašas
+          <select className={`${inputClass} mt-1`} value={fieldRoles.instructor} onChange={(event) => updateInstructorRole(event.target.value)}>
+            <option value="DSS specialistas">DSS specialistas</option>
+            <option value="Vadovas">Įmonės vadovas</option>
+            <option value="niekas">Niekas nepasirašo</option>
+          </select>
+        </label>
+        <p className="text-sm text-slate-600">Darbuotojo parašas privalomas. Parašai, data, laikas ir pasirašymo aplinkos duomenys įrašomi į žurnalą.</p>
       </fieldset>
       <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={onClose}>Atšaukti</button><button className={buttonClass}><Check size={16} />Išsaugoti nustatymus</button></div>
     </form>
