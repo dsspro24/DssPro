@@ -1341,7 +1341,7 @@ const initialData = {
   ],
 };
 
-const organizationResourcePresets = [
+const defaultOrganizationResourcePresets = [
   {
     id: 'basic',
     label: 'Bazinis (visoms įmonėms)',
@@ -1377,9 +1377,6 @@ const organizationResourcePresets = [
     resourceIds: [
       'res-workplace-conduct-test',
       'res-protocol-workplace-conduct',
-      'res-computer-ergonomics-test',
-      'res-computer-ergonomics-journal',
-      'res-protocol-computer-ergonomics',
     ],
   },
   {
@@ -1391,7 +1388,6 @@ const organizationResourcePresets = [
       'res-chemical-safety-instruction-card',
       'res-manual-handling-test',
       'res-protocol-cargo-handling',
-      'res-aap',
     ],
   },
   {
@@ -1408,7 +1404,6 @@ const organizationResourcePresets = [
       'res-chemical-safety-test',
       'res-protocol-chemical-safety',
       'res-chemical-safety-instruction-card',
-      'res-aap',
     ],
   },
   {
@@ -1421,11 +1416,17 @@ const organizationResourcePresets = [
       'res-manual-handling-test',
       'res-protocol-cargo-handling',
       'res-fire-automation-maintenance-journal',
-      'res-work-equipment-periodic-inspection-journal',
-      'res-aap',
     ],
   },
 ];
+
+const normalizeOrganizationResourcePresets = (presets) => defaultOrganizationResourcePresets.map((defaultPreset) => {
+  const savedPreset = Array.isArray(presets) ? presets.find((preset) => preset?.id === defaultPreset.id) : null;
+  const resourceIds = Array.isArray(savedPreset?.resourceIds)
+    ? [...new Set(savedPreset.resourceIds.filter((id) => typeof id === 'string'))]
+    : defaultPreset.resourceIds;
+  return { ...defaultPreset, resourceIds };
+});
 
 const createSandboxWorkspaceData = (sandboxContent = null) => {
   const organizationId = 'org-demo-sandbox';
@@ -1790,10 +1791,14 @@ const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.
 export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, individualPlanRequested = false, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const viewerUserId = previewUserId || cloudUserId;
+  const configuredOrganizationResourcePresets = normalizeOrganizationResourcePresets(creatorCatalog?.organizationResourcePresets);
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
-      ? (creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id)
+      ? [...new Set([
+        ...(creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id),
+        ...configuredOrganizationResourcePresets.find((preset) => preset.id === 'basic').resourceIds,
+      ])].filter((resourceId) => (creatorCatalog?.resources ?? []).some((resource) => resource.id === resourceId))
       : [];
     const cloudDefaults = cloudMode && cloudOrganization
       ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
@@ -1822,6 +1827,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? []) : loadData();
     const workspaceData = {
       ...loadedData,
+      organizationResourcePresets: normalizeOrganizationResourcePresets(
+        loadedData.organizationResourcePresets ?? configuredOrganizationResourcePresets,
+      ),
       resources: (loadedData.resources ?? []).map((resource) => {
         if (sandboxMode) return resource;
         if (resource.id === 'res-fire-safety-journal') {
@@ -4363,6 +4371,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const visibleLibraryResources = data.resources.filter((resource) => !resource.organizationId
     || isCompanyCreatedProtocol(resource, currentOrg?.id)
     || creatorManagementContext && resource.organizationId === currentOrg?.id);
+  const activeOrganizationResourcePresets = normalizeOrganizationResourcePresets(data.organizationResourcePresets);
   const demoSnapshotResources = data.resources.filter((resource) => !resource.organizationId);
   const editingResourceTemplateKind = data.resources.find((resource) => resource.id === editingResourceId)?.templateKind;
   const editingInstructorTemplate = ['intro-dss-journal', 'workplace-dss-journal'].includes(editingResourceTemplateKind);
@@ -4453,9 +4462,9 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
   const applyOrganizationResourcePreset = (presetId) => {
     if (!currentOrg) return;
-    const preset = organizationResourcePresets.find((item) => item.id === presetId);
+    const preset = activeOrganizationResourcePresets.find((item) => item.id === presetId);
     if (!preset) return;
-    const basicPreset = organizationResourcePresets.find((item) => item.id === 'basic');
+    const basicPreset = activeOrganizationResourcePresets.find((item) => item.id === 'basic');
     if (!basicPreset) return;
     setLibraryPresetSelection({ organizationId: currentOrg.id, presetId: preset.id });
     const visibleResourceIds = new Set(visibleLibraryResources.map((resource) => resource.id));
@@ -4544,6 +4553,26 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         : 'Šablonas nebėra numatytasis; jo priskyrimas pašalintas iš esamų įmonių.');
     } catch (error) {
       setNotice(`Numatytojo šablono nustatyti nepavyko: ${error.message}`);
+    }
+  };
+
+  const saveOrganizationResourcePresets = async () => {
+    const sharedResourceIds = new Set(data.resources.filter((resource) => !resource.organizationId).map((resource) => resource.id));
+    const presets = normalizeOrganizationResourcePresets(data.organizationResourcePresets).map((preset) => ({
+      ...preset,
+      resourceIds: preset.resourceIds.filter((resourceId) => sharedResourceIds.has(resourceId)),
+    }));
+    try {
+      if (cloudMode) {
+        const { error } = await supabase.rpc('save_creator_resource_presets', {
+          input_presets: presets,
+        });
+        if (error) throw error;
+      }
+      setData((current) => ({ ...current, organizationResourcePresets: presets }));
+      setNotice('Įmonių bibliotekos rinkiniai išsaugoti. Jie bus taikomi naujoms įmonėms.');
+    } catch (error) {
+      setNotice(`Įmonių bibliotekos rinkinių išsaugoti nepavyko: ${error.message}`);
     }
   };
 
@@ -10338,7 +10367,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'biblioteka' && canManageSelectedWorkspace && <section className="space-y-5"><PageTitle title="Įmonės biblioteka" subtitle="Pasirinkite šablonus, kurie reikalingi šiai įmonei. Darbuotojams priskirkite juos skiltyje Darbuotojai." />
-            <Panel title="Paruošti šablonų rinkiniai"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{organizationResourcePresets.map((preset) => {
+            <Panel title="Paruošti šablonų rinkiniai"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{activeOrganizationResourcePresets.map((preset) => {
               const isSelectedPreset = libraryPresetSelection.organizationId === currentOrg?.id && libraryPresetSelection.presetId === preset.id;
               return <button key={preset.id} type="button" aria-pressed={isSelectedPreset} className={`min-h-16 rounded-lg border px-3 py-3 text-left text-sm font-semibold transition-colors ${isSelectedPreset ? 'border-emerald-700 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => applyOrganizationResourcePreset(preset.id)}>{preset.label}</button>;
             })}</div><p className="mt-3 text-xs text-slate-600">Pasirinkus veiklos sritį, tinkami testai, žurnalai, protokolai ir kortelės iškart pažymimi kaip priskirti įmonei. Įtraukiami ir baziniai šablonai. Esami priskyrimai išsaugomi, o pasirinkimus galite koreguoti žemiau.</p></Panel>
@@ -10915,6 +10944,39 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'biblioteka' && userRole === 'kurejas' && <section className="space-y-5"><PageTitle title="Turinio biblioteka" subtitle="Kurti ir tvarkyti įmonėms prieinamus testų, žurnalų, kortelių ir protokolų šablonus." />
+            <Panel title="Numatytieji įmonių bibliotekos rinkiniai"><p className="mb-3 text-sm text-slate-600">Pažymėkite, kokie šablonai priklauso kiekvienam rinkiniui. Veiklos sričių rinkiniai automatiškai paveldi bazinius šablonus. Visoms įmonėms numatytieji šablonai paveldimi atskirai. Pakeitimai bus rodomi naujai kuriamoms įmonėms; esamų įmonių priskyrimai nekeičiami.</p><div className="space-y-2">{activeOrganizationResourcePresets.map((preset) => {
+              const basicResourceIds = new Set(activeOrganizationResourcePresets.find((item) => item.id === 'basic')?.resourceIds ?? []);
+              const inheritedResourceIds = new Set([
+                ...(preset.id === 'basic' ? [] : basicResourceIds),
+                ...data.resources.filter((resource) => resource.defaultForOrganizations === true && !resource.organizationId).map((resource) => resource.id),
+              ]);
+              const inheritedCount = [...inheritedResourceIds].filter((id) => !preset.resourceIds.includes(id)).length;
+              return <details key={preset.id} open={preset.id === 'basic'} className="rounded-lg border border-slate-200 bg-white">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">{preset.label}<span className="ml-2 text-xs font-normal text-slate-500">{preset.resourceIds.length + inheritedCount} šablonų</span></summary>
+                <fieldset className="grid gap-x-4 gap-y-2 border-t border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <legend className="sr-only">{preset.label} šablonai</legend>
+                  {data.resources.filter((resource) => !resource.organizationId).map((resource) => {
+                    const inheritedFromBasic = preset.id !== 'basic' && basicResourceIds.has(resource.id);
+                    const isDefaultForAll = resource.defaultForOrganizations === true;
+                    const isInherited = inheritedResourceIds.has(resource.id);
+                    const isSelected = preset.resourceIds.includes(resource.id) || isInherited;
+                    const inheritedLabel = inheritedFromBasic ? 'Paveldima iš bazinio rinkinio' : isDefaultForAll ? 'Numatytasis visoms įmonėms' : undefined;
+                    return <label key={resource.id} className={`flex items-start gap-2 text-sm ${isInherited ? 'text-slate-500' : 'text-slate-800'}`} title={inheritedLabel}>
+                      <input type="checkbox" checked={isSelected} disabled={isInherited} onChange={(event) => setData((current) => ({
+                        ...current,
+                        organizationResourcePresets: normalizeOrganizationResourcePresets(current.organizationResourcePresets).map((item) => item.id !== preset.id ? item : {
+                          ...item,
+                          resourceIds: event.target.checked
+                            ? [...new Set([...item.resourceIds, resource.id])]
+                            : item.resourceIds.filter((id) => id !== resource.id),
+                        }),
+                      }))} />
+                      <span>{resource.title}<small className="block text-xs text-slate-500">{resource.type} · {resource.category}</small></span>
+                    </label>;
+                  })}
+                </fieldset>
+              </details>;
+            })}</div><button type="button" className={`${buttonClass} mt-4`} onClick={saveOrganizationResourcePresets}><Check size={16} />Išsaugoti rinkinius</button></Panel>
             {cloudMode && <Panel title="Standartinių šablonų atkūrimas"><p className="text-sm text-slate-600">Atnaujinkite standartinių testų, žurnalų, protokolų ir AAP kortelės turinį pagal programos versiją. Įkeltos nuotraukos ir įmonių nustatymai bus išsaugoti. Atkurti standartiniai šablonai bus pažymėti numatytaisiais ir priskirti esamoms įmonėms. Individualiai sukurti šablonai neatkuriami.</p><button type="button" className={`${buttonClass} mt-3`} disabled={restoringDefaultResources || resourceSaving || resourceFileUploading} onClick={restoreDefaultResources}><Upload size={16} />{restoringDefaultResources ? 'Atkuriami šablonai…' : 'Atkurti standartinius šablonus'}</button></Panel>}
             <Panel title="Turinio tipai"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.resourceTypes.map((type) => <div key={type} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"><span className="text-sm font-semibold">{resourceTypeDisplayNames[type] ?? type}</span><span className="text-xs text-slate-500">{data.resources.filter((resource) => resource.type === type).length} šablonų</span></div>)}</div></Panel>
             <Panel title={editingResourceId ? 'Redaguoti šabloną' : 'Naujas šablonas'}>
