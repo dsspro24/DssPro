@@ -1341,6 +1341,92 @@ const initialData = {
   ],
 };
 
+const organizationResourcePresets = [
+  {
+    id: 'basic',
+    label: 'Bazinis (visoms įmonėms)',
+    resourceIds: [
+      'res-fire',
+      'res-fire-knowledge-test',
+      'res-protocol-fire-safety',
+      'res-civil-safety-training-test',
+      'res-civil-safety-training-journal',
+      'res-protocol-civil-safety-training',
+      'res-computer-ergonomics-test',
+      'res-computer-ergonomics-journal',
+      'res-protocol-computer-ergonomics',
+      'res-journal',
+      'res-intro-dss-journal',
+      'res-fire-safety-journal',
+      'res-evacuation-plan-familiarization-journal',
+      'res-accident-incident-journal',
+      'res-safety-violation-journal',
+      'res-first-aid-kit-inspection-journal',
+      'res-work-equipment-periodic-inspection-journal',
+      'res-internal-documents-register',
+      'res-work-rules-journal',
+      'res-job-description-journal',
+      'res-familiarization-card',
+      'res-aap',
+      'res-medical-examination-schedule',
+    ],
+  },
+  {
+    id: 'office',
+    label: 'Biuras ir paslaugos',
+    resourceIds: [
+      'res-workplace-conduct-test',
+      'res-protocol-workplace-conduct',
+      'res-computer-ergonomics-test',
+      'res-computer-ergonomics-journal',
+      'res-protocol-computer-ergonomics',
+    ],
+  },
+  {
+    id: 'trade-logistics',
+    label: 'Prekyba, sandėlis ir logistika',
+    resourceIds: [
+      'res-chemical-safety-test',
+      'res-protocol-chemical-safety',
+      'res-chemical-safety-instruction-card',
+      'res-manual-handling-test',
+      'res-protocol-cargo-handling',
+      'res-aap',
+    ],
+  },
+  {
+    id: 'construction',
+    label: 'Statybos ir inžineriniai darbai',
+    resourceIds: [
+      'res-work-at-height-test',
+      'res-protocol-work-at-height',
+      'res-height',
+      'res-excavation-safety-test',
+      'res-protocol-excavation',
+      'res-manual-handling-test',
+      'res-protocol-cargo-handling',
+      'res-chemical-safety-test',
+      'res-protocol-chemical-safety',
+      'res-chemical-safety-instruction-card',
+      'res-aap',
+    ],
+  },
+  {
+    id: 'manufacturing',
+    label: 'Gamyba, servisai ir pramonė',
+    resourceIds: [
+      'res-chemical-safety-test',
+      'res-protocol-chemical-safety',
+      'res-chemical-safety-instruction-card',
+      'res-manual-handling-test',
+      'res-protocol-cargo-handling',
+      'res-fire-automation-maintenance-journal',
+      'res-work-equipment-periodic-inspection-journal',
+      'res-aap',
+    ],
+  },
+];
+
 const createSandboxWorkspaceData = (sandboxContent = null) => {
   const organizationId = 'org-demo-sandbox';
   const bundledResources = Array.isArray(sandboxContent?.resources)
@@ -1913,6 +1999,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const profileMenuRef = useRef(null);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryPresetId, setLibraryPresetId] = useState('basic');
   const [demoSnapshotResourceIds, setDemoSnapshotResourceIds] = useState([]);
   const [demoSnapshotExporting, setDemoSnapshotExporting] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -4363,6 +4450,28 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     ...current,
     organizations: current.organizations.map((org) => org.id === orgId ? updater(org) : org),
   }));
+
+  const applyOrganizationResourcePreset = () => {
+    if (!currentOrg) return;
+    const preset = organizationResourcePresets.find((item) => item.id === libraryPresetId);
+    if (!preset) return;
+    const visibleResourceIds = new Set(visibleLibraryResources.map((resource) => resource.id));
+    const presetResourceIds = new Set([
+      ...preset.resourceIds,
+      ...data.resources.filter((resource) => resource.defaultForOrganizations === true && !resource.organizationId).map((resource) => resource.id),
+    ]);
+    const availableResourceIds = [...presetResourceIds].filter((resourceId) => visibleResourceIds.has(resourceId));
+    const newlyAssignedIds = availableResourceIds.filter((resourceId) => !currentOrg.resources.includes(resourceId));
+    if (!newlyAssignedIds.length) {
+      setNotice('Šio rinkinio šablonai jau priskirti įmonei arba bibliotekoje dar nepasiekiami.');
+      return;
+    }
+    updateOrg(currentOrg.id, (org) => ({
+      ...org,
+      resources: [...new Set([...org.resources, ...newlyAssignedIds])],
+    }));
+    setNotice(`Pridėta ${newlyAssignedIds.length} šablonų. Esami priskyrimai ir šablonų turinys nepakeisti.`);
+  };
 
   const createEmployeePosition = (name, selectPosition) => {
     if (!currentOrg) return false;
@@ -10225,6 +10334,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'biblioteka' && canManageSelectedWorkspace && <section className="space-y-5"><PageTitle title="Įmonės biblioteka" subtitle="Pasirinkite šablonus, kurie reikalingi šiai įmonei. Darbuotojams priskirkite juos skiltyje Darbuotojai." />
+            <Panel title="Paruošti šablonų rinkiniai"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="block flex-1 text-sm font-medium">Įmonės veiklos sritis<select className={`${inputClass} mt-1`} value={libraryPresetId} onChange={(event) => setLibraryPresetId(event.target.value)}>{organizationResourcePresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label><button type="button" className={buttonClass} onClick={applyOrganizationResourcePreset}><Check size={16} />Pridėti rinkinio šablonus</button></div><p className="mt-3 text-xs text-slate-600">Rinkinys pažymi rekomenduojamus testus, žurnalus, protokolus ir korteles. Esami priskyrimai bei šablonų turinys nekeičiami; sąrašą galite koreguoti žemiau.</p></Panel>
             {currentOrg?.resources.includes('res-aap') && <Panel title="AAP išdavimo kortelės pozicijos"><form onSubmit={saveAapItems} className="space-y-4"><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-2 py-2">Priemonė</th><th className="px-2 py-2">Pagrindas išduoti</th><th className="px-2 py-2">Kiekis</th><th className="px-2 py-2">Mato vnt.</th><th className="px-2 py-2">Tinkamumo terminas</th><th className="px-2 py-2">Kaina / vnt., Eur</th><th className="px-2 py-2">Suma, Eur</th><th className="px-2 py-2"><span className="sr-only">Šalinti</span></th></tr></thead><tbody>{aapDraft.map((item) => <tr className="border-b border-slate-100" key={item.id}><td className="p-2"><input className={inputClass} value={item.name} onChange={(event) => updateAapItem(item.id, 'name', event.target.value)} required /></td><td className="p-2"><input className={inputClass} value={item.reason} onChange={(event) => updateAapItem(item.id, 'reason', event.target.value)} placeholder="Darbo pobūdis" /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateAapItem(item.id, 'quantity', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.unit} onChange={(event) => updateAapItem(item.id, 'unit', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.validity} onChange={(event) => updateAapItem(item.id, 'validity', event.target.value)} /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateAapItem(item.id, 'unitPrice', event.target.value)} /></td><td className="px-2 text-right tabular-nums">{formatAmount(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</td><td className="p-2"><button type="button" className="text-rose-700" aria-label={`Pašalinti ${item.name}`} onClick={() => setAapDraft((items) => items.filter((row) => row.id !== item.id))}><X size={16} /></button></td></tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Bendra suma: {formatAmount(aapDraft.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0))} Eur</p><div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setAapDraft((items) => [...items, { id: `aap-${Date.now()}`, name: '', reason: '', quantity: 1, unit: 'Vnt.', validity: '', unitPrice: '' }])}><Plus size={15} />Pridėti priemonę</button><button className={buttonClass}>Išsaugoti AAP šabloną</button></div></div><p className="text-xs text-slate-500">Pakeitimai taikomi būsimiems parašams. Jau darbuotojo pasirašytas dokumentas išsaugo savo fiksuotą versiją.</p></form></Panel>}
             <LibraryFilters resources={visibleLibraryResources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
             {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div className="flex h-full flex-col gap-2" key={resource.id}><ResourceCard resource={resource} selected={currentOrg?.resources.includes(resource.id)} onToggle={(checked) => updateOrg(currentOrg.id, (org) => ({ ...org, resources: checked ? [...new Set([...org.resources, resource.id])] : org.resources.filter((id) => id !== resource.id) }))} onDelete={isCompanyCreatedProtocol(resource, currentOrg?.id) ? () => deleteCompanyProtocol(resource) : undefined} onSettings={resource.id === 'res-aap' ? undefined : () => openResourceSettings(resource)} onPreview={() => openResourcePreview(resource)} />{resource.type === 'Protokolas' && !resource.organizationId && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openCompanyProtocolForm(resource)}><Plus size={15} />Kurti atskirą protokolą</button>}</div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}</section>}
