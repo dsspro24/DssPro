@@ -1461,7 +1461,7 @@ const createSandboxWorkspaceData = (sandboxContent = null) => {
   };
 };
 
-function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = [], creatorResources = []) {
+function createInitialCloudWorkspace(organization, managerName = '', defaultResourceIds = [], creatorResources = [], resourcePresetId = '') {
   const organizationTemplate = initialData.organizations[0];
   const planCode = organization.plan_code ?? 'up_to_20';
   const defaultPlan = {
@@ -1490,6 +1490,7 @@ function createInitialCloudWorkspace(organization, managerName = '', defaultReso
     dss: [],
     dssInvitations: [],
     employeeAssignmentPresets: [],
+    ...(resourcePresetId ? { resourcePresetId } : {}),
     resourceSettings: defaultResourceSettings,
     resources: defaultResourceIds,
   };
@@ -1719,7 +1720,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       ).filter((resourceId) => (creatorCatalog?.resources ?? []).some((resource) => resource.id === resourceId))
       : [];
     const cloudDefaults = cloudMode && cloudOrganization
-      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
+      ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [], initializeCreatorDefaults ? initialOrganizationResourcePresetId : '')
       : null;
     const loadedData = sandboxMode
       ? createSandboxWorkspaceData(sandboxContent)
@@ -1742,7 +1743,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         protocolCommissionSignatures: initialCloudData.protocolCommissionSignatures ?? [],
         subscriptions: initialCloudData.subscriptions ?? [],
       }
-      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? []) : loadData();
+      : cloudMode && cloudOrganization ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [], initializeCreatorDefaults ? initialOrganizationResourcePresetId : '') : loadData();
     const workspaceData = {
       ...loadedData,
       organizationResourcePresets: normalizeOrganizationResourcePresets(
@@ -1925,7 +1926,6 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
   const profileMenuRef = useRef(null);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState('visos');
   const [librarySearch, setLibrarySearch] = useState('');
-  const [libraryPresetSelection, setLibraryPresetSelection] = useState({ organizationId: '', presetId: '' });
   const [demoSnapshotResourceIds, setDemoSnapshotResourceIds] = useState([]);
   const [demoSnapshotExporting, setDemoSnapshotExporting] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -4382,21 +4382,17 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!currentOrg) return;
     const preset = activeOrganizationResourcePresets.find((item) => item.id === presetId);
     if (!preset) return;
-    setLibraryPresetSelection({ organizationId: currentOrg.id, presetId: preset.id });
-    const visibleResourceIds = new Set(visibleLibraryResources.map((resource) => resource.id));
     const globallyDefaultIds = data.resources.filter((resource) => resource.defaultForOrganizations === true && !resource.organizationId).map((resource) => resource.id);
-    const availableResourceIds = getOrganizationPresetResourceIds(presetId, activeOrganizationResourcePresets, globallyDefaultIds)
-      .filter((resourceId) => visibleResourceIds.has(resourceId));
-    const newlyAssignedIds = availableResourceIds.filter((resourceId) => !currentOrg.resources.includes(resourceId));
-    if (!newlyAssignedIds.length) {
-      setNotice('Šio rinkinio šablonai jau priskirti įmonei arba bibliotekoje dar nepasiekiami.');
-      return;
-    }
+    const requestedResourceIds = getOrganizationPresetResourceIds(presetId, activeOrganizationResourcePresets, globallyDefaultIds);
+    const availableResourceIds = requestedResourceIds.filter((resourceId) => data.resources.some((resource) => resource.id === resourceId && !resource.organizationId));
+    const unavailableCount = requestedResourceIds.length - availableResourceIds.length;
+    const companyResourceIds = currentOrg.resources.filter((resourceId) => data.resources.some((resource) => resource.id === resourceId && resource.organizationId === currentOrg.id));
     updateOrg(currentOrg.id, (org) => ({
       ...org,
-      resources: [...new Set([...org.resources, ...newlyAssignedIds])],
+      resourcePresetId: preset.id,
+      resources: [...new Set([...companyResourceIds, ...availableResourceIds])],
     }));
-    setNotice(`Pridėta ${newlyAssignedIds.length} šablonų. Esami priskyrimai ir šablonų turinys nepakeisti.`);
+    setNotice(`Priskyrimai nustatyti pagal „${preset.label}“. Šablonų varneles galite koreguoti žemiau.${unavailableCount ? ` Kataloge nerasta ${unavailableCount} rinkinio šablonų.` : ''}`);
   };
 
   const createEmployeePosition = (name, selectPosition) => {
@@ -10280,10 +10276,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
           </section>}
 
           {activeTab === 'biblioteka' && canManageSelectedWorkspace && <section className="space-y-5"><PageTitle title="Įmonės biblioteka" subtitle="Pasirinkite šablonus, kurie reikalingi šiai įmonei. Darbuotojams priskirkite juos skiltyje Darbuotojai." />
-            <Panel title="Paruošti šablonų rinkiniai"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{activeOrganizationResourcePresets.map((preset) => {
-              const isSelectedPreset = libraryPresetSelection.organizationId === currentOrg?.id && libraryPresetSelection.presetId === preset.id;
-              return <button key={preset.id} type="button" aria-pressed={isSelectedPreset} className={`min-h-16 rounded-lg border px-3 py-3 text-left text-sm font-semibold transition-colors ${isSelectedPreset ? 'border-emerald-700 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => applyOrganizationResourcePreset(preset.id)}>{preset.label}</button>;
-            })}</div><p className="mt-3 text-xs text-slate-600">Pasirinkus veiklos sritį, tinkami testai, žurnalai, protokolai ir kortelės iškart pažymimi kaip priskirti įmonei. Įtraukiami ir baziniai šablonai. Esami priskyrimai išsaugomi, o pasirinkimus galite koreguoti žemiau.</p></Panel>
+            <Panel title="Paruoštas šablonų rinkinys"><label className="block max-w-xl text-sm font-medium">Pasirinkite bibliotekos rinkinį<select className={`${inputClass} mt-1`} value={currentOrg?.resourcePresetId ?? ''} onChange={(event) => applyOrganizationResourcePreset(event.target.value)}><option value="">Pasirinkite rinkinį</option>{activeOrganizationResourcePresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label><p className="mt-3 text-xs text-slate-600">Pasirinkus rinkinį, priskyrimai nustatomi pagal administratoriaus parinktas varneles, įskaitant bazinius šablonus. Įmonės sukurti šablonai išlieka. Žemiau galite pridėti arba nuimti varneles; pakeitus rinkinį, bendri šablonai bus nustatyti iš naujo pagal pasirinktą rinkinį.</p></Panel>
             {currentOrg?.resources.includes('res-aap') && <Panel title="AAP išdavimo kortelės pozicijos"><form onSubmit={saveAapItems} className="space-y-4"><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs text-slate-500"><th className="px-2 py-2">Priemonė</th><th className="px-2 py-2">Pagrindas išduoti</th><th className="px-2 py-2">Kiekis</th><th className="px-2 py-2">Mato vnt.</th><th className="px-2 py-2">Tinkamumo terminas</th><th className="px-2 py-2">Kaina / vnt., Eur</th><th className="px-2 py-2">Suma, Eur</th><th className="px-2 py-2"><span className="sr-only">Šalinti</span></th></tr></thead><tbody>{aapDraft.map((item) => <tr className="border-b border-slate-100" key={item.id}><td className="p-2"><input className={inputClass} value={item.name} onChange={(event) => updateAapItem(item.id, 'name', event.target.value)} required /></td><td className="p-2"><input className={inputClass} value={item.reason} onChange={(event) => updateAapItem(item.id, 'reason', event.target.value)} placeholder="Darbo pobūdis" /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateAapItem(item.id, 'quantity', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.unit} onChange={(event) => updateAapItem(item.id, 'unit', event.target.value)} /></td><td className="p-2"><input className={inputClass} value={item.validity} onChange={(event) => updateAapItem(item.id, 'validity', event.target.value)} /></td><td className="p-2"><input className={inputClass} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateAapItem(item.id, 'unitPrice', event.target.value)} /></td><td className="px-2 text-right tabular-nums">{formatAmount(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</td><td className="p-2"><button type="button" className="text-rose-700" aria-label={`Pašalinti ${item.name}`} onClick={() => setAapDraft((items) => items.filter((row) => row.id !== item.id))}><X size={16} /></button></td></tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold">Bendra suma: {formatAmount(aapDraft.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0))} Eur</p><div className="flex gap-2"><button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={() => setAapDraft((items) => [...items, { id: `aap-${Date.now()}`, name: '', reason: '', quantity: 1, unit: 'Vnt.', validity: '', unitPrice: '' }])}><Plus size={15} />Pridėti priemonę</button><button className={buttonClass}>Išsaugoti AAP šabloną</button></div></div><p className="text-xs text-slate-500">Pakeitimai taikomi būsimiems parašams. Jau darbuotojo pasirašytas dokumentas išsaugo savo fiksuotą versiją.</p></form></Panel>}
             <LibraryFilters resources={visibleLibraryResources} resourceTypes={data.resourceTypes} selectedType={libraryTypeFilter} onTypeChange={setLibraryTypeFilter} search={librarySearch} onSearchChange={setLibrarySearch} />
             {filteredLibraryResources.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{filteredLibraryResources.map((resource) => <div className="flex h-full flex-col gap-2" key={resource.id}><ResourceCard resource={resource} selected={currentOrg?.resources.includes(resource.id)} onToggle={(checked) => updateOrg(currentOrg.id, (org) => ({ ...org, resources: checked ? [...new Set([...org.resources, resource.id])] : org.resources.filter((id) => id !== resource.id) }))} onDelete={isCompanyCreatedProtocol(resource, currentOrg?.id) ? () => deleteCompanyProtocol(resource) : undefined} onSettings={resource.id === 'res-aap' ? undefined : () => openResourceSettings(resource)} onPreview={() => openResourcePreview(resource)} />{resource.type === 'Protokolas' && !resource.organizationId && <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => openCompanyProtocolForm(resource)}><Plus size={15} />Kurti atskirą protokolą</button>}</div>)}</div> : <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Pagal pasirinktą tipą ir paiešką šablonų nerasta.</p>}</section>}
