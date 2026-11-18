@@ -10,6 +10,10 @@ import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
 import { updateProtocolBatchRevision } from './lib/protocolBatchRevisions.js';
 import { isProtocolCommissionSigningAvailable } from './lib/protocolCommissionSigning.js';
+import {
+  getOrganizationPresetResourceIds,
+  normalizeOrganizationResourcePresets,
+} from './lib/organizationResourcePresets.js';
 const defaultFamiliarizationTopics = [
   'Psichologinio smurto, diskriminacijos ir priekabiavimo prevencijos politika;',
   'Darbuotojų saugos ir sveikatos politika;',
@@ -1341,93 +1345,6 @@ const initialData = {
   ],
 };
 
-const defaultOrganizationResourcePresets = [
-  {
-    id: 'basic',
-    label: 'Bazinis (visoms įmonėms)',
-    resourceIds: [
-      'res-fire',
-      'res-fire-knowledge-test',
-      'res-protocol-fire-safety',
-      'res-civil-safety-training-test',
-      'res-civil-safety-training-journal',
-      'res-protocol-civil-safety-training',
-      'res-computer-ergonomics-test',
-      'res-computer-ergonomics-journal',
-      'res-protocol-computer-ergonomics',
-      'res-journal',
-      'res-intro-dss-journal',
-      'res-fire-safety-journal',
-      'res-evacuation-plan-familiarization-journal',
-      'res-accident-incident-journal',
-      'res-safety-violation-journal',
-      'res-first-aid-kit-inspection-journal',
-      'res-work-equipment-periodic-inspection-journal',
-      'res-internal-documents-register',
-      'res-work-rules-journal',
-      'res-job-description-journal',
-      'res-familiarization-card',
-      'res-aap',
-      'res-medical-examination-schedule',
-    ],
-  },
-  {
-    id: 'office',
-    label: 'Biuras ir paslaugos',
-    resourceIds: [
-      'res-workplace-conduct-test',
-      'res-protocol-workplace-conduct',
-    ],
-  },
-  {
-    id: 'trade-logistics',
-    label: 'Prekyba, sandėlis ir logistika',
-    resourceIds: [
-      'res-chemical-safety-test',
-      'res-protocol-chemical-safety',
-      'res-chemical-safety-instruction-card',
-      'res-manual-handling-test',
-      'res-protocol-cargo-handling',
-    ],
-  },
-  {
-    id: 'construction',
-    label: 'Statybos ir inžineriniai darbai',
-    resourceIds: [
-      'res-work-at-height-test',
-      'res-protocol-work-at-height',
-      'res-height',
-      'res-excavation-safety-test',
-      'res-protocol-excavation',
-      'res-manual-handling-test',
-      'res-protocol-cargo-handling',
-      'res-chemical-safety-test',
-      'res-protocol-chemical-safety',
-      'res-chemical-safety-instruction-card',
-    ],
-  },
-  {
-    id: 'manufacturing',
-    label: 'Gamyba, servisai ir pramonė',
-    resourceIds: [
-      'res-chemical-safety-test',
-      'res-protocol-chemical-safety',
-      'res-chemical-safety-instruction-card',
-      'res-manual-handling-test',
-      'res-protocol-cargo-handling',
-      'res-fire-automation-maintenance-journal',
-    ],
-  },
-];
-
-const normalizeOrganizationResourcePresets = (presets) => defaultOrganizationResourcePresets.map((defaultPreset) => {
-  const savedPreset = Array.isArray(presets) ? presets.find((preset) => preset?.id === defaultPreset.id) : null;
-  const resourceIds = Array.isArray(savedPreset?.resourceIds)
-    ? [...new Set(savedPreset.resourceIds.filter((id) => typeof id === 'string'))]
-    : defaultPreset.resourceIds;
-  return { ...defaultPreset, resourceIds };
-});
-
 const createSandboxWorkspaceData = (sandboxContent = null) => {
   const organizationId = 'org-demo-sandbox';
   const bundledResources = Array.isArray(sandboxContent?.resources)
@@ -1788,17 +1705,18 @@ const SubscriptionPlanPriceEditor = lazy(() => import('./CreatorSubscriptionAdmi
 const CreatorCustomPlanCreator = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorCustomPlanCreator })));
 const CreatorSubscriptionEditor = lazy(() => import('./CreatorSubscriptionAdmin.jsx').then((module) => ({ default: module.CreatorSubscriptionEditor })));
 
-export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, individualPlanRequested = false, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
+export default function LocalWorkspace({ userRole, onRoleChange, onExit, initialCloudData = null, creatorCatalog = null, initializeCreatorDefaults = false, initialOrganizationResourcePresetId = 'basic', creatorAccounts = [], onCreatorPreview = () => {}, onLoadDssOrganization = null, onRefreshWorkspace = async () => null, onRefreshSubscription = null, onSwitchOrganization = async () => {}, employeeOrganizations = [], onSwitchEmployeeOrganization = async () => {}, availableOrganizations = [], subscriptionPlans = [], subscriptionAccess = { readOnly: false, locked: false }, individualPlanRequested = false, creatorManagementContext = '', creatorPreviewContext = '', previewUserId = '', onExitCreatorPreview = () => {}, onCreatorWorkspaceChanged = async () => {}, onCreatorOrganizationDeleted = async () => {}, onCreatorAccountDeleted = async () => {}, cloudOrganization = null, cloudManagerName = '', cloudUserCreatedAt = '', initialActiveTab = '', onInitialTabApplied = () => {}, initialNotice = '', onInitialNoticeApplied = () => {}, initialOpenedDssOrganizationId = '', initialDssSubscriptionAccess = null, cloudMode: requestedCloudMode = false, cloudUserId = '', sandboxMode = false, sandboxContent = null }) {
   const cloudMode = requestedCloudMode && !sandboxMode;
   const viewerUserId = previewUserId || cloudUserId;
   const configuredOrganizationResourcePresets = normalizeOrganizationResourcePresets(creatorCatalog?.organizationResourcePresets);
   const [validityCheckTime, setValidityCheckTime] = useState(Date.now);
   const [data, setData] = useState(() => {
     const defaultResourceIds = initializeCreatorDefaults
-      ? [...new Set([
-        ...(creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id),
-        ...configuredOrganizationResourcePresets.find((preset) => preset.id === 'basic').resourceIds,
-      ])].filter((resourceId) => (creatorCatalog?.resources ?? []).some((resource) => resource.id === resourceId))
+      ? getOrganizationPresetResourceIds(
+        initialOrganizationResourcePresetId,
+        configuredOrganizationResourcePresets,
+        (creatorCatalog?.resources ?? []).filter((resource) => resource.defaultForOrganizations === true).map((resource) => resource.id),
+      ).filter((resourceId) => (creatorCatalog?.resources ?? []).some((resource) => resource.id === resourceId))
       : [];
     const cloudDefaults = cloudMode && cloudOrganization
       ? createInitialCloudWorkspace(cloudOrganization, cloudManagerName, defaultResourceIds, creatorCatalog?.resources ?? [])
@@ -4464,16 +4382,11 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     if (!currentOrg) return;
     const preset = activeOrganizationResourcePresets.find((item) => item.id === presetId);
     if (!preset) return;
-    const basicPreset = activeOrganizationResourcePresets.find((item) => item.id === 'basic');
-    if (!basicPreset) return;
     setLibraryPresetSelection({ organizationId: currentOrg.id, presetId: preset.id });
     const visibleResourceIds = new Set(visibleLibraryResources.map((resource) => resource.id));
-    const presetResourceIds = new Set([
-      ...basicPreset.resourceIds,
-      ...preset.resourceIds,
-      ...data.resources.filter((resource) => resource.defaultForOrganizations === true && !resource.organizationId).map((resource) => resource.id),
-    ]);
-    const availableResourceIds = [...presetResourceIds].filter((resourceId) => visibleResourceIds.has(resourceId));
+    const globallyDefaultIds = data.resources.filter((resource) => resource.defaultForOrganizations === true && !resource.organizationId).map((resource) => resource.id);
+    const availableResourceIds = getOrganizationPresetResourceIds(presetId, activeOrganizationResourcePresets, globallyDefaultIds)
+      .filter((resourceId) => visibleResourceIds.has(resourceId));
     const newlyAssignedIds = availableResourceIds.filter((resourceId) => !currentOrg.resources.includes(resourceId));
     if (!newlyAssignedIds.length) {
       setNotice('Šio rinkinio šablonai jau priskirti įmonei arba bibliotekoje dar nepasiekiami.');
@@ -8769,7 +8682,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
         input_plan_code: details.planCode,
       });
       if (error) throw error;
-      await onRefreshWorkspace(organizationId, 'prenumerata');
+      await onRefreshWorkspace(organizationId, 'prenumerata', details.resourcePresetId ?? 'basic');
       setNotice('Papildoma įmonė sukurta ir užsakymas pateiktas. Darbo sritimi bus galima naudotis DSS Pro administratoriui patvirtinus apmokėjimą; išankstinę sąskaitą rasite prenumeratos skiltyje.');
     } catch (error) {
       setNotice(`Papildomos įmonės sukurti nepavyko: ${error.message}`);
@@ -10801,7 +10714,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
 
           {activeTab === 'prenumerata' && userRole === 'vadovas' && <section className="max-w-4xl space-y-5" data-readonly-allowed>
             <PageTitle title="Prenumerata ir sąskaitos" subtitle="Peržiūrėkite planą, jo galiojimo laiką ir įmonės prenumeratos sąskaitas." />
-            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && subscriptionAccess.reason === 'grace-period-ended'} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} organizationId={currentOrg?.id ?? ''} individualPlanRequested={individualPlanRequested} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
+            <Panel title={currentOrg?.name}><Suspense fallback={<p className="text-sm text-slate-500">Kraunama prenumerata...</p>}><SubscriptionCard key={`${currentOrg?.id}:${currentSubscription?.id}:${currentSubscription?.planCode}`} subscription={currentSubscription} plans={subscriptionPlans} employeeCount={currentActiveEmployeeCount} readOnly={isSubscriptionReadOnly} locked={isSubscriptionLocked} adminRestoreRequired={isSubscriptionLocked && subscriptionAccess.reason === 'grace-period-ended'} busy={subscriptionActionBusy} cloudMode={cloudMode} managerName={currentOrg?.manager ?? cloudManagerName} organizationId={currentOrg?.id ?? ''} individualPlanRequested={individualPlanRequested} now={validityCheckTime} onOrder={orderSubscription} onCancelOrder={cancelSubscriptionOrder} onChangePlan={changeSubscriptionPlan} onAddCompany={createAdditionalWorkspace} organizationResourcePresets={activeOrganizationResourcePresets} onDemoAction={updateSubscription} onOpenInvoice={openSubscriptionInvoice} inputClass={inputClass} buttonClass={buttonClass} /></Suspense></Panel>
             <Panel title="Sąskaitų istorija">
               <p className="mb-4 text-sm text-slate-600">Čia rasite apmokėjimui skirtas išankstines sąskaitas ir administratoriui patvirtinus apmokėjimą – galutines sąskaitas faktūras. Pasirinkite metus, kad lengviau rastumėte dokumentą.</p>
               <Suspense fallback={<p className="text-sm text-slate-500">Kraunamas saskaitu archyvas...</p>}><SubscriptionInvoiceArchive subscriptions={data.subscriptions.filter((subscription) => subscription.orgId === currentOrg?.id)} organizationName={currentOrg?.name ?? ''} onOpenInvoice={openSubscriptionInvoice} hidePaidPreinvoice inputClass={inputClass} /></Suspense>

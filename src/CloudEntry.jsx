@@ -4,6 +4,10 @@ import { supabase } from './lib/supabase.js';
 import { isSubscriptionActiveForEmployeeAccess, selectCurrentSubscription } from './lib/subscriptionAccess.js';
 import { buildDssOrganization } from './lib/dssOrganization.js';
 import { TERMS_VERSION, PRIVACY_POLICY_VERSION } from './lib/legalVersions.js';
+import {
+  defaultOrganizationResourcePresets,
+  normalizeOrganizationResourcePresets,
+} from './lib/organizationResourcePresets.js';
 
 const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 
@@ -793,7 +797,19 @@ async function loadManagerWorkspace(user, selectedOrganizationId = null) {
   const managerMemberships = memberships.filter((membership) => membership.role === 'manager');
   const managerMembership = managerMemberships.find((membership) => membership.organization_id === selectedOrganizationId)
     ?? managerMemberships[0];
-  if (!managerMembership) return { requiresOrganization: true, managerName, ...companyDetails };
+  if (!managerMembership) {
+    const { data: catalogResult, error: catalogError } = await supabase.from('creator_workspace_data')
+      .select('data')
+      .eq('id', true)
+      .maybeSingle();
+    if (catalogError) throw catalogError;
+    return {
+      requiresOrganization: true,
+      managerName,
+      ...companyDetails,
+      catalog: catalogResult?.data ?? null,
+    };
+  }
   const organizationId = managerMembership.organization_id;
 
   const [catalogResult, organizationsResult, subscriptionPlansResult] = await Promise.all([
@@ -905,12 +921,16 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const [creatorPreviewLoading, setCreatorPreviewLoading] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState('idle');
   const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0);
+  const [selectedOrganizationPresetId, setSelectedOrganizationPresetId] = useState('basic');
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '', billingAddress: '', vatCode: '' });
   const [notice, setNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [legalTermsAccepted, setLegalTermsAccepted] = useState(false);
   const assetMigrationStartedFor = useRef('');
+  const organizationResourcePresets = normalizeOrganizationResourcePresets(
+    workspace?.catalog?.organizationResourcePresets ?? defaultOrganizationResourcePresets,
+  );
 
   useEffect(() => {
     let active = true;
@@ -1099,6 +1119,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       if (error) throw error;
       organizationCreated = true;
       const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+      loadedWorkspace.initialOrganizationResourcePresetId = selectedOrganizationPresetId;
       if (loadedWorkspace?.requiresOrganization || loadedWorkspace?.organization?.id !== organizationId) {
         throw new Error('Įmonė sukurta, bet jos darbo srities duomenys dar nepasiekiami. Bandykite įkelti iš naujo.');
       }
@@ -1119,6 +1140,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
   const signOut = () => {
     setWorkspace(null);
     setCreatorPreview(null);
+    setSelectedOrganizationPresetId('basic');
     setWorkspaceStatus('idle');
     setSession(null);
     setForm({ fullName: '', email: '', password: '', confirmPassword: '', signingPin: '', confirmSigningPin: '', companyName: '', companyCode: '', billingAddress: '', vatCode: '' });
@@ -1137,9 +1159,12 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
     return loadedWorkspace;
   };
 
-  const refreshSignedInWorkspace = useCallback(async (organizationId = workspace?.organization?.id, initialTab = '') => {
+  const refreshSignedInWorkspace = useCallback(async (organizationId = workspace?.organization?.id, initialTab = '', initialOrganizationResourcePresetId = 'basic') => {
     if (!session?.user) return null;
     const loadedWorkspace = await loadManagerWorkspace(session.user, organizationId);
+    if (loadedWorkspace?.initializeCreatorDefaults) {
+      loadedWorkspace.initialOrganizationResourcePresetId = initialOrganizationResourcePresetId;
+    }
     if (initialTab) setInitialWorkspaceTab(initialTab);
     setWorkspace(loadedWorkspace);
     setWorkspaceStatus(getWorkspaceStatus(loadedWorkspace));
@@ -1477,6 +1502,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
       initialCloudData={workspace.data}
       creatorCatalog={workspace.catalog}
       initializeCreatorDefaults={workspace.initializeCreatorDefaults}
+      initialOrganizationResourcePresetId={workspace.initialOrganizationResourcePresetId}
       creatorAccounts={workspace.creatorAccounts}
       onCreatorPreview={openCreatorPreview}
       onCreatorWorkspaceChanged={() => refreshCreatorWorkspace()}
@@ -1522,6 +1548,7 @@ export default function CloudEntry({ onExit, onBackToLanding }) {
           ? <>Jūsų įmonei reikalingas individualus planas. Sukūrę įmonę, parašykite <a className="font-semibold underline" href="mailto:dsspro@inbox.lt">dsspro@inbox.lt</a> ir nurodykite įmonės pavadinimą bei darbuotojų skaičių. Paruoštą planą rasite prenumeratos skiltyje.</>
           : `Pasirinktas planas: ${({ up_to_20: 'Iki 20 darbuotojų · 29,99 €/mėn.', up_to_50: 'Iki 50 darbuotojų · 49,99 €/mėn.', up_to_75: 'Iki 75 darbuotojų · 59,99 €/mėn.', up_to_200: 'Iki 200 darbuotojų · 129,99 €/mėn.' })[session.user.user_metadata?.plan_code] ?? 'Iki 20 darbuotojų · 29,99 €/mėn.'}. Išankstinę sąskaitą apmokėkite per 5 dienas.`}</p>
         <form onSubmit={createOrganization} className="mt-5 space-y-4">
+          <fieldset className="space-y-2"><legend className="text-sm font-semibold">Įmonės veiklos sritis</legend><p className="text-xs text-slate-600">Pasirinkus sritį, jai ir bazinei įmonei skirti šablonai bus iškart priskirti naujai įmonei. Vėliau galėsite keisti priskyrimus bibliotekoje.</p><div className="grid gap-2 sm:grid-cols-2">{organizationResourcePresets.map((preset) => <button key={preset.id} type="button" aria-pressed={selectedOrganizationPresetId === preset.id} className={`rounded-md border px-3 py-2 text-left text-sm font-semibold ${selectedOrganizationPresetId === preset.id ? 'border-emerald-700 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => setSelectedOrganizationPresetId(preset.id)}>{preset.label}</button>)}</div></fieldset>
           <label className="block text-sm font-medium">Įmonės pavadinimas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" autoComplete="organization" value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} required /></label>
           <label className="block text-sm font-medium">Įmonės kodas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" value={form.companyCode} onChange={(event) => setForm({ ...form, companyCode: event.target.value })} /></label>
           <label className="block text-sm font-medium">PVM mokėtojo kodas<input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" maxLength={40} value={form.vatCode} onChange={(event) => setForm({ ...form, vatCode: event.target.value })} placeholder="LT123456789" /></label>
