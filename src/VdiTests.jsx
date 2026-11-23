@@ -139,7 +139,6 @@ export default function VdiTests() {
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
             Pasirinkite pasiruošimo kryptį ir išbandykite žinias.
           </p>
-          <p className="mt-2 text-sm text-slate-500">Išlaikymo slenkstis: 75 %.</p>
         </div>
 
         {!categoryId ? (
@@ -151,7 +150,6 @@ export default function VdiTests() {
                   <span className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-sm font-black text-emerald-800">{item.id === 'darbdavys' ? 'D' : 'DSS'}</span>
                   <h3 className="font-bold text-slate-950">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
-                  <span className="mt-4 block text-sm font-bold text-emerald-800">{item.questions.length} klausimų banke →</span>
                 </button>
               ))}
             </div>
