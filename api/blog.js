@@ -99,7 +99,7 @@ function renderHeader() {
 }
 
 function renderFooter() {
-  return '<footer class="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500"><nav aria-label="Poraštės nuorodos" class="flex flex-wrap justify-center gap-x-5 gap-y-2"><a href="/tinklarastis" class="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a><a href="/naudojimo-salygos" class="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a></nav><p class="mt-3">© 2026 DSS Pro. Informaciniai straipsniai nepakeičia individualios konsultacijos.</p></footer>';
+  return '<footer class="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500"><nav aria-label="Poraštės nuorodos" class="flex flex-wrap justify-center gap-x-5 gap-y-2"><a href="/tinklarastis" class="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a><a href="/vdi-testai" class="font-semibold text-emerald-800 hover:text-emerald-950">VDI testai</a><a href="/naudojimo-salygos" class="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a></nav><p class="mt-3">© 2026 DSS Pro. Informaciniai straipsniai nepakeičia individualios konsultacijos.</p></footer>';
 }
 
 function renderArticleCard(post) {

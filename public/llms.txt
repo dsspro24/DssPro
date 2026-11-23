@@ -1,0 +1,15 @@
+# DSS Pro
+
+DSS Pro - darbuotojų saugos ir sveikatos (DSS) dokumentų, instruktavimų, testų, žurnalų ir parašų valdymo internetinė sistema įmonėms.
+
+Pagrindiniai puslapiai:
+- https://www.dsspro.lt/
+- https://www.dsspro.lt/vdi-testai
+- https://www.dsspro.lt/tinklarastis
+
+VDI testai:
+- Savarankiškas mokymas pagal viešai skelbiamus VDI pavyzdinius klausimus.
+- Kategorijos: darbdaviui atstovaujantis asmuo ir DSS specialistas.
+- Mokymosi režimas naudoja atsitiktinę klausimų grupę ir po pasirinkimo parodo teisingą atsakymą bei paaiškinimą.
+- Egzaminas naudoja atsitiktinę klausimų grupę, atgalinį laikmatį ir visų atsakymų peržiūrą.
+- Klausimų duomenys laikomi statiniuose JSON failuose; testų atsakymai ir rezultatai neperduodami į duomenų bazę.

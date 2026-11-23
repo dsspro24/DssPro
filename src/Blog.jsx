@@ -318,6 +318,7 @@ export default function BlogPage({ slug = '', initialData = null }) {
     <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
       <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
         <a href={BLOG_PATH} className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
+        <a href="/vdi-testai" className="font-semibold text-emerald-800 hover:text-emerald-950">VDI testai</a>
         <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
         <a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a>
         <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button>
