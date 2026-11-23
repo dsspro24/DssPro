@@ -41,7 +41,6 @@ function getSourceLabel(source) {
 export default function VdiTests() {
   const [categoryId, setCategoryId] = useState('');
   const [mode, setMode] = useState('');
-  const [questionCount, setQuestionCount] = useState(40);
   const [questions, setQuestions] = useState([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -55,11 +54,6 @@ export default function VdiTests() {
     document.title = 'VDI testai | DSS Pro';
     return () => { document.title = 'DSS Pro'; };
   }, []);
-
-  useEffect(() => {
-    if (!category) return;
-    setQuestionCount(category.questions.length >= 40 ? 40 : category.questions.length);
-  }, [categoryId]);
 
   useEffect(() => {
     if (mode !== 'exam' || finished) return undefined;
@@ -86,14 +80,38 @@ export default function VdiTests() {
     setFinished(false);
   };
 
-  const startTest = () => {
+  const startTest = (selectedMode = mode) => {
     if (!category) return;
-    const count = mode === 'exam' ? Math.min(questionCount, category.questions.length) : category.questions.length;
+    const count = selectedMode === 'exam'
+      ? Math.min(40, category.questions.length)
+      : Math.min(30, category.questions.length);
     setQuestions(shuffle(category.questions).slice(0, count));
     setAnswers({});
     setSelectedAnswer(null);
     setQuestionIndex(0);
-    setSecondsLeft(Math.max(5, count) * 60);
+    setSecondsLeft(selectedMode === 'exam' ? Math.max(5, count) * 60 : 0);
+    setFinished(false);
+  };
+
+  const repeatSameTest = () => {
+    setQuestions((current) => [...current]);
+    setAnswers({});
+    setSelectedAnswer(null);
+    setQuestionIndex(0);
+    setSecondsLeft(mode === 'exam' ? Math.max(5, questions.length) * 60 : 0);
+    setFinished(false);
+  };
+
+  const startWithNewQuestions = () => {
+    if (!category) return;
+    const count = mode === 'exam'
+      ? Math.min(40, category.questions.length)
+      : Math.min(30, category.questions.length);
+    setQuestions(shuffle(category.questions).slice(0, count));
+    setAnswers({});
+    setSelectedAnswer(null);
+    setQuestionIndex(0);
+    setSecondsLeft(mode === 'exam' ? Math.max(5, count) * 60 : 0);
     setFinished(false);
   };
 
@@ -159,11 +177,11 @@ export default function VdiTests() {
             <button type="button" onClick={() => setCategoryId('')} className="mb-5 text-sm font-semibold text-slate-500 hover:text-emerald-800">← Keisti kategoriją</button>
             <h2 className="text-xl font-bold text-slate-950">{category.title}</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <button type="button" onClick={() => setMode('learning')} className="rounded-xl border border-slate-200 p-5 text-left hover:border-emerald-400 hover:bg-emerald-50/40">
+              <button type="button" onClick={() => { setMode('learning'); startTest('learning'); }} className="rounded-xl border border-slate-200 p-5 text-left hover:border-emerald-400 hover:bg-emerald-50/40">
                 <h3 className="font-bold text-slate-950">Mokymosi režimas</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Pasirinkus atsakymą iškart matysite rezultatą ir paaiškinimą.</p>
               </button>
-              <button type="button" onClick={() => setMode('exam')} className="rounded-xl border border-slate-200 p-5 text-left hover:border-emerald-400 hover:bg-emerald-50/40">
+              <button type="button" onClick={() => { setMode('exam'); startTest('exam'); }} className="rounded-xl border border-slate-200 p-5 text-left hover:border-emerald-400 hover:bg-emerald-50/40">
                 <h3 className="font-bold text-slate-950">Egzamino simuliacija</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Atsitiktiniai klausimai, laikmatis ir galutinis rezultatų sąrašas.</p>
               </button>
@@ -174,19 +192,19 @@ export default function VdiTests() {
             <button type="button" onClick={() => setMode('')} className="mb-5 text-sm font-semibold text-slate-500 hover:text-emerald-800">← Keisti režimą</button>
             {mode === 'exam' ? (
               <div className="mb-6">
-                <label htmlFor="question-count" className="block text-sm font-bold text-slate-950">Klausimų skaičius</label>
-                <select id="question-count" value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm sm:max-w-xs">
-                  <option value={40} disabled={category.questions.length < 40}>40 klausimų</option>
-                  <option value={category.questions.length}>Visi turimi ({category.questions.length})</option>
-                </select>
+                <p className="text-sm text-slate-600">
+                  Testas prasidės automatiškai iš atsitiktinai atrinktų {Math.min(40, category.questions.length)} klausimų.
+                </p>
               </div>
-            ) : <p className="mb-6 text-sm text-slate-600">Mokymuisi bus parodyti visi turimi šios kategorijos klausimai.</p>}
+            ) : <p className="mb-6 text-sm text-slate-600">Mokymuisi bus parodyta {Math.min(30, category.questions.length)} atsitiktinai atrinktų klausimų.</p>}
             <button type="button" onClick={startTest} className="rounded-xl bg-[#0c4a3b] px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-900">Pradėti testą</button>
           </section>
         ) : finished ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <p className={`text-sm font-bold ${result.percent >= 75 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {result.percent >= 75 ? 'Testas išlaikytas' : 'Testas neišlaikytas'} · Testas baigtas
+              {mode === 'exam'
+                ? `${result.percent >= 75 ? 'Testas išlaikytas' : 'Testas neišlaikytas'} · Testas baigtas`
+                : 'Mokymosi testas baigtas'}
             </p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">{result.percent}%</h2>
             <p className="mt-2 text-slate-600">Teisingai atsakyta į <strong className="text-slate-950">{result.correct} iš {result.total}</strong> klausimų.</p>
@@ -211,7 +229,12 @@ export default function VdiTests() {
                 );
               })}
             </div>
-            <button type="button" onClick={reset} className="mt-7 rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 hover:border-emerald-700 hover:text-emerald-800">Pasirinkti kitą kategoriją</button>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button type="button" onClick={repeatSameTest} className="rounded-xl bg-[#0c4a3b] px-5 py-3 text-sm font-bold text-white hover:bg-emerald-900">Kartoti tuos pačius klausimus</button>
+              <button type="button" onClick={startWithNewQuestions} className="rounded-xl border border-emerald-700 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">Pradėti su naujais klausimais</button>
+              <button type="button" onClick={() => { setCategoryId(''); setMode(''); }} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 hover:border-emerald-700 hover:text-emerald-800">Pasirinkti kitą kategoriją</button>
+              <a href="/" className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 hover:border-emerald-700 hover:text-emerald-800">Grįžti į DSS Pro pagrindinį puslapį</a>
+            </div>
           </section>
         ) : (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
