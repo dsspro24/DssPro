@@ -137,7 +137,7 @@ export default function VdiTests() {
           <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] text-emerald-700">Savarankiškas pasiruošimas</p>
           <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">VDI testai</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-            Pasirinkite pasiruošimo kryptį ir išbandykite žinias. Klausimai ir testų logika vykdoma tiesiai jūsų naršyklėje – nė vienas atsakymas neperduodamas į duomenų bazę.
+            Pasirinkite pasiruošimo kryptį ir išbandykite žinias.
           </p>
           <p className="mt-2 text-sm text-slate-500">Išlaikymo slenkstis: 75 %.</p>
         </div>
