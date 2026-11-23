@@ -32,10 +32,16 @@ function isCorrect(question, answer) {
     : correctIndexes.includes(answer);
 }
 
+function getSourceLabel(source) {
+  if (!source) return '';
+  if (typeof source === 'string') return source;
+  return [source.roleLabel, source.testNumber ? `VDI testas ${source.testNumber}` : '', source.testDate].filter(Boolean).join(' · ');
+}
+
 export default function VdiTests() {
   const [categoryId, setCategoryId] = useState('');
   const [mode, setMode] = useState('');
-  const [questionCount, setQuestionCount] = useState(20);
+  const [questionCount, setQuestionCount] = useState(40);
   const [questions, setQuestions] = useState([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -49,6 +55,11 @@ export default function VdiTests() {
     document.title = 'VDI testai | DSS Pro';
     return () => { document.title = 'DSS Pro'; };
   }, []);
+
+  useEffect(() => {
+    if (!category) return;
+    setQuestionCount(category.questions.length >= 40 ? 40 : category.questions.length);
+  }, [categoryId]);
 
   useEffect(() => {
     if (mode !== 'exam' || finished) return undefined;
@@ -128,6 +139,7 @@ export default function VdiTests() {
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
             Pasirinkite pasiruošimo kryptį ir išbandykite žinias. Klausimai ir testų logika vykdoma tiesiai jūsų naršyklėje – nė vienas atsakymas neperduodamas į duomenų bazę.
           </p>
+          <p className="mt-2 text-sm text-slate-500">Išlaikymo slenkstis: 75 %.</p>
         </div>
 
         {!categoryId ? (
@@ -166,8 +178,7 @@ export default function VdiTests() {
               <div className="mb-6">
                 <label htmlFor="question-count" className="block text-sm font-bold text-slate-950">Klausimų skaičius</label>
                 <select id="question-count" value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm sm:max-w-xs">
-                  <option value={20} disabled={category.questions.length < 20}>20 klausimų</option>
-                  <option value={30} disabled={category.questions.length < 30}>30 klausimų</option>
+                  <option value={40} disabled={category.questions.length < 40}>40 klausimų</option>
                   <option value={category.questions.length}>Visi turimi ({category.questions.length})</option>
                 </select>
               </div>
@@ -176,7 +187,9 @@ export default function VdiTests() {
           </section>
         ) : finished ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <p className="text-sm font-bold text-emerald-700">Testas baigtas</p>
+            <p className={`text-sm font-bold ${result.percent >= 75 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {result.percent >= 75 ? 'Testas išlaikytas' : 'Testas neišlaikytas'} · Testas baigtas
+            </p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">{result.percent}%</h2>
             <p className="mt-2 text-slate-600">Teisingai atsakyta į <strong className="text-slate-950">{result.correct} iš {result.total}</strong> klausimų.</p>
             <div className="mt-7 rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
@@ -235,7 +248,7 @@ export default function VdiTests() {
               <div className={`mt-5 rounded-xl border p-4 text-sm leading-6 ${isCorrect(questions[questionIndex], selectedAnswer) ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
                 <strong>{isCorrect(questions[questionIndex], selectedAnswer) ? 'Teisingai.' : 'Neteisingai.'}</strong>
                 {questions[questionIndex].explanation && <p className="mt-1">{questions[questionIndex].explanation}</p>}
-                {questions[questionIndex].source && <p className="mt-2 text-xs opacity-70">Šaltinis: {questions[questionIndex].source}</p>}
+                {getSourceLabel(questions[questionIndex].source) && <p className="mt-2 text-xs opacity-70">Šaltinis: {getSourceLabel(questions[questionIndex].source)}</p>}
               </div>
             )}
             <div className="mt-6 flex justify-end">
