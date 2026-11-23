@@ -3608,5 +3608,3045 @@
       "testDate": "2023-05-25",
       "questionNumber": 40
     }
+  },
+  {
+    "id": "45848-1",
+    "question": "Ar Lietuvos Respublikos darbuotojų saugos ir sveikatos įstatyme yra numatyta atsakomybė už darbuotojų saugos ir sveikatos norminių teisės aktų reikalavimų pažeidimus?",
+    "options": [
+      "Yra numatyta konkreti atsakomybė už darbuotojų saugos ir sveikatos norminių teisės aktų reikalavimų pažeidimus.",
+      "Nėra numatyta atsakomybė, nes tai numato tik Lietuvos Respublikos Administracinių nusižengimų kodekso nuostatai.",
+      "Yra numatyti atsakomybės bendrieji principai už darbuotojų saugos ir sveikatos norminių teisės aktų reikalavimų pažeidimus."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbuotojų saugos ir sveikatos įstatyme numatyti atsakomybės bendrieji principai už DSS norminių teisės aktų reikalavimų pažeidimus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 1
+    }
+  },
+  {
+    "id": "45848-2",
+    "question": "Ar gali parengtas darbuotojų saugos ir sveikatos instrukcijas patvirtinti padalinio vadovas?",
+    "options": [
+      "Ne.",
+      "Taip.",
+      "Ne, nes instrukcijas gali tvirtinti tik darbdavio įgaliotas asmuo."
+    ],
+    "correctIndex": 0,
+    "explanation": "DSS instrukcijas tvirtina darbdavys arba darbdaviui atstovaujantis asmuo, o ne padalinio vadovas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 2
+    }
+  },
+  {
+    "id": "45848-3",
+    "question": "Kaip turi būti ženklinamos įmonėje vietos, kur darbuotojams kyla susidūrimo su kliūtimis, griuvimo ir daiktų kritimo pavojus?",
+    "options": [
+      "Draudžiamaisiais vaizdiniais saugos ir sveikatos apsaugos ženklais arba tam tikros vietos dažomos specifine saugos spalva.",
+      "Turi būti paženklintos besikeičiančiais juodais ir geltonais arba raudonais ir baltais dryžiais.",
+      "Įpareigojamaisiais vaizdiniais saugos ir sveikatos apsaugos ženklais."
+    ],
+    "correctIndex": 1,
+    "explanation": "Susidūrimo su kliūtimis, griuvimo ir daiktų kritimo pavojaus vietos ženklinamos besikeičiančiais juodais ir geltonais arba raudonais ir baltais dryžiais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 3
+    }
+  },
+  {
+    "id": "45848-4",
+    "question": "Tiriant psichosocialinius veiksnius vertinami darbuotojų tarpusavio santykiai ir (ar) santykiai su darbdaviu ir (ar) trečiaisiais asmenimis, pavyzdžiui:",
+    "options": [
+      "didelis darbo tempas, darbuotojų sugebėjimų ir galimybių atlikti užduotis neatitikimas",
+      "kolegų ir vadovų palaikymas, konfliktai, fizinis ir psichologinis smurtas darbe",
+      "darbo laiko trukmė, darbo sutarties rūšis, darbo apmokėjimo ir premijavimo ypatumai"
+    ],
+    "correctIndex": 1,
+    "explanation": "Santykiniams psichosocialiniams veiksniams priskiriamas kolegų ir vadovų palaikymas, konfliktai, fizinis ir psichologinis smurtas darbe.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 4
+    }
+  },
+  {
+    "id": "45848-5",
+    "question": "Kas turi informuoti darbuotoją apie jo pareigą nedelsiant pranešti apie nelaimingą atsitikimą pakeliui į darbą ar iš darbo?",
+    "options": [
+      "Darbdavys.",
+      "Profesinė sąjunga.",
+      "Darbuotojų atstovas saugai ir sveikatai."
+    ],
+    "correctIndex": 0,
+    "explanation": "Apie pareigą nedelsiant pranešti apie nelaimingą atsitikimą pakeliui į darbą ar iš darbo darbuotoją informuoja darbdavys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 5
+    }
+  },
+  {
+    "id": "45848-6",
+    "question": "Kokioms įmonėms taikomi Darbuotojų apsaugos nuo cheminių veiksnių darbe nuostatai?",
+    "options": [
+      "Visoms įmonėms, esančioms Lietuvos Respublikos teritorijoje, kurių darbo vietose yra arba gali būti pavojingų cheminių veiksnių.",
+      "Tik įmonėms, kurios deklaruoja, kad dirba su cheminėmis medžiagomis.",
+      "Tik įmonėms, gaminančioms chemines medžiagas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Nuostatai taikomi visoms Lietuvos Respublikos įmonėms, kurių darbo vietose yra arba gali būti pavojingų cheminių veiksnių.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 6
+    }
+  },
+  {
+    "id": "45848-7",
+    "question": "Nustatant, ar neviršijama žemutinė ekspozicijos vertė veiksmams pradėti, triukšmo veikimas darbuotojui yra vertinamas:",
+    "options": [
+      "neatsižvelgiant į tai, kad naudojamasi asmeninėmis klausos apsaugos priemonėmis",
+      "atsižvelgiant į darbuotojų sveikatos tikrinimų rezultatus",
+      "atsižvelgiant į tai, kad naudojamasi asmeninėmis klausos apsaugos priemonėmis"
+    ],
+    "correctIndex": 0,
+    "explanation": "Ekspozicijos vertės veiksmams pradėti nustatomos neatsižvelgiant į asmeninių klausos apsaugos priemonių poveikį.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 7
+    }
+  },
+  {
+    "id": "45848-8",
+    "question": "Ribinė triukšmo ekspozicijos vertė:",
+    "options": [
+      "85 dB(A)",
+      "80 dB(A)",
+      "87 dB(A)"
+    ],
+    "correctIndex": 2,
+    "explanation": "Ribinė triukšmo ekspozicijos vertė yra 87 dB(A).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 8
+    }
+  },
+  {
+    "id": "45848-9",
+    "question": "Kas užtikrina, kad darbuotojai įsidarbindami ir darbo metu įmonėje, įstaigoje, organizacijoje ar kitoje organizacinėje struktūroje gautų informaciją apie darbuotojų saugos ir sveikatos organizavimą joje, esančią ar galimą profesinę riziką parengtas priemones rizikai šalinti ir (ar) sumažinti?",
+    "options": [
+      "Darbdavio įgaliotas asmuo.",
+      "Padalinio vadovas.",
+      "Darbdaviui atstovaujantis asmuo."
+    ],
+    "correctIndex": 2,
+    "explanation": "Tai užtikrina darbdaviui atstovaujantis asmuo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 9
+    }
+  },
+  {
+    "id": "45848-10",
+    "question": "Kokius reikalavimus turi atitikti permatomos ir šviesą praleidžiančios sienos bei stiklinės pertvaros, esančios patalpose arti darbo vietų ir judėjimo kelių steigiamose darbovietėse?",
+    "options": [
+      "Negali būti įrengiamos patalpose kur juda vidaus transportas, kuris gali pažeisti tokias sienas bei pertvaras ir dėl to nukentėti darbuotojai.",
+      "Negali būti įrengiamos gamybinėse patalpose, kur naudojami įvairūs įrenginiai ir dėl permatomų ir šviesą praleidžiančių sienų bei stiklinių pertvarų gali kilti papildomas pavojus darbuotojų saugai ir sveikatai.",
+      "Turi būti ryškiai pažymėtos ir pagamintos iš saugios medžiagos arba įrengtos apsaugos, kad darbuotojai išvengtų sąlyčio su sienomis ar sužeidimų, jei tokios sienos sudužtų."
+    ],
+    "correctIndex": 2,
+    "explanation": "Tokios sienos ir pertvaros turi būti aiškiai pažymėtos, iš saugios medžiagos arba turėti apsaugas nuo sąlyčio ar sužeidimų sudužus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 10
+    }
+  },
+  {
+    "id": "45848-11",
+    "question": "N-1 formos aktas surašomas asmeniui, kai įvykis darbe įvyksta:",
+    "options": [
+      "tarnybinių komandiruočių metu vykdant darbdavio užduotį paskirties vietoje",
+      "dirbant savavališkai be įmonės vadovo ar padalinio vadovo žinios",
+      "nukentėjus, kai prieš jį buvo panaudotas smurtas, jeigu smurto aplinkybės ir motyvai nesusiję su darbu"
+    ],
+    "correctIndex": 0,
+    "explanation": "N-1 formos aktas surašomas, kai nelaimingas atsitikimas įvyksta, pavyzdžiui, tarnybinės komandiruotės metu vykdant darbdavio užduotį.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 11
+    }
+  },
+  {
+    "id": "45848-12",
+    "question": "Ką privalo daryti darbdavys, jeigu darbuotojui išduota asmeninė apsaugos priemonė susidėvėjo pirma nustatyto laiko, sugedo ar dingo?",
+    "options": [
+      "Turi išduoti darbuotojui nemokamai analogišką asmeninę apsaugos priemonę.",
+      "Turi teisę pareikalauti, kad darbuotojas nupirktų analogišką asmeninę apsaugos priemonę vietoj pirma nustatyto laiko susidėvėjusios, sugedusios ar dingusios.",
+      "Turi išduoti darbuotojui analogišką asmeninę apsaugos priemonę ir dalį priemonės kainos išskaičiuoti iš darbuotojo atlyginimo."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbdavys privalo nemokamai išduoti darbuotojui analogišką asmeninę apsaugos priemonę.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 12
+    }
+  },
+  {
+    "id": "45848-13",
+    "question": "Kokie teisės aktai nustato darbo aplinkos veiksnių leistinas ribines vertes (dydžius)?",
+    "options": [
+      "Sveikatos saugos reglamentai (higienos normos) ir kiti darbuotojų saugos ir sveikatos norminiai teisės aktai.",
+      "Darbuotojų saugos ir sveikatos įstatymas.",
+      "Darbo kodeksas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Leistinas ribines vertes nustato higienos normos ir kiti DSS norminiai teisės aktai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 13
+    }
+  },
+  {
+    "id": "45848-14",
+    "question": "Kokią apsaugos nuo elektros kategoriją turi turėti specialistai, kontroliuojantys elektros saugos reikalavimus?",
+    "options": [
+      "Privalo turėti AK apsaugos nuo elektros kategoriją.",
+      "Privalo turėti VK apsaugos nuo elektros kategoriją.",
+      "Privalo turėti PK apsaugos nuo elektros kategoriją."
+    ],
+    "correctIndex": 0,
+    "explanation": "Elektros saugos reikalavimus kontroliuojantys specialistai privalo turėti AK apsaugos nuo elektros kategoriją.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 14
+    }
+  },
+  {
+    "id": "45848-15",
+    "question": "Ar nepalankios darbo aplinkos sąlygos, tokios kaip netinkama temperatūra, drėgmė ir vėdinimas, gali padidinti riziką, ypač susižaloti nugarą?",
+    "options": [
+      "Rizika susižaloti nugarą priklauso nuo krovinio, bet ne nuo darbo aplinkos.",
+      "Ne. Šios darbo aplinkos sąlygos nekelia rizikos susižaloti nugarą.",
+      "Taip. Netinkama temperatūra, drėgmė ir vėdinimas, gali padidinti riziką, ypač susižaloti nugarą."
+    ],
+    "correctIndex": 2,
+    "explanation": "Nepalančios darbo aplinkos sąlygos (temperatūra, drėgmė, vėdinimas) gali padidinti riziką susižaloti nugarą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 15
+    }
+  },
+  {
+    "id": "45848-16",
+    "question": "Kokius reikalavimus turi atitikti langai ir stoglangiai steigiamose darbovietėse?",
+    "options": [
+      "Darbuotojai turi turėti galimybę saugiai atidaryti, uždaryti, reguliuoti bei fiksuoti langus, stoglangius ir vėdinimo įrenginius.",
+      "Langai ir stoglangiai turi būti pagaminti iš nedūžtančio stiklo arba kitokios patvarios medžiagos, kad nekeltų pavojaus darbuotojų, esančių patalpoje, saugai ir sveikatai.",
+      "Langai ir stoglangiai turi atsidarinėti į išorę, kad nekeltų pavojaus darbuotojų esančių patalpoje saugai ir sveikatai."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbuotojai turi turėti galimybę saugiai atidaryti, uždaryti, reguliuoti bei fiksuoti langus, stoglangius ir vėdinimo įrenginius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 16
+    }
+  },
+  {
+    "id": "45848-17",
+    "question": "Jeigu darbovietėje nėra darbdavio lygmeniu veikiančios profesinės sąjungos, ar gali tokioje darbovietėje būti sudaroma kolektyvinė sutartis?",
+    "options": [
+      "Taip, jeigu visuotinis darbdavio darbuotojų susirinkimas yra įgaliojęs šakos profesinę sąjungą vesti derybas dėl darbdavio lygmens kolektyvinės sutarties.",
+      "Taip, kolektyvinių derybų funkciją gali vykdyti darbo taryba.",
+      "Tokios galimybės nėra."
+    ],
+    "correctIndex": 1,
+    "explanation": "Nesant darbdavio lygmens profesinės sąjungos, kolektyvinių derybų funkciją gali vykdyti darbo taryba.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 17
+    }
+  },
+  {
+    "id": "45848-18",
+    "question": "Ar darbuotojai privalo laikytis darbdaviui atstovaujančio asmens patvirtintų įmonės darbuotojų saugos ir sveikatos vietinių (lokalinių) norminių teisės aktų bei darbuotojų saugos ir sveikatos norminių teisės aktų, su kuriais supažindinami pasirašytinai, reikalavimų?",
+    "options": [
+      "Privalo tik darbdavys.",
+      "Taip, privalo.",
+      "Jei tai nustatyta darbo sutartyje."
+    ],
+    "correctIndex": 1,
+    "explanation": "Darbuotojai privalo laikytis DSS norminių ir lokalinių teisės aktų, su kuriais yra supažindinti, reikalavimų.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 18
+    }
+  },
+  {
+    "id": "45848-19",
+    "question": "Kas gali sudaryti kolektyvinę sutartį, jeigu įmonėje veikia kelios profesinės sąjungos?",
+    "options": [
+      "Jungtinė profesinių sąjungų atstovybė ir darbdavys.",
+      "Kiekviena profesinė sąjunga gali sudaryti atskiras kolektyvines sutartis.",
+      "Profesinė sąjunga, jungianti daugiau darbdavio darbuotojų, ir darbdavys."
+    ],
+    "correctIndex": 0,
+    "explanation": "Veikiant kelioms profesinėms sąjungoms, kolektyvinę sutartį sudaro jungtinė profesinių sąjungų atstovybė ir darbdavys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 19
+    }
+  },
+  {
+    "id": "45848-20",
+    "question": "Prieš kiek dienų per išbandymo terminą darbuotojas turi įspėti darbdavį apie darbo sutarties nutraukimą?",
+    "options": [
+      "prieš 2 darbo dienas.",
+      "prieš 3 darbo dienas.",
+      "prieš 5 darbo dienas."
+    ],
+    "correctIndex": 1,
+    "explanation": "Per išbandymo terminą darbuotojas įspėja darbdavį apie darbo sutarties nutraukimą prieš 3 darbo dienas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 20
+    }
+  },
+  {
+    "id": "45848-21",
+    "question": "Draudžiama darbuotojams išduoti:",
+    "options": [
+      "asmenines apsaugos priemones, jeigu yra įrengtos kolektyvinės apsaugos priemones",
+      "neišskalbtas, neišvalytas, nedezinfekuotas asmenines apsaugos priemones",
+      "asmenines apsaugos priemones, jeigu darbuotojai nenori jų naudoti"
+    ],
+    "correctIndex": 1,
+    "explanation": "Draudžiama išduoti neišskalbtas, neišvalytas, nedezinfekuotas asmenines apsaugos priemones.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 21
+    }
+  },
+  {
+    "id": "45848-22",
+    "question": "Ar naudojant fizinę jėgą gali atsirasti rizika ypač susižeisti nugarą, jei fizinė jėga naudojama tik sukant liemenį?",
+    "options": [
+      "Rizika priklauso nuo darbuotojo sveikatos.",
+      "Taip.",
+      "Ne, nes sukant liemenį sužeisti neįmanoma."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, liemens sukimas tvarkant krovinius ar naudojant fizinę jėgą gali padidinti riziką susižaloti nugarą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 22
+    }
+  },
+  {
+    "id": "45848-23",
+    "question": "Su kuo darbdavys turi suderinti parengtą darbuotojams nemokamai išduodamų asmeninių apsaugos priemonių sąrašą?",
+    "options": [
+      "Su darbuotojų saugos ir sveikatos tarnyba.",
+      "Su Valstybine darbo inspekcija.",
+      "Su darbuotojų atstovais."
+    ],
+    "correctIndex": 2,
+    "explanation": "Nemokamai išduodamų AAP sąrašas derinamas su darbuotojų atstovais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 23
+    }
+  },
+  {
+    "id": "45848-24",
+    "question": "Įmonėje įvykę įvykiai darbe, nelaimingi atsitikimai darbe privalo būti užregistruoti:",
+    "options": [
+      "darbo sutartyje",
+      "incidentų aktų registravimo žurnale",
+      "įvykių darbe, nelaimingų atsitikimų darbe, nelaimingų atsitikimų pakeliui į darbą ar iš darbo aktų registravimo žurnale"
+    ],
+    "correctIndex": 2,
+    "explanation": "Įvykiai darbe ir nelaimingi atsitikimai registruojami įvykių darbe, nelaimingų atsitikimų darbe, nelaimingų atsitikimų pakeliui į darbą ar iš darbo aktų registravimo žurnale.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 24
+    }
+  },
+  {
+    "id": "45848-25",
+    "question": "Kaip reikia elgtis transporto priemonių dujų balionų pildymo metu pastebėjus dujų nuotėkį?",
+    "options": [
+      "Pildymo operaciją būtina nedelsiant nutraukti, o transporto priemonę, neužvedant variklio ir neįjungiant žibintų – nustumti į saugią vietą.",
+      "Nustoti pildyti ir kuo greičiau išvažiuoti iš degalinės.",
+      "Iškviesti dujų tarnybas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Pastebėjus dujų nuotėkį, pildymas nutraukiamas, o transporto priemonė neužvedant variklio ir neįjungiant žibintų nustumiama į saugią vietą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 25
+    }
+  },
+  {
+    "id": "45848-26",
+    "question": "Ar darbuotojai skiepijami darbdavio lėšomis?",
+    "options": [
+      "Sprendžia darbdavys.",
+      "Teisės aktai nereglamentuoja.",
+      "Taip, skiepijami darbuotojai, kuriems yra pavojus susirgti užkrečiamąja liga."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbdavio lėšomis skiepijami darbuotojai, kuriems kyla pavojus susirgti užkrečiamąja liga.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 26
+    }
+  },
+  {
+    "id": "45848-27",
+    "question": "Kas vadovauja Valstybinei darbo inspekcijai?",
+    "options": [
+      "Lietuvos Respublikos vyriausiasis valstybinis darbo inspektorius.",
+      "Lietuvos Respublikos generalinis inspektorius.",
+      "Direktorius."
+    ],
+    "correctIndex": 0,
+    "explanation": "VDI vadovauja Lietuvos Respublikos vyriausiasis valstybinis darbo inspektorius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 27
+    }
+  },
+  {
+    "id": "45848-28",
+    "question": "Ar visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) taikoma Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“?",
+    "options": [
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ taikoma tik tais atvejais, kai šios sistemos naudojamos mokymosi tikslais.",
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ taikoma.",
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ netaikoma."
+    ],
+    "correctIndex": 2,
+    "explanation": "Higienos norma HN 32:2004 visuomeninės paskirties kompiuterių sistemoms netaikoma.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 28
+    }
+  },
+  {
+    "id": "45848-29",
+    "question": "Ar Lietuvos Respublikos darbuotojų saugos ir sveikatos įstatymas reglamentuoja darbuotojų atstovų saugai ir sveikatai skaičių įmonėje?",
+    "options": [
+      "Taip, kiekvienoje darbo pamainoje privalo būti ne mažiau kaip vienas darbuotojų atstovas saugai ir sveikatai.",
+      "Taip, kiekvienoje įmonėje privalo būti ne mažiau kaip vienas darbuotojų atstovas saugai ir sveikatai.",
+      "Ne, tai nustato darbuotojų atstovai."
+    ],
+    "correctIndex": 2,
+    "explanation": "Konkretaus darbuotojų atstovų saugai ir sveikatai skaičiaus įmonėje DSS įstatymas nenustato (tai sprendžiama darbuotojų / jų atstovų tvarka).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 29
+    }
+  },
+  {
+    "id": "45848-30",
+    "question": "Kas yra „Potencialiai pavojingi įrenginiai\"?",
+    "options": [
+      "Darbo priemonės ir kiti įrenginiai, kurie pagaminti nepilnai laikantis techninių reglamentų reikalavimų ir todėl juos naudojant kyla padidintas pavojus darbuotojų ir kitų žmonių gyvybei, sveikatai, aplinkai.",
+      "Darbo priemonės ir kiti įrenginiai, kuriuos naudojant kyla pavojus darbuotojų ir kitų žmonių gyvybei, sveikatai, aplinkai ar turtui dėl juose sukauptos energijos bei vykstančių procesų ir kuriems reikalinga Potencialiai pavojingų įrenginių priežiūros įstatymo nustatyta priežiūra.",
+      "Darbo priemonės ir kiti įrenginiai, kuriuos naudojant kyla pavojus darbuotojų ir kitų žmonių gyvybei, sveikatai, aplinkai ar turtui dėl jų sudėtingos konstrukcijos, didelių gabaritų ir/ar sudėtingo valdymo."
+    ],
+    "correctIndex": 1,
+    "explanation": "Potencialiai pavojingi įrenginiai – įrenginiai, keliantys pavojų dėl sukauptos energijos ar vykstančių procesų, kuriems taikoma Potencialiai pavojingų įrenginių priežiūros įstatymo priežiūra.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 30
+    }
+  },
+  {
+    "id": "45848-31",
+    "question": "Kenksmingi ir pavojingi darbo aplinkos veiksniai, kuriems esant naudojamos asmeninės apsaugos priemonės, yra skirstomi į:",
+    "options": [
+      "didelio pavojingumo, vidutinio ir mažai pavojingus.",
+      "fizikinius, cheminius, biologinius, ergonominius ir kitus veiksnius",
+      "fizinius, psichosocialinius ir kitus veiksnius"
+    ],
+    "correctIndex": 1,
+    "explanation": "Veiksniai skirstomi į fizikinius, cheminius, biologinius, ergonominius ir kitus veiksnius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 31
+    }
+  },
+  {
+    "id": "45848-32",
+    "question": "Ar už darbo laiko apskaitos pažeidimus taikoma administracinė atsakomybė?",
+    "options": [
+      "Taip.",
+      "Tokia atsakomybė nenumatyta.",
+      "Ne, išskyrus už nelegalų darbą."
+    ],
+    "correctIndex": 0,
+    "explanation": "Taip, už darbo laiko apskaitos pažeidimus numatyta administracinė atsakomybė.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 32
+    }
+  },
+  {
+    "id": "45848-33",
+    "question": "Kada tikrinamos darbdavių, kurie atlieka darbuotojų saugos ir sveikatos tarnybos funkcijas, žinios Valstybinėje darbo inspekcijoje?",
+    "options": [
+      "Pasirengus DSS žinių tikrinimui savarankiškai.",
+      "Tik pabaigus privalomą mokymą pagal atitinkamą programą (atsižvelgiant į vykdomą ekonominės veiklos sritį).",
+      "Baigus 16 valandų mokymo programą."
+    ],
+    "correctIndex": 1,
+    "explanation": "Žinios VDI tikrinamos pabaigus privalomą mokymą pagal atitinkamą programą pagal vykdomą ekonominės veiklos sritį.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 33
+    }
+  },
+  {
+    "id": "45848-34",
+    "question": "Kuris iš šių rizikos veiksnių yra pavojingas, atitinkantis „pavojingo veiksnio“ sąvoką?",
+    "options": [
+      "Kritimas iš aukščio.",
+      "Nepatogi darbo poza.",
+      "Triukšmas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Kritimas iš aukščio yra pavojingas rizikos veiksnys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 34
+    }
+  },
+  {
+    "id": "45848-35",
+    "question": "Darbuotojai, pajutę neigiamą darbo ar darbo aplinkos poveikį sveikatai, turi teisę:",
+    "options": [
+      "kreiptis į darbdavį dėl papildomų atostogų",
+      "pasitikrinti sveikatą kitu laiku, negu nustatytas darbuotojų sveikatos patikrinimo grafike",
+      "pasiimti neapmokamų atostogų"
+    ],
+    "correctIndex": 1,
+    "explanation": "Pajutę neigiamą poveikį sveikatai, darbuotojai turi teisę tikrintis sveikatą ne pagal įprastą grafiką.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 35
+    }
+  },
+  {
+    "id": "45848-36",
+    "question": "Ar reikia profesinę riziką vertinti projektuojant ir įrengiant darbo vietas?",
+    "options": [
+      "Ne.",
+      "Taip.",
+      "Teisės aktai nereglamentuoja."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, profesinė rizika vertinama ir projektuojant bei įrengiant darbo vietas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 36
+    }
+  },
+  {
+    "id": "45848-37",
+    "question": "Į ką darbuotojas pirmiausiai turi kreiptis dėl darbų sustabdymo, kai darbdavio įgaliotas asmuo, darbdaviui atstovaujantis asmuo nesiima reikiamų priemonių pašalinti darbuotojų saugos ir sveikatos reikalavimų pažeidimus ir apsaugoti darbuotoją (darbuotojus) nuo galimo pavojaus saugai ir sveikatai?",
+    "options": [
+      "Į policiją.",
+      "Į Valstybinę darbo inspekciją.",
+      "Į įmonės darbuotojų saugos ir sveikatos komitetą, darbuotojų atstovus."
+    ],
+    "correctIndex": 2,
+    "explanation": "Pirmiausia kreipiamasi į įmonės DSS komitetą, darbuotojų atstovus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 37
+    }
+  },
+  {
+    "id": "45848-38",
+    "question": "Jeigu įmonėje nėra galimybės sudaryti dvišalės komisijos, įvykį darbe ar nelaimingą atsitikimą pakeliui į darbą ar iš darbo tiria:",
+    "options": [
+      "kitos įmonės atsakingi darbuotojai",
+      "Prokuratūros paskirti asmenys",
+      "Valstybinės darbo inspekcijos inspektorius (-iai)"
+    ],
+    "correctIndex": 2,
+    "explanation": "Nesant galimybės sudaryti dvišalės komisijos, įvykį tiria VDI inspektorius (-iai).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 38
+    }
+  },
+  {
+    "id": "45848-39",
+    "question": "Ne vėliau kaip per vieną mėnesį nuo darbo tarybos įgaliojimų pradžios darbo tarybos pirmininkas apie darbo tarybos sudarymą informuoja:",
+    "options": [
+      "darbdavio buveinės teritorijos Valstybinės darbo inspekcijos teritorinį skyrių",
+      "Lietuvos Respublikos vyriausiąjį valstybinį darbo inspektorių",
+      "darbdavio buveinės teritorijos Valstybinės darbo inspekcijos darbo ginčų komisiją"
+    ],
+    "correctIndex": 0,
+    "explanation": "Apie darbo tarybos sudarymą per vieną mėnesį informuojamas darbdavio buveinės teritorijos VDI teritorinis skyrius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 39
+    }
+  },
+  {
+    "id": "45848-40",
+    "question": "Ar kasos aparatams taikoma Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“?",
+    "options": [
+      "Ne.",
+      "Taikoma tik naudojant juos prekybos centruose.",
+      "Taip."
+    ],
+    "correctIndex": 0,
+    "explanation": "Higienos norma HN 32:2004 kasos aparatams netaikoma.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(6) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas II–III grupių ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45848",
+      "testDate": "2023-05-30",
+      "questionNumber": 40
+    }
+  },
+  {
+    "id": "45839-1",
+    "question": "Kokių priemonių turi būti imamasi, jeigu darbo vietose yra darbo aplinkos orą teršiantys aerozolinio, dujinio ar kietųjų dalelių pavidalo teršalai ir mikroorganizmai, galintys tiesiogiai kenkti darbuotojų saugai ir sveikatai?",
+    "options": [
+      "Darbo vietose turi būti iškabinami saugos ir sveikatos apsaugos ženklai informuojantys apie pavojingą darbo aplinką.",
+      "Darbuotojai turi būti aprūpinti tinkamomis asmeninės apsaugos priemonėmis.",
+      "Teršalai turi būti nedelsiant šalinami iš darbo aplinkos."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbo aplinkos orą teršiantys aerozolinio, dujinio ar kietųjų dalelių pavidalo teršalai ir mikroorganizmai, galintys tiesiogiai kenkti darbuotojų saugai ir sveikatai, turi būti nedelsiant šalinami iš darbo aplinkos.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 1
+    }
+  },
+  {
+    "id": "45839-2",
+    "question": "Per kiek laiko turi būti ištirtas nelaimingas atsitikimas pakeliui į darbą ar iš darbo?",
+    "options": [
+      "Per 7 darbo dienas.",
+      "Per 10 darbo dienų.",
+      "Per 10 kalendorinių dienų."
+    ],
+    "correctIndex": 0,
+    "explanation": "Nelaimingas atsitikimas pakeliui į darbą ar iš darbo turi būti ištirtas per 7 darbo dienas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 2
+    }
+  },
+  {
+    "id": "45839-3",
+    "question": "Su kuo privalo konsultuotis darbdavys rengdamas Darbuotojams nemokamai išduodamų asmeninių apsaugos priemonių sąrašą?",
+    "options": [
+      "Valstybinės darbo inspekcijos inspektoriumi.",
+      "Su asmeninių apsaugos priemonių tiekėjais ir gamintojais.",
+      "Su darbdavio įgaliotais asmenimis, specialistais, darbuotojų atstovais."
+    ],
+    "correctIndex": 2,
+    "explanation": "Rengdamas nemokamai išduodamų AAP sąrašą, darbdavys konsultuojasi su darbdavio įgaliotais asmenimis, specialistais, darbuotojų atstovais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 3
+    }
+  },
+  {
+    "id": "45839-4",
+    "question": "Ar reikia profesinę riziką vertinti projektuojant ir įrengiant darbo vietas?",
+    "options": [
+      "Taip.",
+      "Teisės aktai nereglamentuoja.",
+      "Ne."
+    ],
+    "correctIndex": 0,
+    "explanation": "Profesinė rizika privalo būti vertinama ir projektuojant bei įrengiant darbo vietas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 4
+    }
+  },
+  {
+    "id": "45839-5",
+    "question": "Darbuotojų atstovas saugai ir sveikatai padalinio vadovui kelis kartus pranešė apie pavojų darbo vietoje (yra grėsmė nukristi darbuotojams iš aukščio), tačiau padalinio vadovas nesiima priemonių. Kokias teises šiuo atveju turi darbuotojų atstovas saugai ir sveikatai?",
+    "options": [
+      "Sušaukti darbuotojų susirinkimą.",
+      "Nedelsiant pranešti VDI.",
+      "Pranešti darbdaviui atstovaujančiam asmeniui, o šiam nesiimant priemonių profesinės rizikos veiksniams šalinti ar jiems mažinti, pranešti Valstybinei darbo inspekcijai."
+    ],
+    "correctIndex": 2,
+    "explanation": "Pranešus padalinio vadovui ir jam nesiimant veiksmų, kreipiamasi į darbdaviui atstovaujantį asmenį, o jei ir šis nesiima priemonių – į VDI.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 5
+    }
+  },
+  {
+    "id": "45839-6",
+    "question": "Įrengiant darbo vietas turi būti įvertinta:",
+    "options": [
+      "darbuotojo žalingi įpročiai",
+      "darbuotojo fizinės galimybės",
+      "darbuotojo priklausymas profsąjungoms"
+    ],
+    "correctIndex": 1,
+    "explanation": "Įrengiant darbo vietas turi būti įvertintos darbuotojo fizinės galimybės.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 6
+    }
+  },
+  {
+    "id": "45839-7",
+    "question": "Kas yra laikomos darbdavio (darbovietės) lygmeniu socialinės partnerystės šalimis?",
+    "options": [
+      "Darbdavio atstovai ir profesinė sąjunga.",
+      "Darbdavio atstovai ir darbo taryba.",
+      "Darbdavys ir darbuotojų atstovai."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbovietės lygmeniu socialinės partnerystės šalys yra darbdavys ir darbuotojų atstovai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 7
+    }
+  },
+  {
+    "id": "45839-8",
+    "question": "Kas praneša Valstybinei darbo inspekcijai apie įtariamą lėtinę profesinę ligą?",
+    "options": [
+      "Darbuotojas.",
+      "Darbdavys.",
+      "Gydytojas."
+    ],
+    "correctIndex": 1,
+    "explanation": "Apie įtariamą lėtinę profesinę ligą Valstybinei darbo inspekcijai praneša darbdavys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 8
+    }
+  },
+  {
+    "id": "45839-9",
+    "question": "Įmonės, kurioje dėl įvykio darbe žalą sveikatai patiria kitos įmonės darbuotojas, darbdavys privalo nedelsdamas:",
+    "options": [
+      "sudaryti dvišalę komisiją",
+      "apie tai pranešti nukentėjusio darbuotojo darbdaviui, išsaugoti įvykio darbe vietą, sudaryti reikiamas sąlygas tirti įvykį darbe ir paskirti savo atstovą, kuris dalyvaus tiriant tokį įvykį darbe",
+      "apie tai pranešti darbuotojų atstovui"
+    ],
+    "correctIndex": 1,
+    "explanation": "Darbdavys privalo pranešti nukentėjusio darbuotojo darbdaviui, išsaugoti įvykio vietą, sudaryti tyrimo sąlygas ir paskirti savo atstovą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 9
+    }
+  },
+  {
+    "id": "45839-10",
+    "question": "Ar Valstybinės darbo inspekcijos inspektorių reikalavimai ir nurodymai yra privalomi?",
+    "options": [
+      "Taip, yra privalomi.",
+      "Jie yra rekomendacinio pobūdžio.",
+      "Ne, neprivalomi."
+    ],
+    "correctIndex": 0,
+    "explanation": "VDI inspektorių reikalavimai ir nurodymai yra privalomi.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 10
+    }
+  },
+  {
+    "id": "45839-11",
+    "question": "Kam asmeninės apsaugos priemonės sąvoka taikoma?",
+    "options": [
+      "Priemonei, skirtai darbuotojui turėti ar dėvėti, siekiant apsaugoti jį nuo rizikos veiksnių, galinčių kelti grėsmę darbuotojo saugai ir sveikatai bei kitam šiam tikslui skirtam priedui ar reikmeniui.",
+      "Priemonėms, naudojamoms avarinių ir gelbėjimo tarnybų.",
+      "Įprastiems darbo drabužiams ir uniformoms, kurios nėra specialiai pritaikytos darbuotojo saugai ir sveikatai užtikrinti."
+    ],
+    "correctIndex": 0,
+    "explanation": "Asmeninė apsauginė priemonė – priemonė, skirta darbuotojui turėti ar dėvėti siekiant apsaugoti jį nuo rizikos veiksnių, keliančių grėsmę saugai ir sveikatai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 11
+    }
+  },
+  {
+    "id": "45839-12",
+    "question": "Lengvo nelaimingo atsitikimo darbe N-1 formos aktą, dalyvaujant darbuotojų atstovui (-ams) saugai ir sveikatai, užpildo:",
+    "options": [
+      "darbdavio į dvišalę komisiją paskirtas atstovas",
+      "įmonės vadovo įsakymu ar kitu tvarkomuoju dokumentu patvirtintas darbuotojų atstovas (atstovai)",
+      "įmonės vadovas"
+    ],
+    "correctIndex": 0,
+    "explanation": "Lengvo nelaimingo atsitikimo N-1 formos aktą užpildo darbdavio į dvišalę komisiją paskirtas atstovas, dalyvaujant darbuotojų atstovui (-ams) saugai ir sveikatai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 12
+    }
+  },
+  {
+    "id": "45839-13",
+    "question": "Žemutinė triukšmo ekspozicijos vertė:",
+    "options": [
+      "87 dB(A)",
+      "85 dB(A)",
+      "80 dB(A)"
+    ],
+    "correctIndex": 2,
+    "explanation": "Žemutinė triukšmo ekspozicijos vertė veiksmams pradėti yra 80 dB(A).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 13
+    }
+  },
+  {
+    "id": "45839-14",
+    "question": "Darbo sutartis – tai…?",
+    "options": [
+      "darbuotojo ir darbdavio susitarimas, pagal kurį darbuotojas įsipareigoja būdamas pavaldus darbdaviui ir jo naudai atlikti darbo funkciją, o darbdavys įsipareigoja už tai mokėti darbo užmokestį.",
+      "darbdavių susitarimas, pagal kurį darbdaviai įdarbina darbuotojus.",
+      "civilinis susitarimas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbo sutartis – darbuotojo ir darbdavio susitarimas dėl darbo funkcijos atlikimo pavaldžiai darbdavio naudai už darbo užmokestį.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 14
+    }
+  },
+  {
+    "id": "45839-15",
+    "question": "Ar darbdavys privalo imtis tinkamų priemonių, kad neįgaliesiems būtų sudarytos sąlygos gauti darbą, dirbti?",
+    "options": [
+      "Taip, privalo.",
+      "Įstatymas tokios pareigos nenustato.",
+      "Ne, neprivalo."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbdavys privalo imtis tinkamų priemonių neįgaliųjų įdarbinimo ir darbo sąlygoms užtikrinti.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 15
+    }
+  },
+  {
+    "id": "45839-16",
+    "question": "Visada, kai negalima išsiversti be to, kad darbuotojai tvarkytų krovinius rankomis, darbdavys turi įvertinti:",
+    "options": [
+      "krovinio kėlimo mechanizuotai kaštus",
+      "krovinių savybes, fizinės jėgos naudojimą, darbo aplinkos veiksnius ir darbo reikalavimus",
+      "darbo sutarties terminus"
+    ],
+    "correctIndex": 1,
+    "explanation": "Tvarkant krovinius rankomis, vertinamos krovinių savybės, fizinės jėgos naudojimas, darbo aplinkos veiksniai ir darbo reikalavimai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 16
+    }
+  },
+  {
+    "id": "45839-17",
+    "question": "Ar būtina, apmokant darbuotojus, kuriems darbe kyla rizika dėl triukšmo, informuoti juos apie faktinius išmatuotus triukšmo lygius, nurodant, ar jie viršija, ar neviršija ribinių ekspozicijos verčių?",
+    "options": [
+      "Būtina informuoti apie faktinius išmatuotus triukšmo lygius ir apie tai, ar neviršija leistinų verčių, paaiškinant jų svarbą ir galimą profesinę riziką.",
+      "Būtina informuoti tik apie esamą triukšmo riziką darbe.",
+      "Nebūtina informuoti, jeigu faktiniai išmatuoti triukšmo lygiai neviršija ribinių ekspozicijos verčių."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbuotojai turi būti informuojami apie faktinius išmatuotus triukšmo lygius, ar neviršija verčių, ir paaiškinama rizika.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 17
+    }
+  },
+  {
+    "id": "45839-18",
+    "question": "Kokie reikalavimai keliami darbo aplinkai, kai darbo vietose naudojamos pavojingos cheminės medžiagos bei preparatai?",
+    "options": [
+      "Pavojingos cheminės medžiagos turi būti naudojamos uždarose sistemose, kad nekiltų pavojus darbuotojų saugai ir sveikatai.",
+      "Neturi būti viršijamos cheminių medžiagų koncentracijos nustatytos ribinės vertės (dydžiai) darbo aplinkos ore.",
+      "Turi būti sudarytos tokios darbo sąlygos, kad darbo aplinkos ore nebūtų pavojingų cheminių medžiagų."
+    ],
+    "correctIndex": 1,
+    "explanation": "Darbo aplinkos ore neturi būti viršijamos nustatytos cheminių medžiagų koncentracijos ribinės vertės.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 18
+    }
+  },
+  {
+    "id": "45839-19",
+    "question": "Ar apsauginis nuo saulės kremas priskiriamas prie darbdavio išduodamų asmeninių apsaugos priemonių?",
+    "options": [
+      "Ne, nes tai nėra tiesioginė odos apsaugos priemonė.",
+      "Taip, jeigu darbai vykdomi saulėje.",
+      "Ne, nes asmeninėms apsaugos priemonėms priskiriama kūno apranga ir įtaisai nuo kritimo iš aukščio."
+    ],
+    "correctIndex": 1,
+    "explanation": "Kai darbai atliekami saulėje ir kyla UV / saulės poveikio rizika, odos apsaugos priemonės gali būti skiriamos kaip AAP.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 19
+    }
+  },
+  {
+    "id": "45839-20",
+    "question": "Ar būtina įvertinti profesinę riziką visose darbo vietose?",
+    "options": [
+      "Taip.",
+      "Ne.",
+      "Teisės aktai nereglamentuoja."
+    ],
+    "correctIndex": 0,
+    "explanation": "Profesinę riziką būtina įvertinti visose darbo vietose.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 20
+    }
+  },
+  {
+    "id": "45839-21",
+    "question": "Kai darbuotojui nepakanka profesinių įgūdžių arba instruktavimo metu suteiktų žinių, kad jis galėtų saugiai dirbti ir nebūtų pakenkta jo sveikatai, darbdaviui atstovaujantis asmuo organizuoja:",
+    "options": [
+      "darbuotojui stažuotę",
+      "papildomą instruktavimą",
+      "darbuotojo mokymą"
+    ],
+    "correctIndex": 0,
+    "explanation": "Kai nepakanka profesinių įgūdžių ar instruktavimo metu suteiktų žinių saugiam darbui, organizuojama stažuotė.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 21
+    }
+  },
+  {
+    "id": "45839-22",
+    "question": "Darbdaviui atstovaujantis asmuo, nustatydamas darbuotojų saugos ir sveikatos vidinės kontrolės tvarką įmonėje, ją svarsto su darbuotojais, su darbuotojų atstovais saugai ir sveikatai, darbuotojų saugos ir sveikatos komitetu ir jiems praneša:",
+    "options": [
+      "apie įpareigojimus, duotus padalinių vadovams dėl darbuotojų saugos ir sveikatos vidinės kontrolės ir priemonių įgyvendinimo įmonėje, padaliniuose, darbo vietose",
+      "apie darbuotojų saugos ir sveikatos politikos formavimą įmonėje ir profesinės rizikos mažinimo priemonių įgyvendinimo prioritetus",
+      "apie Valstybinės darbo inspekcijos patikrinimo rezultatus"
+    ],
+    "correctIndex": 0,
+    "explanation": "Nustatant DSS vidinės kontrolės tvarką, pranešama apie įpareigojimus padalinių vadovams dėl vidinės kontrolės ir priemonių įgyvendinimo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 22
+    }
+  },
+  {
+    "id": "45839-23",
+    "question": "Ką privalo išduoti darbdaviui atstovaujantis ar jo įgaliotas asmuo, siųsdamas dirbantį asmenį tikrintis sveikatą?",
+    "options": [
+      "Privalomo sveikatos patikrinimo medicininės pažymos formą F Nr. 047/a.",
+      "Išrašą iš ambulatorinės kortelės F Nr. 027/a.",
+      "Asmens medicininę knygelę (sveikatos pasą) F Nr. 048/a."
+    ],
+    "correctIndex": 0,
+    "explanation": "Siunčiant tikrintis sveikatą, išduodama Privalomo sveikatos patikrinimo medicininės pažymos forma F Nr. 047/a.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 23
+    }
+  },
+  {
+    "id": "45839-24",
+    "question": "Ką privalo daryti darbdavys, kai potencialiai pavojingo darbo įrenginio sauga priklauso nuo jo instaliavimo sąlygų?",
+    "options": [
+      "Kreiptis į įgaliotą potencialiai pavojingų įrenginių priežiūros įstaigą ir užtikrinti, kad įrenginys būtų patikrintas po instaliavimo prieš jį paleidžiant dirbti pirmą kartą, kad būtų įsitikinta, jog įrenginys instaliuotas teisingai ir veikia tinkamai.",
+      "Kreiptis į įrenginio gamintoją, kad šis įvertintų ar įrenginys tinkamai instaliuotas prieš jį paleidžiant dirbti pirmą kartą, ir tokiu būdu įsitikinta, jog įrenginys instaliuotas teisingai ir veikia tinkamai.",
+      "Sudaryti komisiją, kuri įvertintų ar įrenginys tinkamai instaliuotas prieš jį paleidžiant dirbti pirmą kartą, ir tokiu būdu įsitikinta, jog įrenginys instaliuotas teisingai ir veikia tinkamai."
+    ],
+    "correctIndex": 0,
+    "explanation": "Potencialiai pavojingas įrenginys, kurio sauga priklauso nuo instaliavimo, patikrinamas po instaliavimo prieš pirmą paleidimą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 24
+    }
+  },
+  {
+    "id": "45839-25",
+    "question": "Ar darbo aplinkos savybės turi įtakos nustatant riziką darbuotojui tvarkant krovinius rankomis?",
+    "options": [
+      "Ne, nes įtaką turi tik krovinio svoris ir nustatytas darbo tempas.",
+      "Taip, jeigu darbuotojo yra ribotos fizinės galimybės atlikti darbą.",
+      "Taip."
+    ],
+    "correctIndex": 2,
+    "explanation": "Taip, darbo aplinkos savybės turi įtakos nustatant riziką tvarkant krovinius rankomis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 25
+    }
+  },
+  {
+    "id": "45839-26",
+    "question": "Buities, sanitarinės ir higienos patalpos turi būti įrengiamos:",
+    "options": [
+      "abu atsakymai teisingi",
+      "dirbant lauke",
+      "kai pagal technologiją reikia ypatingų švaros ir sterilumo sąlygų (pavyzdžiui, maisto, kosmetikos, farmacijos produktų gamyba)"
+    ],
+    "correctIndex": 0,
+    "explanation": "Buities, sanitarinės ir higienos patalpos įrengiamos atsižvelgiant į darbo sąlygas ir technologinius reikalavimus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 26
+    }
+  },
+  {
+    "id": "45839-27",
+    "question": "Už saugių ir sveikatai nekenksmingų darbo sąlygų užtikrinimą yra atsakingas:",
+    "options": [
+      "darbuotojų atstovas saugai ir sveikatai",
+      "darbdavys",
+      "darbdavio įgaliotas asmuo"
+    ],
+    "correctIndex": 1,
+    "explanation": "Už saugių ir sveikatai nekenksmingų darbo sąlygų užtikrinimą yra atsakingas darbdavys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 27
+    }
+  },
+  {
+    "id": "45839-28",
+    "question": "Ar darbuotojai skiepijami darbdavio lėšomis?",
+    "options": [
+      "Taip, skiepijami darbuotojai, kuriems yra pavojus susirgti užkrečiamąja liga.",
+      "Ne.",
+      "Teisės aktai nereglamentuoja."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbuotojai, kuriems yra pavojus susirgti užkrečiamąja liga, skiepijami darbdavio lėšomis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 28
+    }
+  },
+  {
+    "id": "45839-29",
+    "question": "Kokiais atvejais Lietuvos Respublikos vyriausiasis valstybinis darbo inspektorius gali pareikalauti, kad darbdaviui atstovaujantis asmuo pakartotinai pasitikrintų darbuotojų saugos ir sveikatos srities žinias?",
+    "options": [
+      "Ištyrus sunkų ar mirtiną nelaimingą atsitikimą darbe, profesinę ligą ir nustačius, kad darbdaviui atstovaujantis asmuo nesusipažinęs arba nepakankamai susipažinęs su darbuotojų saugos ir sveikatos reikalavimais, arba nustačius, kad žinojo apie darbuotojų saugos ir sveikatos reikalavimų pažeidimus, bet nesiėmė priemonių žinomiems pažeidimams pašalinti.",
+      "Įvykus įmonėje sunkiam ar mirtinam nelaimingam atsitikimui ir visais atvejais, kai yra sustabdomi darbai įmonėje.",
+      "Kai vienu metu įmonėje sunkiai sužalojami du ir daugiau darbuotojų."
+    ],
+    "correctIndex": 0,
+    "explanation": "Pakartotinis žinių patikrinimas gali būti pareikalautas ištyrus sunkų ar mirtiną įvykį ar profesinę ligą bei nustačius nepakankamą susipažinimą su DSS reikalavimais ar nesiėmimą priemonių žinomiems pažeidimams šalinti.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 29
+    }
+  },
+  {
+    "id": "45839-30",
+    "question": "Kaip reikia elgtis transporto priemonių dujų balionų pildymo metu pastebėjus dujų nuotėkį?",
+    "options": [
+      "Iškviesti dujų tarnybas.",
+      "Pildymo operaciją būtina nedelsiant nutraukti, o transporto priemonę, neužvedant variklio ir neįjungiant žibintų – nustumti į saugią vietą.",
+      "Nustoti pildyti ir kuo greičiau išvažiuoti iš degalinės."
+    ],
+    "correctIndex": 1,
+    "explanation": "Pastebėjus nuotėkį, pildymas nedelsiant nutraukiamas, o transporto priemonė neužvedant variklio ir neįjungiant žibintų nustumiama į saugią vietą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 30
+    }
+  },
+  {
+    "id": "45839-31",
+    "question": "Kokie reikalavimai keliami į abi puses varstomoms arba sukamosioms durims bei vartams?",
+    "options": [
+      "Negali būti pagaminti iš stiklo.",
+      "Turi būti permatomi, jei jie nepermatomi, turi turėti permatomas įsprūdas.",
+      "Negali būti permatomi, turi būti pagaminti iš nepermatomos medžiagos."
+    ],
+    "correctIndex": 1,
+    "explanation": "Į abi puses varstomos ar sukamosios durys bei vartai turi būti permatomi arba turėti permatomas įsprūdas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 31
+    }
+  },
+  {
+    "id": "45839-32",
+    "question": "Kokiais atvejais įmonėje skirti asmenį, atsakingą už elektros ūkį, nebūtina?",
+    "options": [
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 50 kW esant trifaziam elektros įvadui.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 30 kW arba esant vienfaziam elektros įvadui.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 60 kW."
+    ],
+    "correctIndex": 1,
+    "explanation": "Skirti asmens, atsakingo už elektros ūkį, nebūtina, jei žemosios įtampos įrenginių leista galia ne didesnė kaip 30 kW arba esant vienfaziam įvadui.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 32
+    }
+  },
+  {
+    "id": "45839-33",
+    "question": "Kuo būtina vadovautis naudojant pavojingą cheminę medžiagą darbo vietose, kad būtų užtikrinta darbuotojų sauga ir sveikata?",
+    "options": [
+      "Informacija ir reikalavimais, nurodytais saugos duomenų lape, kurį gamintojas pateikia kartu su realizuojama pavojinga chemine medžiaga, preparatu.",
+      "Informacija, kuri yra pateikta apie naudojamą cheminę medžiagą ar preparatą internete.",
+      "Informacija, kurią pateikia naudojamos cheminės medžiagos ar preparato tiekėjas produkto sertifikate."
+    ],
+    "correctIndex": 0,
+    "explanation": "Naudojant pavojingą cheminę medžiagą, vadovaujamasi saugos duomenų lape (SDL) pateikta informacija ir reikalavimais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 33
+    }
+  },
+  {
+    "id": "45839-34",
+    "question": "Kas priima sprendimą steigti darbuotojų saugos ir sveikatos komitetą įmonėje (toliau - Komitetas) įmonėse, kai darbuotojų skaičius mažesnis nei 50?",
+    "options": [
+      "Profesinė sąjunga, jeigu to pageidauja bent 1/3 įmonės darbuotojų.",
+      "Darbdaviui atstovaujantis asmuo.",
+      "Komitetas steigiamas darbdavio ar darbuotojų atstovų iniciatyva arba daugiau kaip pusės įmonės darbuotojų kolektyvo siūlymu."
+    ],
+    "correctIndex": 2,
+    "explanation": "Kai darbuotojų mažiau nei 50, komitetas steigiamas darbdavio ar darbuotojų atstovų iniciatyva arba daugiau kaip pusės darbuotojų siūlymu.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 34
+    }
+  },
+  {
+    "id": "45839-35",
+    "question": "Ar privaloma stabdyti darbus, kai gamtinės sąlygos kliudo saugiai juos atlikti?",
+    "options": [
+      "Neprivaloma.",
+      "Teisės aktai tai nereglamentuoja, sprendžia darbdavys.",
+      "Taip."
+    ],
+    "correctIndex": 2,
+    "explanation": "Taip, kai gamtinės sąlygos kliudo saugiai atlikti darbus, darbus stabdyti privaloma.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 35
+    }
+  },
+  {
+    "id": "45839-36",
+    "question": "Ar visose darbo vietose darbuotojai privalo naudoti asmenines apsaugos priemones?",
+    "options": [
+      "Tose darbo vietose, kurios yra pažymėtos įspėjamaisiais saugos ir sveikatos apsaugos ženklais.",
+      "Visose darbo vietose, kuriose darbuotojas būna darbo metu.",
+      "Tose darbo vietose, kurios yra pažymėtos atitinkamais įpareigojančiais saugos ir sveikatos apsaugos ženklais."
+    ],
+    "correctIndex": 2,
+    "explanation": "AAP naudojamos ten, kur tai nustatyta pagal rizikos vertinimą ir (ar) nurodyta atitinkamais įpareigojančiais ženklais / reikalavimais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 36
+    }
+  },
+  {
+    "id": "45839-37",
+    "question": "Ką turi užtikrinti darbdaviui atstovaujantis asmuo, dviejų darbdavių susitarimu pasiųsdamas darbuotoją laikinam darbui į kitą įmonę?",
+    "options": [
+      "Kad darbuotojas turėtų kvalifikaciją patvirtinančius dokumentus ir visais atvejais būtų atestuotas darbuotojų saugos ir sveikatos klausimais.",
+      "Kad darbuotojas būtų instruktuotas saugos ir sveikatos klausimais toje įmonėje į kurią jis siunčiamas laikinam darbui.",
+      "Kad darbuotojui vadovautų darbdavio paskirtas asmuo ir užtikrintų, kad nekiltų darbuotojui pavojus."
+    ],
+    "correctIndex": 1,
+    "explanation": "Siunčiant laikinam darbui į kitą įmonę, užtikrinama, kad darbuotojas būtų instruktuotas DSS klausimais toje įmonėje.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 37
+    }
+  },
+  {
+    "id": "45839-38",
+    "question": "Steigiant darbovietes kaip turi būti įrengti judėjimo keliai, laiptai, pritvirtintos kopėčios, krovimo aikštelės bei platformos?",
+    "options": [
+      "Turi būti tokių matmenų ir išdėstyti taip, kad pėstiesiems ir transporto priemonėms būtų galima saugiai judėti ir nekeltų pavojaus darbuotojams, esantiems šalia šių judėjimo kelių.",
+      "Judėjimo keliai, laiptai, pritvirtintos kopėčios, krovimo aikštelės bei platformos turi būti įrengtos taip, kad į tas zonas negalėtų patekti darbuotojai, kurių darbas nėra susijęs su šiomis priemonėmis.",
+      "Judėjimo keliai, laiptai, pritvirtintos kopėčios, krovimo aikštelės bei platformos turi būti įrengtos taip, kad visi darbuotojai galėtų laisvai prie jų prieiti ir naudotis."
+    ],
+    "correctIndex": 0,
+    "explanation": "Judėjimo keliai, laiptai, kopėčios, krovimo aikštelės ir platformos įrengiami saugių matmenų ir išdėstymo, kad pėstieji ir transportas galėtų saugiai judėti.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 38
+    }
+  },
+  {
+    "id": "45839-39",
+    "question": "Psichosocialinės rizikos veiksnių tyrimo metu darbdavys užtikrina:",
+    "options": [
+      "pokalbių su darbuotojais ar jų atstovais, darbuotojų anketavimo galimybę",
+      "apmokėjimą už papildomą darbą",
+      "profesinių sąjungų ar darbuotojų atstovų dalyvavimą"
+    ],
+    "correctIndex": 0,
+    "explanation": "Psichosocialinės rizikos tyrimo metu užtikrinama pokalbių ir darbuotojų anketavimo galimybė.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 39
+    }
+  },
+  {
+    "id": "45839-40",
+    "question": "Ar kasos aparatams taikoma Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“?",
+    "options": [
+      "Taip.",
+      "Ne.",
+      "Taikoma tik naudojant juos prekybos centruose."
+    ],
+    "correctIndex": 1,
+    "explanation": "Higienos norma HN 32:2004 kasos aparatams netaikoma.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45839",
+      "testDate": "2023-05-29",
+      "questionNumber": 40
+    }
+  },
+  {
+    "id": "45849-1",
+    "question": "Žemutinė triukšmo ekspozicijos vertė:",
+    "options": [
+      "87 dB(A)",
+      "80 dB(A)",
+      "85 dB(A)"
+    ],
+    "correctIndex": 1,
+    "explanation": "Žemutinė triukšmo ekspozicijos vertė veiksmams pradėti yra 80 dB(A).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 1
+    }
+  },
+  {
+    "id": "45849-2",
+    "question": "Su kokiais pavojais, galinčiais kilti darbuotojui dėl darbo įrenginių naudojimo, darbuotojas privalo būti supažindintas?",
+    "options": [
+      "Su pavojais, galinčiais kilti naudojant potencialiai povojingus įrenginius, turimus įmonėje.",
+      "Su visais pavojais darbuotojui galinčiais kilti dėl įrenginių, naudojamų darbo patalpose, darbo zonoje ar darbo vietoje, taip pat pavojais, susijusiais su įrenginiais, kuriais darbuotojas pats tiesiogiai nesinaudoja.",
+      "Su visais pavojais darbuotojui galinčiais kilti dėl įrenginių, su kuriais jis dirba jam pavestą darbą, naudojimo."
+    ],
+    "correctIndex": 1,
+    "explanation": "Darbuotojas privalo būti supažindintas su visais pavojais dėl įrenginių darbo patalpose, zonoje ar darbo vietoje, įskaitant ir tuos, kuriais pats tiesiogiai nesinaudoja.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 2
+    }
+  },
+  {
+    "id": "45849-3",
+    "question": "Ką nustato Psichosocialinių profesinės rizikos veiksnių tyrimo metodiniai nurodymai?",
+    "options": [
+      "Darbuotojų bei jų atstovų skundų bei pasiūlymų duomenų stebėsenos procedūras.",
+      "Psichosocialinių profesinės rizikos veiksnių tyrimo reikalavimus ir kvalifikacinius reikalavimus šį tyrimą atliekantiems asmenims.",
+      "Kontrolinių darbo aplinkos veiksnių matavimų ir prevencinių planų metodikas."
+    ],
+    "correctIndex": 1,
+    "explanation": "Metodiniai nurodymai nustato psichosocialinių rizikos veiksnių tyrimo reikalavimus ir kvalifikacinius reikalavimus tyrimą atliekantiems asmenims.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 3
+    }
+  },
+  {
+    "id": "45849-4",
+    "question": "Visada, kai negalima išsiversti be to, kad darbuotojai tvarkytų krovinius rankomis, darbdavys turi įvertinti:",
+    "options": [
+      "darbo sutarties terminus",
+      "krovinių savybes, fizinės jėgos naudojimą, darbo aplinkos veiksnius ir darbo reikalavimus",
+      "krovinio kėlimo mechanizuotai kaštus"
+    ],
+    "correctIndex": 1,
+    "explanation": "Tvarkant krovinius rankomis, vertinamos krovinių savybės, fizinės jėgos naudojimas, darbo aplinkos veiksniai ir darbo reikalavimai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 4
+    }
+  },
+  {
+    "id": "45849-5",
+    "question": "Į ką darbuotojas pirmiausiai turi kreiptis dėl darbų sustabdymo, kai darbdavio įgaliotas asmuo, darbdaviui atstovaujantis asmuo nesiima reikiamų priemonių pašalinti darbuotojų saugos ir sveikatos reikalavimų pažeidimus ir apsaugoti darbuotoją (darbuotojus) nuo galimo pavojaus saugai ir sveikatai?",
+    "options": [
+      "Į policiją.",
+      "Į Valstybinę darbo inspekciją.",
+      "Į įmonės darbuotojų saugos ir sveikatos komitetą, darbuotojų atstovus."
+    ],
+    "correctIndex": 2,
+    "explanation": "Pirmiausia kreipiamasi į įmonės DSS komitetą, darbuotojų atstovus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 5
+    }
+  },
+  {
+    "id": "45849-6",
+    "question": "Kokiais atvejais darbuotojams turi būti numatyti persirengimo kambariai?",
+    "options": [
+      "Tik tada kai darbuotojai dirba su pavojingomis cheminėmis medžiagomis.",
+      "Jei darbuotojai darbo metu privalo dėvėti darbo drabužius.",
+      "Visais atvejais darbuotojams, kurie darbo aplinkoje susiduria su profesinės rizikos veiksniais turi būti numatyti persirengimo kambariai."
+    ],
+    "correctIndex": 1,
+    "explanation": "Persirengimo kambariai numatomi, kai darbuotojai darbo metu privalo dėvėti darbo drabužius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 6
+    }
+  },
+  {
+    "id": "45849-7",
+    "question": "Jeigu darbovietėje nėra darbdavio lygmeniu veikiančios profesinės sąjungos, ar gali tokioje darbovietėje būti sudaroma kolektyvinė sutartis?",
+    "options": [
+      "Taip, jeigu visuotinis darbdavio darbuotojų susirinkimas yra įgaliojęs šakos profesinę sąjungą vesti derybas dėl darbdavio lygmens kolektyvinės sutarties.",
+      "Taip, kolektyvinių derybų funkciją gali vykdyti darbo taryba.",
+      "Tokios galimybės nėra."
+    ],
+    "correctIndex": 1,
+    "explanation": "Nesant darbdavio lygmens profesinės sąjungos, kolektyvinių derybų funkciją gali vykdyti darbo taryba.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 7
+    }
+  },
+  {
+    "id": "45849-8",
+    "question": "Kaip reikia elgtis transporto priemonių dujų balionų pildymo metu pastebėjus dujų nuotėkį?",
+    "options": [
+      "Pildymo operaciją būtina nedelsiant nutraukti, o transporto priemonę, neužvedant variklio ir neįjungiant žibintų – nustumti į saugią vietą.",
+      "Nustoti pildyti ir kuo greičiau išvažiuoti iš degalinės.",
+      "Iškviesti dujų tarnybas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Pastebėjus dujų nuotėkį, pildymas nutraukiamas, o transporto priemonė neužvedant variklio ir neįjungiant žibintų nustumiama į saugią vietą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 8
+    }
+  },
+  {
+    "id": "45849-9",
+    "question": "Darbuotojų atstovais laikomi:",
+    "options": [
+      "profesinė sąjunga",
+      "profesinė sąjunga, darbo taryba ir darbuotojų patikėtinis",
+      "profesinė sąjunga ar darbo taryba"
+    ],
+    "correctIndex": 1,
+    "explanation": "Darbuotojų atstovais laikomi profesinė sąjunga, darbo taryba ir darbuotojų patikėtinis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 9
+    }
+  },
+  {
+    "id": "45849-10",
+    "question": "Darbuotojams turi būti sudaryta tokia darbo aplinka, kad joje nebūtų pavojingų ir (ar) kenksmingų veiksnių, keliančių susižalojimo ar kitokio sveikatos pakenkimo riziką, o jei tokia rizika yra:",
+    "options": [
+      "turi būti įsteigtas darbuotojų saugos ir sveikatos komitetas",
+      "turi būti sustabdyti darbai",
+      "ji turi būti kuo mažesnė ir turi būti numatytos priemonės tokiai rizikai šalinti"
+    ],
+    "correctIndex": 2,
+    "explanation": "Jei tokia rizika yra, ji turi būti kuo mažesnė ir numatytos priemonės jai šalinti.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 10
+    }
+  },
+  {
+    "id": "45849-11",
+    "question": "Kokie teisės aktai nustato darbo aplinkos veiksnių leistinas ribines vertes (dydžius)?",
+    "options": [
+      "Darbuotojų saugos ir sveikatos įstatymas.",
+      "Darbo kodeksas.",
+      "Sveikatos saugos reglamentai (higienos normos) ir kiti darbuotojų saugos ir sveikatos norminiai teisės aktai."
+    ],
+    "correctIndex": 2,
+    "explanation": "Leistinas ribines vertes nustato higienos normos ir kiti DSS norminiai teisės aktai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 11
+    }
+  },
+  {
+    "id": "45849-12",
+    "question": "Psichosocialinių veiksnių tyrimą atliekantys kompetentingi asmenys turi būti įgiję kompetencijų ir turintys tai patvirtinantį pažymėjimą šioje srityje:",
+    "options": [
+      "vykdomi ar planuojami vykdyti pakyčiai įmonėje ir jų įtaka streso darbe išsivystymui",
+      "darbo sąlygas, darbo priemonės, darbo laiko režimas",
+      "psichosocialinių veiksnių tyrimo, vertinimo principai ir metodikos"
+    ],
+    "correctIndex": 2,
+    "explanation": "Kompetentingų asmenų pažymėjimas apima psichosocialinių veiksnių tyrimo, vertinimo principus ir metodikas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 12
+    }
+  },
+  {
+    "id": "45849-13",
+    "question": "Kas, nukentėjus darbuotojui dėl įvykio darbe, pateikia pažymą apie pakenkimo sveikatai sunkumą?",
+    "options": [
+      "Valstybinio socialinio draudimo fondo valdybos teritorinis skyrius.",
+      "Asmens sveikatos priežiūros įstaiga, kuri suteikė dėl įvykio darbe nukentėjusiam darbuotojui medicinos pagalbą arba kurioje jis gydomas.",
+      "Asmens sveikatos priežiūros įstaiga, kurioje dėl įvykio darbe nukentėjęs darbuotojas yra prisirašęs."
+    ],
+    "correctIndex": 1,
+    "explanation": "Pažymą apie pakenkimo sveikatai sunkumą pateikia ASPĮ, suteikusi medicinos pagalbą arba kurioje nukentėjusysis gydomas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 13
+    }
+  },
+  {
+    "id": "45849-14",
+    "question": "Koks yra privalomo profilaktinio sveikatos tikrinimo tikslas?",
+    "options": [
+      "Apsaugoti dirbančių asmenų ir darbuotojų sveikatą nuo nelaimingų atsitikimų pakeliui į darbą.",
+      "Apsaugoti dirbančių asmenų ir darbuotojų sveikatą nuo galimo profesinės rizikos veiksnių poveikio, siekiant išvengti traumų ar kitokio darbuotojo sveikatos pakenkimo.",
+      "Apsaugoti dirbančių asmenų ir darbuotojų sveikatą nuo incidentų darbe."
+    ],
+    "correctIndex": 1,
+    "explanation": "Privalomo sveikatos tikrinimo tikslas – apsaugoti darbuotojų sveikatą nuo profesinės rizikos veiksnių poveikio ir išvengti traumų ar sveikatos pakenkimo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 14
+    }
+  },
+  {
+    "id": "45849-15",
+    "question": "Kokios formos žiniaraščiuose tvarkoma darbo laiko apskaita?",
+    "options": [
+      "Vyriausybės patvirtintos formos darbo laiko apskaitos žiniaraščiuose, kurie gali būti pildomi ir saugomi elektroniniu būdu.",
+      "Valstybinės darbo inspekcijos patvirtintos formos darbo laiko apskaitos žiniaraščiuose, kurie gali būti pildomi ir saugomi elektroniniu būdu.",
+      "Darbdavio patvirtintos formos darbo laiko apskaitos žiniaraščiuose, kurie gali būti pildomi ir saugomi elektroniniu būdu."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbo laiko apskaita tvarkoma Vyriausybės patvirtintos formos žiniaraščiuose (gali būti pildomi ir saugomi elektroniniu būdu).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 15
+    }
+  },
+  {
+    "id": "45849-16",
+    "question": "Kas gali inicijuoti kolektyvinius darbo ginčus dėl interesų?",
+    "options": [
+      "Profesinė sąjunga.",
+      "Darbuotojų atstovas saugai ir sveikatai.",
+      "Darbo taryba."
+    ],
+    "correctIndex": 0,
+    "explanation": "Kolektyvinius darbo ginčus dėl interesų gali inicijuoti profesinė sąjunga.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 16
+    }
+  },
+  {
+    "id": "45849-17",
+    "question": "Kokiame teisės akte yra surašytos darbuotojų saugos ir sveikatos specialistų, profesinės sveikatos specialistų ir įmonės darbuotojų saugos ir sveikatos tarnybos funkcijos?",
+    "options": [
+      "Įmonių darbuotojų saugos ir sveikatos tarnybų pavyzdiniuose nuostatuose.",
+      "Lietuvos Respublikos darbuotojų saugos ir sveikatos įstatyme.",
+      "Įmonių darbuotojų saugos ir sveikatos komitetų bendruosiuose nuostatuose."
+    ],
+    "correctIndex": 0,
+    "explanation": "DSS specialistų, profesinės sveikatos specialistų ir DSS tarnybos funkcijos nustatytos Įmonių darbuotojų saugos ir sveikatos tarnybų pavyzdiniuose nuostatuose.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 17
+    }
+  },
+  {
+    "id": "45849-18",
+    "question": "Kur darbdaviai privalo įrengti saugos ir sveikatos apsaugos ženklus pagal Saugos ir sveikatos apsaugos ženklų naudojimo darbovietėse nuostatų reikalavimus?",
+    "options": [
+      "Ten, kur neįmanoma išvengti rizikos arba pakankamai ją sumažinti kolektyvinėmis saugos priemonėmis, darbo organizavimo metodais, būdais.",
+      "Tik ten, kur į darbo vietas gali patekti pašaliniai asmenys.",
+      "Ant gaminamos ir teikiamos į rinką produkcijos."
+    ],
+    "correctIndex": 0,
+    "explanation": "Ženklai įrengiami ten, kur rizikos neįmanoma išvengti ar pakankamai sumažinti kolektyvinėmis priemonėmis ar darbo organizavimu.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 18
+    }
+  },
+  {
+    "id": "45849-19",
+    "question": "Kokia forma daromi darbo sutarties pakeitimai?",
+    "options": [
+      "raštu viename sutarties egzemplioriuje.",
+      "žodžiu.",
+      "raštu abiejuose sutarties egzemplioriuose."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbo sutarties pakeitimai daromi raštu abiejuose sutarties egzemplioriuose.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 19
+    }
+  },
+  {
+    "id": "45849-20",
+    "question": "Ar reikia profesinę riziką vertinti projektuojant ir įrengiant darbo vietas?",
+    "options": [
+      "Teisės aktai nereglamentuoja.",
+      "Taip.",
+      "Ne."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, profesinė rizika vertinama ir projektuojant bei įrengiant darbo vietas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 20
+    }
+  },
+  {
+    "id": "45849-21",
+    "question": "Kokiomis asmeninėmis apsaugos priemonėmis darbdavys privalo aprūpinti darbuotoją, kurį vienu metu veikia daugiau kaip vienas rizikos veiksnys ir (ar) pavojus?",
+    "options": [
+      "Visomis reikiamomis asmeninėmis apsaugos priemonėmis, kurios būtų tarpusavyje suderintos ir garantuotų apsaugą nuo rizikos veiksnių ir (ar) pavojų.",
+      "Tokiu atveju darbuotojo sauga ir sveikata turi būti užtikrinama tik kolektyvinėmis saugos priemonėmis.",
+      "Asmeninėmis apsaugos priemonėmis, kurios garantuotų apsaugą nuo pavojingiausių rizikos veiksnių."
+    ],
+    "correctIndex": 0,
+    "explanation": "Veikiant keliems rizikos veiksniams, AAP turi būti tarpusavyje suderintos ir apsaugoti nuo visų jų.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 21
+    }
+  },
+  {
+    "id": "45849-22",
+    "question": "Kokios garantijos taikomos darbuotojams, paskirtiems į darbo tarybos rinkimų komisiją?",
+    "options": [
+      "Jie rinkimų komisijos įgaliojimų metu darbdavio iniciatyva negali būti atleidžiami iš darbo.",
+      "Jiems rinkimų komisijos įgaliojimų metu negali būti skiriamos drausminės nuobaudos.",
+      "Jie rinkimų komisijos įgaliojimų metu negali būti siunčiami į tarnybinę komandiruotę."
+    ],
+    "correctIndex": 0,
+    "explanation": "Rinkimų komisijos nariai įgaliojimų metu darbdavio iniciatyva negali būti atleidžiami iš darbo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 22
+    }
+  },
+  {
+    "id": "45849-23",
+    "question": "Ar dėvėtos asmeninės apsaugos priemonės gali būti duodamos kitiems darbuotojams?",
+    "options": [
+      "Gali, jeigu dėl to neprieštarauja darbuotojai.",
+      "Negali, darbuotojai turi būti aprūpinti tik naujomis asmeninėmis apsaugos priemonėmis.",
+      "Susidarius tam tikroms aplinkybėms gali būti duodamos kitiems darbuotojams tik išskalbtos, išvalytos ir dezinfekuotos."
+    ],
+    "correctIndex": 2,
+    "explanation": "Dėvėtos AAP gali būti perduodamos kitiems darbuotojams tik nustatytais atvejais ir būtinai išskalbtos, išvalytos bei dezinfekuotos.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 23
+    }
+  },
+  {
+    "id": "45849-24",
+    "question": "Kokie specialūs reikalavimai keliami darbovietėms lauke?",
+    "options": [
+      "Darbo vietos lauke pagal galimybes turi būti įrengtos taip, kad būtų užtikrinta nuolatos teigiama darbo aplinkos temperatūra.",
+      "Darbo vietos lauke turi būti įrengtos taip, kad darbuotojai, kilus pavojui saugai ir sveikatai, žinotų kur yra asmeninės apsaugos priemonės.",
+      "Darbo vietos lauke pagal galimybes turi būti įrengtos taip, kad darbuotojai, kilus pavojui, galėtų greitai palikti savo darbo vietas arba skubiai sulaukti pagalbos."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbo vietos lauke įrengiamos taip, kad kilus pavojui darbuotojai galėtų greitai jas palikti arba skubiai sulaukti pagalbos.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 24
+    }
+  },
+  {
+    "id": "45849-25",
+    "question": "Tiriant psichosocialinius veiksnius vertinami darbuotojų tarpusavio santykiai ir (ar) santykiai su darbdaviu ir (ar) trečiaisiais asmenimis, pavyzdžiui:",
+    "options": [
+      "didelis darbo tempas, darbuotojų sugebėjimų ir galimybių atlikti užduotis neatitikimas",
+      "kolegų ir vadovų palaikymas, konfliktai, fizinis ir psichologinis smurtas darbe",
+      "darbo laiko trukmė, darbo sutarties rūšis, darbo apmokėjimo ir premijavimo ypatumai"
+    ],
+    "correctIndex": 1,
+    "explanation": "Santykiniams veiksniams priskiriamas kolegų ir vadovų palaikymas, konfliktai, fizinis ir psichologinis smurtas darbe.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 25
+    }
+  },
+  {
+    "id": "45849-26",
+    "question": "Tiriant įvykį darbe privalu nustatyti:",
+    "options": [
+      "ar įvykį lėmė darbuotojų saugą ir sveikatą, darbo santykius reglamentuojančių teisės aktų pažeidimai, ar šie pažeidimai yra įvykio darbe priežastys",
+      "ar įvykį lėmė darbuotojų ir darbdavių santykių įforminimo netikslumai",
+      "ar įvykį lėmė darbuotojų saugos ir sveiktos paslaugas teikiančių trečiųjų asmenų veiksmai"
+    ],
+    "correctIndex": 0,
+    "explanation": "Tiriant įvykį darbe nustatoma, ar jį lėmė DSS / darbo santykių teisės aktų pažeidimai ir ar jie yra įvykio priežastys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 26
+    }
+  },
+  {
+    "id": "45849-27",
+    "question": "Ką reiškia sąvoka „stresas darbe“?",
+    "options": [
+      "Darbuotojo reakcija į nepalankiai susiklosčiusius santykius šeimoje, kai darbuotojui nesinori grįžti po darbo į namus.",
+      "Darbuotojo reakcija į psichosocialinius veiksnius susiklosčiusius visuomenėje dėl darbo jėgos migracijos.",
+      "Darbuotojo reakcija į nepalankius darbo sąlygų, darbo reikalavimų, darbo organizavimo, darbo turinio, darbuotojų tarpusavio santykių ir (ar) santykių su darbdaviu ir (ar) trečiaisiais asmenimis psichosocialinius veiksnius."
+    ],
+    "correctIndex": 2,
+    "explanation": "Stresas darbe – reakcija į nepalankius darbo sąlygų, reikalavimų, organizavimo, turinio ir santykių psichosocialinius veiksnius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 27
+    }
+  },
+  {
+    "id": "45849-28",
+    "question": "Kokių įrenginių priežiūrai taikomas Potencialiai pavojingų įrenginių priežiūros įstatymas?",
+    "options": [
+      "Liftų ir jų įrangos.",
+      "Radijo aktyvios spinduliuotės šaltinius savo sudėtyje turinčių įrenginių.",
+      "Aukštos įtampos elektros įrenginių."
+    ],
+    "correctIndex": 0,
+    "explanation": "Potencialiai pavojingų įrenginių priežiūros įstatymas taikomas, pavyzdžiui, liftų ir jų įrangos priežiūrai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 28
+    }
+  },
+  {
+    "id": "45849-29",
+    "question": "Dinaminiam darbui būdinga:",
+    "options": [
+      "raumenų susitraukimai atliekant judesius, nustatytus tik Krovinių kėlimo rankomis nuostatuose",
+      "raumenų susitraukimai atliekant judesius",
+      "raumenų susitraukimai išmatuojami dinamometru"
+    ],
+    "correctIndex": 1,
+    "explanation": "Dinaminiam darbui būdingi raumenų susitraukimai atliekant judesius.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 29
+    }
+  },
+  {
+    "id": "45849-30",
+    "question": "Darbuotoja, esanti penktą mėnesį nėščia, prašo sudaryti sąlygas pailsėti atsigulus. Ar tokias sąlygas užtikrina teisės aktai?",
+    "options": [
+      "Taip.",
+      "Taip, tais atvejais, kai darbuotoja dirba fiziškai sunkų darbą.",
+      "Ne."
+    ],
+    "correctIndex": 0,
+    "explanation": "Taip, nėščiosioms turi būti sudarytos sąlygos pailsėti atsigulus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 30
+    }
+  },
+  {
+    "id": "45849-31",
+    "question": "Kokie reikalavimai keliami darbo aplinkai, kai darbo vietose naudojamos pavojingos cheminės medžiagos bei preparatai?",
+    "options": [
+      "Neturi būti viršijamos cheminių medžiagų koncentracijos nustatytos ribinės vertės (dydžiai) darbo aplinkos ore.",
+      "Pavojingos cheminės medžiagos turi būti naudojamos uždarose sistemose, kad nekiltų pavojus darbuotojų saugai ir sveikatai.",
+      "Turi būti sudarytos tokios darbo sąlygos, kad darbo aplinkos ore nebūtų pavojingų cheminių medžiagų."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbo aplinkos ore neturi būti viršijamos nustatytos cheminių medžiagų koncentracijos ribinės vertės.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 31
+    }
+  },
+  {
+    "id": "45849-32",
+    "question": "Kokiais atvejais įmonėje skirti asmenį, atsakingą už elektros ūkį, nebūtina?",
+    "options": [
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 30 kW arba esant vienfaziam elektros įvadui.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 60 kW.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 50 kW esant trifaziam elektros įvadui."
+    ],
+    "correctIndex": 0,
+    "explanation": "Skirti asmens, atsakingo už elektros ūkį, nebūtina, jei žemosios įtampos įrenginių leista galia ne didesnė kaip 30 kW arba esant vienfaziam įvadui.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 32
+    }
+  },
+  {
+    "id": "45849-33",
+    "question": "Kas turi užtikrinti, kad dirbti sulygtą darbą, atlikti pavestą užduotį būtų leidžiama tik darbuotojui, žinančiam ir gebančiam taikyti saugius darbo metodus?",
+    "options": [
+      "Darbdaviui atstovaujantis asmuo ar jo pavedimu įgaliotas asmuo.",
+      "Darbdavio įgaliotas asmuo.",
+      "Darbuotojų saugos ir sveikatos specialistas."
+    ],
+    "correctIndex": 0,
+    "explanation": "Tai užtikrina darbdaviui atstovaujantis asmuo ar jo pavedimu įgaliotas asmuo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 33
+    }
+  },
+  {
+    "id": "45849-34",
+    "question": "Ar visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) taikoma Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“?",
+    "options": [
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ netaikoma.",
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ taikoma.",
+      "Visuomeninės paskirties kompiuterių sistemoms (sistemoms, kurios naudojamos mokymuisi, informacijos paieškai, laisvalaikiui ir pan.) Lietuvos higienos norma HN 32: 2004 „Darbas su videoterminalais. Saugos ir sveikatos reikalavimai“ taikoma tik tais atvejais, kai šios sistemos naudojamos mokymosi tikslais."
+    ],
+    "correctIndex": 0,
+    "explanation": "Higienos norma HN 32:2004 visuomeninės paskirties kompiuterių sistemoms netaikoma.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 34
+    }
+  },
+  {
+    "id": "45849-35",
+    "question": "Nelaimingo atsitikimo darbe tyrimo rezultatai surašomi N-2 formos akte, kai nelaimingas atsitikimas įvyksta darbuotojo darbo dienomis kelyje tarp darbovietės ir:",
+    "options": [
+      "vietos, kurioje gyvena",
+      "valgyklos įmonės patalpose ar jos teritorijoje asmens pertraukos pailsėti ir pavalgyti metu",
+      "esant kitoje įmonėje, įspėjimo apie darbo sutarties nutraukimą laikotarpiu darbdavio suteiktu darbuotojui laisvu nuo darbo laiku ieškotis naujo darbo"
+    ],
+    "correctIndex": 0,
+    "explanation": "N-2 formos aktas surašomas, kai nelaimingas atsitikimas įvyksta pakeliui į darbą ar iš darbo (tarp darbovietės ir gyvenamosios vietos).",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 35
+    }
+  },
+  {
+    "id": "45849-36",
+    "question": "Darbuotojui mirus dėl įtariamos ūmios profesinės ligos, darbdavys apie tai nedelsdamas telefonu, faksu ar elektroniniu paštu praneša:",
+    "options": [
+      "atitinkamos apylinkės prokuratūrai, Valstybinės darbo inspekcijos teritoriniam skyriui ir Valstybinio socialinio draudimo fondo valdybos teritoriniam skyriui",
+      "Sveikatos apsaugos ministerijai",
+      "asmens sveikatos priežiūros įstaigai"
+    ],
+    "correctIndex": 0,
+    "explanation": "Apie mirtį dėl įtariamos ūmios profesinės ligos pranešama apylinkės prokuratūrai, VDI teritoriniam skyriui ir „Sodros“ teritoriniam skyriui.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 36
+    }
+  },
+  {
+    "id": "45849-37",
+    "question": "Ar darbdavys atleidžiamas nuo atsakomybės sudaryti darbuotojams saugias ir sveikatai nekenksmingas darbo sąlygas, suteikdamas įpareigojimus darbuotojų saugos ir sveikatos specialistams, darbdavio įgaliotiems asmenims darbuotojų saugai ir sveikatai, arba turėdamas sutartinius įpareigojimus juridiniams ar fiziniams asmenims, vykdantiems darbuotojų saugos ir sveikatos tarnybos funkcijas ar dalį jų?",
+    "options": [
+      "Ne, išskyrus atvejus kai sutartiniuose įsipareigojimuose numatyta darbuotojo atsakomybė.",
+      "Taip.",
+      "Ne."
+    ],
+    "correctIndex": 2,
+    "explanation": "Ne, darbdavys nuo šios atsakomybės neatleidžiamas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 37
+    }
+  },
+  {
+    "id": "45849-38",
+    "question": "Kokia darbdavio pareiga darbuotojų saugos ir sveikatos srityje?",
+    "options": [
+      "Sudaryti darbuotojams saugias ir sveikatai nekenksmingas darbo sąlygas visais su darbu susijusiais aspektais, pranešant VDI apie darbuotojų saugos ir sveikatos tarnybos funkcijų vykdymą įmonėje.",
+      "Paskirti darbdavio įgaliotus asmenis darbuotojų saugos ir sveikatos priemonėms įgyvendinti.",
+      "Sudaryti darbuotojams saugias ir sveikatai nekenksmingas darbo sąlygas visais su darbu susijusiais aspektais."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbdavio pareiga – sudaryti darbuotojams saugias ir sveikatai nekenksmingas darbo sąlygas visais su darbu susijusiais aspektais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 38
+    }
+  },
+  {
+    "id": "45849-39",
+    "question": "Ar statiniuose, įrengiant darbo vietas, būtina vadovautis Darboviečių įrengimo bendraisiais nuostatais?",
+    "options": [
+      "Taip.",
+      "Kaip nustatyta kolektyvinėje sutartyje.",
+      "Ne."
+    ],
+    "correctIndex": 0,
+    "explanation": "Taip, statiniuose įrengiant darbo vietas vadovaujamasi Darboviečių įrengimo bendraisiais nuostatais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 39
+    }
+  },
+  {
+    "id": "45849-40",
+    "question": "Ką reiškia sąvoka “kenksmingas veiksnys“?",
+    "options": [
+      "Rizikos veiksnys darbo aplinkoje, kuris veikdamas darbuotojo organizmą gali sukelti ligą ar profesinę ligą ir kurio poveikis gali būti pavojingas gyvybei.",
+      "Galima grėsmė darbuotojų sveikatai ir gyvybei.",
+      "Traumos ar kitokio darbuotojo sveikatos pakenkimo galimybė dėl kenksmingo ir (ar) pavojingo darbo aplinkos rizikos veiksnio."
+    ],
+    "correctIndex": 0,
+    "explanation": "Kenksmingas veiksnys – darbo aplinkos rizikos veiksnys, kuris veikdamas organizmą gali sukelti ligą ar profesinę ligą ir kurio poveikis gali būti pavojingas gyvybei.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45849",
+      "testDate": "2023-05-30",
+      "questionNumber": 40
+    }
+  },
+  {
+    "id": "45829-1",
+    "question": "Ką reiškia sąvoka \"nelaimingas atsitikimas darbe\"?",
+    "options": [
+      "Tai įvykis darbe, kai darbuotojas mirė dėl ligos, nesusijusios su darbu.",
+      "Tai įvykis darbe, įskaitant eismo įvykį , atliekant darbo funkcijas ar būnant darbo vietoje, dėl kurio darbuotojas patiria žalą sveiktai ir netenka darbingumo nors vienai dienai arba dėl kurio darbuotojas miršta, nustatyta tvarka ištirtas ir pripažintas nelaimingu atsitikimu darbe.",
+      "Tai įvykis darbe, įskaitant eismo įvykį, susijęs su darbu, kai nesužeidžiamas nė vienas darbuotojas arba kai dėl darbuotojo traumos, gautos per šį įvykį, reikalinga tik pirmoji medicinos pagalba."
+    ],
+    "correctIndex": 1,
+    "explanation": "Nelaimingas atsitikimas darbe – įvykis darbe (įskaitant eismo įvykį) atliekant darbo funkcijas ar būnant darbo vietoje, dėl kurio netenkama darbingumo bent vienai dienai arba mirštama, ir jis nustatyta tvarka ištirtas bei pripažintas nelaimingu atsitikimu darbe.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 1
+    }
+  },
+  {
+    "id": "45829-2",
+    "question": "Ką gali darbdaviui atstovaujantis asmuo, įgyvendindamas darbdavio pareigą sudaryti saugias ir sveikas darbo sąlygas, pavesti padalinio vadovui?",
+    "options": [
+      "Įgyvendinti nelaimingų atsitikimų darbe ir profesinių ligų prevencines priemones įmonės padalinyje, duodamas jam konkrečius pavedimus.",
+      "Užtikrinti visos įmonės darbuotojų saugą ir sveikatą.",
+      "Įgyvendinti tik profesinių ligų prevencines priemones padalinyje."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbdaviui atstovaujantis asmuo gali pavesti padalinio vadovui įgyvendinti nelaimingų atsitikimų darbe ir profesinių ligų prevencines priemones padalinyje, duodamas konkrečius pavedimus.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 2
+    }
+  },
+  {
+    "id": "45829-3",
+    "question": "Kokiais atvejais darbuotojams turi būti įrengtos atskiros spintelės kasdieniniams ir darbo drabužiams?",
+    "options": [
+      "Kai dirbama naudojant asmenines apsaugos priemones.",
+      "Kai dirbama lauko sąlygomis.",
+      "Kai dirbama su pavojingomis medžiagomis, nešvarumais ar drėgmėje."
+    ],
+    "correctIndex": 2,
+    "explanation": "Atskiros spintelės kasdieniniams ir darbo drabužiams įrengiamos, kai dirbama su pavojingomis medžiagomis, nešvarumais ar drėgmėje.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 3
+    }
+  },
+  {
+    "id": "45829-4",
+    "question": "Kada darbuotojas turi teisę atsisakyti dirbti?",
+    "options": [
+      "Abu atsakymai teisingi.",
+      "Sugedus darbo priemonei.",
+      "Kai dirbama neįrengus reikiamų kolektyvinės apsaugos priemonių."
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbuotojas turi teisę atsisakyti dirbti tiek sugedus darbo priemonei, tiek kai dirbama neįrengus reikiamų kolektyvinės apsaugos priemonių.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 4
+    }
+  },
+  {
+    "id": "45829-5",
+    "question": "Kaip apmokama už laiką, kurį darbuotojų saugos ir sveikatos komiteto narys vykdo jam pavestus įpareigojimus, susijusius su darbuotojų sauga ir sveikata, ar mokosi?",
+    "options": [
+      "Jam mokamas vidutinis darbo užmokestis.",
+      "Jam mokamas minimalus darbo užmokestis.",
+      "Jam mokamas kolektyvinėje sutartyje sulygtas darbo užmokestis ar suteikiamos laisvos dienos."
+    ],
+    "correctIndex": 0,
+    "explanation": "Už šį laiką DSS komiteto nariui mokamas vidutinis darbo užmokestis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 5
+    }
+  },
+  {
+    "id": "45829-6",
+    "question": "Su kuo darbdavys turi suderinti parengtą darbuotojams nemokamai išduodamų asmeninių apsaugos priemonių sąrašą?",
+    "options": [
+      "Su darbuotojų atstovais.",
+      "Su darbuotojų saugos ir sveikatos tarnyba.",
+      "Su Valstybine darbo inspekcija."
+    ],
+    "correctIndex": 0,
+    "explanation": "Nemokamai išduodamų AAP sąrašas derinamas su darbuotojų atstovais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 6
+    }
+  },
+  {
+    "id": "45829-7",
+    "question": "Ar evakavimo keliai išėjimų link ir patys išėjimai privalo būti visada laisvi?",
+    "options": [
+      "Jei darbuotojai reikalauja.",
+      "Taip.",
+      "Ne."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, evakavimo keliai ir išėjimai privalo būti visada laisvi.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 7
+    }
+  },
+  {
+    "id": "45829-8",
+    "question": "Kas priima sprendimą steigti darbuotojų saugos ir sveikatos komitetą įmonėje (toliau - Komitetas) įmonėse, kai darbuotojų skaičius mažesnis nei 50?",
+    "options": [
+      "Darbdaviui atstovaujantis asmuo.",
+      "Komitetas steigiamas darbdavio ar darbuotojų atstovų iniciatyva arba daugiau kaip pusės įmonės darbuotojų kolektyvo siūlymu.",
+      "Profesinė sąjunga, jeigu to pageidauja bent 1/3 įmonės darbuotojų."
+    ],
+    "correctIndex": 1,
+    "explanation": "Kai darbuotojų mažiau nei 50, komitetas steigiamas darbdavio ar darbuotojų atstovų iniciatyva arba daugiau kaip pusės darbuotojų siūlymu.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 8
+    }
+  },
+  {
+    "id": "45829-9",
+    "question": "Sugedus darbo įrenginiui darbuotojas atsisakė dirbti. Ar pagrįstas darbuotojo atsisakymas dirbti?",
+    "options": [
+      "Ne, jeigu siekiant laiku baigti užsakymą, tęsti darbus su ne visiškai tvarkingu įrenginiu reikalauja padalinio vadovas.",
+      "Taip.",
+      "Taip, tik tuo atveju, jeigu tai gresia darbuotojo gyvybei."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, darbuotojo atsisakymas dirbti su sugedusiu darbo įrenginiu yra pagrįstas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 9
+    }
+  },
+  {
+    "id": "45829-10",
+    "question": "Kas, vadovaujantis Darbuotojų saugos ir sveikatos įstatymu, organizuoja profesinės rizikos vertinimą įmonėje?",
+    "options": [
+      "Darbdavio įgaliotas asmuo.",
+      "Darbdaviui atstovaujantis asmuo arba jo pavedimu darbdavio įgaliotas asmuo.",
+      "Darbdavio įgaliotas asmuo darbuotojų saugai ir sveikatai."
+    ],
+    "correctIndex": 1,
+    "explanation": "Profesinės rizikos vertinimą organizuoja darbdaviui atstovaujantis asmuo arba jo pavedimu darbdavio įgaliotas asmuo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 10
+    }
+  },
+  {
+    "id": "45829-11",
+    "question": "Kas įmonėje sprendžia kokias kolektyvines apsaugos priemones naudoti?",
+    "options": [
+      "Darbdavio įgaliotas asmuo.",
+      "Padalinio vadovas.",
+      "Darbdavys."
+    ],
+    "correctIndex": 2,
+    "explanation": "Kokias kolektyvines apsaugos priemones naudoti, sprendžia darbdavys.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 11
+    }
+  },
+  {
+    "id": "45829-12",
+    "question": "Kas kontroliuoja ar laikomasi potencialiai pavojingų įrenginių techninės būklės tikrinimo tvarkos ir terminų?",
+    "options": [
+      "Technikos priežiūros tarnyba.",
+      "Valstybinė darbo inspekcija.",
+      "Miesto (rajono) savivaldybė."
+    ],
+    "correctIndex": 1,
+    "explanation": "Potencialiai pavojingų įrenginių techninės būklės tikrinimo tvarkos ir terminų laikymąsi kontroliuoja Valstybinė darbo inspekcija.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 12
+    }
+  },
+  {
+    "id": "45829-13",
+    "question": "Kada darbuotojui turi būti suteikta pietų pertrauka?",
+    "options": [
+      "Ne vėliau kaip po 5 valandų darbo.",
+      "Ne vėliau kaip po 4 valandų darbo.",
+      "Ne vėliau kaip po 3 valandų darbo."
+    ],
+    "correctIndex": 0,
+    "explanation": "Pietų pertrauka turi būti suteikta ne vėliau kaip po 5 valandų darbo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 13
+    }
+  },
+  {
+    "id": "45829-14",
+    "question": "Jeigu darbai yra susiję su užteršimu, ar darbuotojams turi būti nemokamai duodamos asmens higienos priemonės (muilas, rankšluosčiai ir kita)?",
+    "options": [
+      "Teisės aktai nereglamentuoja.",
+      "Ne.",
+      "Taip."
+    ],
+    "correctIndex": 2,
+    "explanation": "Taip, jei darbai susiję su užteršimu, asmens higienos priemonės suteikiamos nemokamai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 14
+    }
+  },
+  {
+    "id": "45829-15",
+    "question": "Darbuotojų atstovais laikomi:",
+    "options": [
+      "profesinė sąjunga, darbo taryba ir darbuotojų patikėtinis",
+      "profesinė sąjunga ar darbo taryba",
+      "profesinė sąjunga"
+    ],
+    "correctIndex": 0,
+    "explanation": "Darbuotojų atstovais laikomi profesinė sąjunga, darbo taryba ir darbuotojų patikėtinis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 15
+    }
+  },
+  {
+    "id": "45829-16",
+    "question": "Ar turi būti įmonėje, įstaigoje, organizacijoje ar kitoje organizacinėje struktūroje vykdomas profesinės rizikos stebėjimas?",
+    "options": [
+      "Jei taip nustatė darbdavys ar darbdaviui atstovaujantis asmuo.",
+      "Taip.",
+      "Ne."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, profesinės rizikos stebėjimas turi būti vykdomas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 16
+    }
+  },
+  {
+    "id": "45829-17",
+    "question": "Ūmūs apsinuodijimai darbe tiriami:",
+    "options": [
+      "Profesinių ligų tyrimo ir apskaitos nuostatų, patvirtintų Lietuvos Respublikos Vyriausybės 2004 m. balandžio 28 d. nutarimu Nr. 487“, nustatyta tvarka",
+      "Nelaimingų atsitikimų darbe tyrimo ir apskaitos nuostatų, patvirtintų Lietuvos Respublikos Vyriausybės 2004 m. rugsėjo 2 d. nutarimu Nr. 1118 „Dėl Nelaimingų atsitikimų darbe tyrimo ir apskaitos nuostatų patvirtinimo“, nustatyta tvarka",
+      "Lietuvos Respublikos valstybinės darbo inspekcijos nustatyta tvarka"
+    ],
+    "correctIndex": 1,
+    "explanation": "Ūmūs apsinuodijimai darbe tiriami Nelaimingų atsitikimų darbe tyrimo ir apskaitos nuostatų nustatyta tvarka.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 17
+    }
+  },
+  {
+    "id": "45829-18",
+    "question": "Ką turi įvertinti darbdavys vykdydamas pareigą užtikrinti saugias ir nekenksmingas darbo sąlygas dirbant su cheminėmis medžiagomis ir jų mišiniais?",
+    "options": [
+      "Informaciją apie saugą ir sveikatą, kurią pateikia tiekėjas atitinkamuose saugos duomenų lapuose.",
+      "Informaciją, kurią pateikia naudojamos cheminės medžiagos ar mišinio tiekėjas produkto sertifikate.",
+      "Informaciją, kuri yra pateikta apie naudojamą cheminę medžiagą ar mišinį internete."
+    ],
+    "correctIndex": 0,
+    "explanation": "Vertinama informacija apie saugą ir sveikatą, pateikta tiekėjo saugos duomenų lapuose.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 18
+    }
+  },
+  {
+    "id": "45829-19",
+    "question": "Darbuotojas dirba miesto savivaldybės įmonėje parkų priežiūros specialistu. Vertinant profesinę riziką darbo vietoje yra nustatyta rizika darbuotojui užsikrėsti užkrečiamąja liga – erkiniu encefalitu. Kokių priemonių turi imtis darbdavys siekdamas apsaugoti darbuotojus nuo užkrečiamos ligos?",
+    "options": [
+      "Imasi visų reikiamų priemonių darbuotojų apsaugai nuo biologinių medžiagų poveikio, tame tarpe ir darbuotojo skiepijimo darbdavio lėšomis.",
+      "Imasi visų reikiamų priemonių darbuotojų apsaugai nuo pavojingų medžiagų poveikio ir rekomenduoja darbuotojams skiepytis savo lėšomis.",
+      "Išduoda asmenines apsaugos priemones."
+    ],
+    "correctIndex": 0,
+    "explanation": "Imamasi visų reikiamų priemonių apsaugai nuo biologinių veiksnių, įskaitant skiepijimą darbdavio lėšomis.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 19
+    }
+  },
+  {
+    "id": "45829-20",
+    "question": "Lengvas nelaimingas atsitikimas darbe, tai:",
+    "options": [
+      "įvykis, dėl kurio darbuotojas netenka darbingumo nors vienai dienai",
+      "nelaimingas atsitikimas darbe, kuris nepriskiriamas sunkių ar mirtinų nelaimingų atsitikimų darbe kategorijai",
+      "įvykis, kuris priskiriamas nelaimingų atsitikimų darbe kategorijai"
+    ],
+    "correctIndex": 1,
+    "explanation": "Lengvas nelaimingas atsitikimas darbe – nelaimingas atsitikimas darbe, kuris nepriskiriamas sunkių ar mirtinų kategorijai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 20
+    }
+  },
+  {
+    "id": "45829-21",
+    "question": "Ar galima darbuotojams vaikščioti savaeigių darbo įrenginių veikimo zonoje?",
+    "options": [
+      "Turi būti imtasi priemonių, draudžiančių darbuotojams vaikščioti savaeigių įrenginių veikimo zonoje. Jeigu atliekant darbus darbuotojams reikia vaikščioti savaeigių įrenginių veikimo zonoje, privaloma imtis tinkamų priemonių apsaugoti juos, kad įrenginiai nesužalotų.",
+      "Negalima, savaeigių darbo įrenginių veikimo zonos turi būti aptvertos ir į jas darbuotojai neturi patekti.",
+      "Galima, jeigu įmonė yra parengus vidaus tvarkos taisykles, kuriose yra numatyta, kad darbuotojai gali vaikščioti savaeigių darbo įrenginių veikimo zonoje."
+    ],
+    "correctIndex": 0,
+    "explanation": "Vaikščiojimas draudžiamas arba, jei būtina dirbant, imamasi priemonių darbuotojams apsaugoti, kad nesužalotų.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 21
+    }
+  },
+  {
+    "id": "45829-22",
+    "question": "Kur yra nustatomi konkrečios darbo priemonės saugaus naudojimo reikalavimai?",
+    "options": [
+      "Konkrečios darbo priemonės saugaus naudojimo reikalavimus nustato atitinkami darbuotojų saugos ir sveikatos norminiai teisės aktai.",
+      "Konkrečios darbo priemonės saugaus naudojimo reikalavimai nustatomi darbo priemonės dokumentuose, kuriuos kartu su darbo priemone privalo pateikti gamintojas.",
+      "Konkrečios darbo priemonės saugaus naudojimo reikalavimus nustato techniniai reglamentai ar kiti darbuotojų saugos ir sveikatos norminiai teisės aktai."
+    ],
+    "correctIndex": 0,
+    "explanation": "Konkrečios darbo priemonės saugaus naudojimo reikalavimus nustato atitinkami DSS norminiai teisės aktai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 22
+    }
+  },
+  {
+    "id": "45829-23",
+    "question": "Kokia turi būti sudaryta darbuotojams darbo aplinka?",
+    "options": [
+      "Kad darbo sąlygų kenksmingi veiksniai neviršytų leistinų ribinių verčių (dydžių), nustatytų higienos normose ir kituose darbuotojų saugos ir sveikatos norminiuose teisės aktuose.",
+      "Kad joje visiškai nebūtų pavojingų ir (ar) kenksmingų veiksnių, keliančių susižalojimo ar kitokio sveikatos pakenkimo riziką.",
+      "Kad joje nebūtų pavojingų ir (ar) kenksmingų veiksnių, keliančių susižalojimo ar kitokio sveikatos pakenkimo riziką, o jei tokia rizika yra, ji turi būti kuo mažesnė ir turi būti numatytos priemonės tokiai rizikai šalinti."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbo aplinka sudaroma taip, kad nebūtų pavojingų ir (ar) kenksmingų veiksnių, o jei rizika yra – ji kuo mažesnė ir numatytos priemonės jai šalinti.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 23
+    }
+  },
+  {
+    "id": "45829-24",
+    "question": "Krovinių tvarkymas rankomis – tai:",
+    "options": [
+      "krovinių sandėliavimas prisilaikant saugaus krovinių sandėliavimo taisyklių",
+      "krovinių sudėjimas į stelažus, siekiant išvengti krovinių kritimo",
+      "krovinio gabenimas ar laikymas, kai vienas ar daugiau darbuotojų kelia, leidžia žemyn, stumia, traukia, neša ar judina krovinį, kuris dėl jo savybių ar nepalankių ergonominių sąlygų kelia riziką darbuotojams, ypač susižeisti nugarą"
+    ],
+    "correctIndex": 2,
+    "explanation": "Krovinių tvarkymas rankomis – gabenimas ar laikymas rankomis, kai dėl krovinio savybių ar ergonominių sąlygų kyla rizika, ypač susižeisti nugarą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 24
+    }
+  },
+  {
+    "id": "45829-25",
+    "question": "Per septynias paeiliui einančias dienas negali būti dirbama daugiau kaip:",
+    "options": [
+      "6 dienas",
+      "5 dienas",
+      "4 darbo dienas ir šeštadienį"
+    ],
+    "correctIndex": 0,
+    "explanation": "Per septynias paeiliui einančias dienas negali būti dirbama daugiau kaip 6 dienas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 25
+    }
+  },
+  {
+    "id": "45829-26",
+    "question": "Ar gali du ar daugiau darbo įrenginių, naudojamų nepalydimiems kroviniams kelti, būti sumontuojami ar pastatomi taip, kad jų darbo zonos sutaptų?",
+    "options": [
+      "Gali, tačiau turi būti imtasi tinkamų priemonių, padedančių išvengti krovinių ir (arba) pačių darbo įrenginių dalių susidūrimo.",
+      "Gali, jeigu operatoriai, valdantys darbo įrenginius, naudojamus nepalydimiems kroviniams kelti, mato vienas kitą.",
+      "Negali, darbo įrenginiai, naudojami nepalydimiems kroviniams kelti, turi būti sumontuojami ar pastatomi taip, kad jų darbo zonos nesutaptų."
+    ],
+    "correctIndex": 0,
+    "explanation": "Gali, jei imamasi priemonių, padedančių išvengti krovinių ar įrenginių dalių susidūrimo.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 26
+    }
+  },
+  {
+    "id": "45829-27",
+    "question": "Kuris teiginys yra teisingas?",
+    "options": [
+      "Naudojant pavojingą cheminę medžiagą, privaloma vadovautis informacija ir reikalavimais, nurodytais saugos duomenų lape.",
+      "Darbdavys privalo darbuotojus pasirašytinai supažindinti su visų naudojamų cheminių medžiagų saugos duomenų lapais.",
+      "Dirbant su cheminėmis medžiagomis ir jų mišiniais privalu taikyti paskyrų - leidimų sistemą."
+    ],
+    "correctIndex": 0,
+    "explanation": "Naudojant pavojingą cheminę medžiagą, būtina vadovautis saugos duomenų lape nurodyta informacija ir reikalavimais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 27
+    }
+  },
+  {
+    "id": "45829-28",
+    "question": "Ar darbdavys nedelsdamas telefonu ar elektroniniu paštu privalo pranešti atitinkamai teritorinei prokuratūrai, Valstybinės darbo inspekcijos teritoriniam skyriui ir, jei turima duomenų, vienam iš nukentėjusio darbuotojo šeimos narių, apie kiekvieną įvykį darbe dėl kurio darbuotojas mirė, taip pat apie darbuotojo mirtį dėl ligos, nesusijusios su darbu, arba jei sunkiai pakenkta (ar manoma, kad sunkiai pakenkta) darbuotojo sveikatai?",
+    "options": [
+      "Taip.",
+      "Ne.",
+      "Teisės aktai nereglamentuoja."
+    ],
+    "correctIndex": 0,
+    "explanation": "Taip, darbdavys privalo nedelsdamas pranešti šioms institucijoms ir šeimos nariui.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 28
+    }
+  },
+  {
+    "id": "45829-29",
+    "question": "Ar nepalankios darbo aplinkos sąlygos, tokios kaip netinkama temperatūra, drėgmė ir vėdinimas, gali padidinti riziką, ypač susižaloti nugarą?",
+    "options": [
+      "Rizika susižaloti nugarą priklauso nuo krovinio, bet ne nuo darbo aplinkos.",
+      "Taip. Netinkama temperatūra, drėgmė ir vėdinimas, gali padidinti riziką, ypač susižaloti nugarą.",
+      "Ne. Šios darbo aplinkos sąlygos nekelia rizikos susižaloti nugarą."
+    ],
+    "correctIndex": 1,
+    "explanation": "Taip, netinkama temperatūra, drėgmė ir vėdinimas gali padidinti riziką susižaloti nugarą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 29
+    }
+  },
+  {
+    "id": "45829-30",
+    "question": "Kokios trukmės kasmetinės atostogos priklauso neįgaliajam, jeigu jis dirba 5 darbo dienas per savaitę?",
+    "options": [
+      "25 darbo dienų.",
+      "35 darbo dienų",
+      "20 darbo dienų."
+    ],
+    "correctIndex": 0,
+    "explanation": "Dirbant 5 darbo dienas per savaitę, neįgaliajam suteikiamos 25 darbo dienų kasmetinės atostogos.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 30
+    }
+  },
+  {
+    "id": "45829-31",
+    "question": "Įtarus darbuotojui lėtinę profesinę ligą, kas apie tai raštu praneša darbdaviui?",
+    "options": [
+      "Asmuo, matęs įvykį arba jo pasekmes.",
+      "Gydytojas.",
+      "Visuomenės sveikatos centras apskrityje."
+    ],
+    "correctIndex": 1,
+    "explanation": "Įtarus lėtinę profesinę ligą, apie tai raštu darbdaviui praneša gydytojas.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 31
+    }
+  },
+  {
+    "id": "45829-32",
+    "question": "Tiriant psichosocialinius veiksnius vertinamos darbo sąlygos, tokios kaip:",
+    "options": [
+      "darbas nakties laiku ar pamainomis, darbas veikiant cheminiams, biologiniams, ergonominiams, fizikiniams ar fiziniams veiksniams",
+      "darbas susijęs su trumpesniu darbo pamainos laiku",
+      "darbas, kai taikomos specialiosios pertraukos"
+    ],
+    "correctIndex": 0,
+    "explanation": "Vertinamas darbas nakties laiku ar pamainomis, taip pat darbas veikiant įvairiems aplinkos rizikos veiksniams.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 32
+    }
+  },
+  {
+    "id": "45829-33",
+    "question": "Ar neįgalieji gali būti skiriami dirbti viršvalandinius darbus?",
+    "options": [
+      "Taip, gali.",
+      "Jeigu nedraudžia sveikatos priežiūros įstaigos išvada ir tik su jų sutikimu.",
+      "Ne, negali."
+    ],
+    "correctIndex": 1,
+    "explanation": "Neįgalieji gali būti skiriami dirbti viršvalandinius darbus tik jei nedraudžia ASPĮ išvada ir tik su jų sutikimu.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 33
+    }
+  },
+  {
+    "id": "45829-34",
+    "question": "Kas yra laikomos darbdavio (darbovietės) lygmeniu socialinės partnerystės šalimis?",
+    "options": [
+      "Darbdavio atstovai ir darbo taryba.",
+      "Darbdavio atstovai ir profesinė sąjunga.",
+      "Darbdavys ir darbuotojų atstovai."
+    ],
+    "correctIndex": 2,
+    "explanation": "Darbovietės lygmeniu socialinės partnerystės šalys yra darbdavys ir darbuotojų atstovai.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 34
+    }
+  },
+  {
+    "id": "45829-35",
+    "question": "Ar būtina įvertinti profesinę riziką visose darbo vietose?",
+    "options": [
+      "Teisės aktai nereglamentuoja.",
+      "Taip.",
+      "Ne."
+    ],
+    "correctIndex": 1,
+    "explanation": "Profesinę riziką būtina įvertinti visose darbo vietose.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 35
+    }
+  },
+  {
+    "id": "45829-36",
+    "question": "Nustatant, ar neviršijama žemutinė ekspozicijos vertė veiksmams pradėti, triukšmo veikimas darbuotojui yra vertinamas:",
+    "options": [
+      "atsižvelgiant į darbuotojų sveikatos tikrinimų rezultatus",
+      "neatsižvelgiant į tai, kad naudojamasi asmeninėmis klausos apsaugos priemonėmis",
+      "atsižvelgiant į tai, kad naudojamasi asmeninėmis klausos apsaugos priemonėmis"
+    ],
+    "correctIndex": 1,
+    "explanation": "Žemutinė ekspozicijos vertė veiksmams pradėti nustatoma neatsižvelgiant į asmeninių klausos apsaugos priemonių naudojimą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 36
+    }
+  },
+  {
+    "id": "45829-37",
+    "question": "Kokiais atvejais įmonėje skirti asmenį, atsakingą už elektros ūkį, nebūtina?",
+    "options": [
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 60 kW.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 50 kW esant trifaziam elektros įvadui.",
+      "Jei turimų žemosios įtampos elektros įrenginių leista naudoti galia yra ne didesnė kaip 30 kW arba esant vienfaziam elektros įvadui."
+    ],
+    "correctIndex": 2,
+    "explanation": "Skirti asmens, atsakingo už elektros ūkį, nebūtina, jei žemosios įtampos įrenginių leista galia ne didesnė kaip 30 kW arba esant vienfaziam įvadui.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 37
+    }
+  },
+  {
+    "id": "45829-38",
+    "question": "Kada gali būti paskirta administracinė nuobauda už darbuotojų saugos ir sveikatos norminių teisės aktų pažeidimus?",
+    "options": [
+      "Ne vėliau kaip per vienerius metus nuo administracinio nusižengimo padarymo dienos, o trunkamojo administracinio nusižengimo atveju – per vienerius metus nuo jo paaiškėjimo dienos.",
+      "Ne vėliau kaip per dvejus metus nuo administracinio nusižengimo padarymo dienos, o trunkamojo administracinio nusižengimo atveju – per dvejus metus nuo jo paaiškėjimo dienos.",
+      "Ne vėliau kaip per trejus metus nuo administracinio nusižengimo padarymo dienos, o trunkamojo administracinio nusižengimo atveju – per trejus metus nuo jo paaiškėjimo dienos."
+    ],
+    "correctIndex": 0,
+    "explanation": "Administracinė nuobauda gali būti paskirta ne vėliau kaip per vienerius metus nuo padarymo (ar trunkamojo nusižengimo paaiškėjimo) dienos.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 38
+    }
+  },
+  {
+    "id": "45829-39",
+    "question": "Ar visose darbo vietose darbuotojai privalo naudoti asmenines apsaugos priemones?",
+    "options": [
+      "Tose darbo vietose, kurios yra pažymėtos įspėjamaisiais saugos ir sveikatos apsaugos ženklais.",
+      "Tose darbo vietose, kurios yra pažymėtos atitinkamais įpareigojančiais saugos ir sveikatos apsaugos ženklais.",
+      "Visose darbo vietose, kuriose darbuotojas būna darbo metu."
+    ],
+    "correctIndex": 1,
+    "explanation": "AAP naudojamos ten, kur tai nustatyta pagal rizikos vertinimą ir nurodyta įpareigojančiais ženklais / reikalavimais.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 39
+    }
+  },
+  {
+    "id": "45829-40",
+    "question": "Kaip reikia elgtis transporto priemonių dujų balionų pildymo metu pastebėjus dujų nuotėkį?",
+    "options": [
+      "Iškviesti dujų tarnybas.",
+      "Nustoti pildyti ir kuo greičiau išvažiuoti iš degalinės.",
+      "Pildymo operaciją būtina nedelsiant nutraukti, o transporto priemonę, neužvedant variklio ir neįjungiant žibintų – nustumti į saugią vietą."
+    ],
+    "correctIndex": 2,
+    "explanation": "Pastebėjus nuotėkį, pildymas nedelsiant nutraukiamas, o transporto priemonė neužvedant variklio ir neįjungiant žibintų nustumiama į saugią vietą.",
+    "source": {
+      "role": "dss-vadovas",
+      "roleLabel": "DSS vadovas / atstovaujantis asmuo",
+      "vdiGroup": "(7) Darbdavio, darbdaviui atstovaujančio asmens, atliekančio DSS tarnybos funkcijas III grupės ekonominės veiklos rūšių įmonėse",
+      "testNumber": "45829",
+      "testDate": "2023-05-29",
+      "questionNumber": 40
+    }
   }
 ]
