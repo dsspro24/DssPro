@@ -1,0 +1,26 @@
+[
+  {
+    "id": "grupe-i-1",
+    "question": "Pavyzdinis klausimas I grupei: į kurią kategoriją paprastai patenka žemesnės rizikos ekonominės veiklos rūšys?",
+    "options": ["I grupė", "II grupė", "III grupė", "Nė viena grupė"],
+    "correctIndex": 0,
+    "explanation": "Konkrečios ekonominės veiklos rūšies grupė priklauso nuo teisės aktuose nustatyto priskyrimo.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-i-2",
+    "question": "Pavyzdinis klausimas: kokia priemonė padeda nustatyti I grupės įmonės pagrindinius saugos pavojus?",
+    "options": ["Rizikos vertinimas", "Tik darbo laiko grafikas", "Tik metinis pelnas", "Tik darbuotojų skaičius"],
+    "correctIndex": 0,
+    "explanation": "Rizikos vertinimas padeda identifikuoti pavojus ir priimti tinkamas prevencijos priemones.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-i-3",
+    "question": "Pavyzdinis klausimas: kam svarbu periodiškai peržiūrėti saugos dokumentus?",
+    "options": ["Darbdaviui ir saugos funkcijas atliekančiam personalui", "Tik VDI darbuotojams", "Tik draudikams", "Tik naujiems darbuotojams"],
+    "correctIndex": 0,
+    "explanation": "Dokumentai ir priemonės turi būti atnaujinami pasikeitus sąlygoms, procesams ar teisės aktams.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  }
+]

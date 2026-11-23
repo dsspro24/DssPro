@@ -1,0 +1,26 @@
+[
+  {
+    "id": "darbdavys-1",
+    "question": "Pavyzdinis klausimas: kas, kaip tikėtina, turėtų užtikrinti saugios darbo sąlygas darbdavio vadovaujamoje įmonėje?",
+    "options": ["Darbdavys", "Tik darbuotojai", "Tik valstybės institucijos", "Tik kolektyvinės sutarties šalys"],
+    "correctIndex": 0,
+    "explanation": "Darbdavys atsakingas už saugios ir sveikos darbo aplinkos organizavimą bei darbuotojų saugos ir sveikatos priemones.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "darbdavys-2",
+    "question": "Pavyzdinis klausimas: kada darbuotojui reikėtų suteikti bendrąjį įvadinį instruktavimą?",
+    "options": ["Priimant į darbą", "Tik po pirmos avarijos", "Tik kasmet", "Tik išvykus iš darbo"],
+    "correctIndex": 0,
+    "explanation": "Bendrasis įvadinis instruktavimas paprastai organizuojamas priimant darbuotoją į darbą.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "darbdavys-3",
+    "question": "Pavyzdinis klausimas: ką darbdavys privalo atlikti prieš pradėdamas naują darbo procesą?",
+    "options": ["Identifikuoti ir įvertinti susijusius pavojus bei rizikas", "Iš karto įsigyti visą galimą įrangą", "Visiškai pasikliauti darbuotojo patirtimi", "Negali keisti organizavimo tvarkos"],
+    "correctIndex": 0,
+    "explanation": "Saugos ir sveikatos sprendimai turėtų būti grindžiami rizikos vertinimu.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  }
+]

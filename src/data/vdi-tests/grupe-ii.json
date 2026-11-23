@@ -1,0 +1,26 @@
+[
+  {
+    "id": "grupe-ii-1",
+    "question": "Pavyzdinis klausimas II grupei: kokia priemonė skatina prevenciją organizacijoje?",
+    "options": ["Rizikos vertinimas ir prevencijos priemonių planavimas", "Tik baudos darbuotojams", "Tik atskirų darbuotojų laikraščiai", "Tik metinė ataskaita kredito įstaigai"],
+    "correctIndex": 0,
+    "explanation": "Prevencija efektyvi, kai grindžiama rizikų vertinimu ir aiškiais organizavimo sprendimais.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-ii-2",
+    "question": "Pavyzdinis klausimas: kada darbuotojas turi būti instruktuojamas apie darbo vietoje kylančius pavojus?",
+    "options": ["Priimant į darbą ir pasikeitus darbo sąlygoms", "Tik baigiant darbą", "Tik pirkimo skyriuje", "Tik po premijos"],
+    "correctIndex": 0,
+    "explanation": "Instruktavimas svarbus priimant ir keisis darbo sąlygoms bei pavojams.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-ii-3",
+    "question": "Pavyzdinis klausimas: kas turėtų žinoti avarinio atvejo veiksmų tvarką?",
+    "options": ["Įmonėje atsakingi darbuotojai ir tie, kuriems ji taikoma", "Tik apsaugos darbuotojai", "Tik prižiūrintis darbuotojas", "Tik valdyba"],
+    "correctIndex": 0,
+    "explanation": "Evakuacijos ir avarinių veiksmų tvarka turi būti žinoma visiems paveiktiems asmenims.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  }
+]

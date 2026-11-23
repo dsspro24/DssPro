@@ -1,0 +1,26 @@
+[
+  {
+    "id": "grupe-iii-1",
+    "question": "Pavyzdinis klausimas III grupei: kas turėtų būti svarbiausia priimant sprendimus dėl saugos priemonių?",
+    "options": ["Rizikos lygis ir prevencijos efektyvumas", "Tik priemonės kaina", "Tik darbuotojų pageidavimai", "Tik įmonės reklaminė kampanija"],
+    "correctIndex": 0,
+    "explanation": "Saugos priemonės turi sumažinti realią riziką, o jų pasirinkimas grindžiamas vertinimu.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-iii-2",
+    "question": "Pavyzdinis klausimas: kokia apsaugos priemonių pirmenybės tvarka turėtų būti taikoma?",
+    "options": ["Pirmiausia kolektyvinės, paskui individualios apsaugos priemonės", "Pirmiausia individualios, paskui kolektyvinės", "Tik individualios apsaugos priemonės", "Tik simboliniai ženklai"],
+    "correctIndex": 0,
+    "explanation": "Pirmiausia siekiama pašalinti ar kontroliuoti pavojų kolektyvinėmis priemonėmis, o AAP taikomos, kai rizikos neišvengiama.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  },
+  {
+    "id": "grupe-iii-3",
+    "question": "Pavyzdinis klausimas: kam organizacijoje svarbu stebėti saugos būklę?",
+    "options": ["Darbdaviui ir atsakingiems saugos bei sveikatos funkcijoms", "Tik klientams", "Tik apskaitos skyriui", "Tik tiekėjams"],
+    "correctIndex": 0,
+    "explanation": "Saugos būklę reikėtų nuolat stebėti ir vertinti bei imtis koregavimo priemonių.",
+    "source": "VDI pavyzdinių klausimų konceptas"
+  }
+]

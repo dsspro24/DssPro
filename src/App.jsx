@@ -28,6 +28,7 @@ const LocalWorkspace = lazy(() => import('./LocalWorkspace.jsx'));
 const BlogPage = lazy(() => import('./Blog.jsx'));
 const TermsOfService = lazy(() => import('./TermsOfService.jsx'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy.jsx'));
+const VdiTests = lazy(() => import('./VdiTests.jsx'));
 
 export default function App() {
   let page;
@@ -35,6 +36,8 @@ export default function App() {
     page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliamos naudojimo sąlygos…</p></main>}><TermsOfService /></Suspense>;
   } else if (/^\/privatumo-politika\/?$/.test(window.location.pathname)) {
     page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliama privatumo politika…</p></main>}><PrivacyPolicy /></Suspense>;
+  } else if (/^\/vdi-testai\/?$/.test(window.location.pathname)) {
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliami VDI testai…</p></main>}><VdiTests /></Suspense>;
   } else if (window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/)) {
     const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
     const slug = blogRoute[1]
@@ -378,6 +381,7 @@ function DemoApp({ cloudMode = false }) {
               <a className="transition hover:text-emerald-800" href="#kaip-veikia">Kaip veikia</a>
               <a className="transition hover:text-emerald-800" href="#galimybes">Galimybės</a>
               <a className="transition hover:text-emerald-800" href="#kainos">Kainos</a>
+              <a className="transition hover:text-emerald-800" href="/vdi-testai">VDI testai</a>
             </nav>
             <button
               onClick={() => { setCurrentPage('app'); setActiveTab('skydelis'); }}
@@ -670,6 +674,7 @@ function DemoApp({ cloudMode = false }) {
         <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
           <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
             <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
+            <a href="/vdi-testai" className="font-semibold text-emerald-800 hover:text-emerald-950">VDI testai</a>
             <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>
             <a href="/privatumo-politika" className="font-semibold text-emerald-800 hover:text-emerald-950">Privatumo politika</a>
             <button type="button" className="font-semibold text-emerald-800 hover:text-emerald-950" onClick={() => window.dispatchEvent(new Event('dsspro:open-cookie-settings'))}>Slapukų nustatymai</button>
