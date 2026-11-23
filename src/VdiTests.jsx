@@ -6,9 +6,12 @@ import grupeIIIQuestions from './data/vdi-tests/grupe-iii.json';
 
 const CATEGORIES = [
   { id: 'darbdavys', title: 'Darbdaviui atstovaujantis asmuo', description: 'Vadovams ir asmenims, kuriems pavesta atlikti DSS specialisto funkcijas.', questions: darbdaviuiQuestions },
-  { id: 'grupe-i', title: 'DSS specialistas – I grupė', description: 'Ekonominių veiklos rūšių I grupės klausimai.', questions: grupeIQuestions },
-  { id: 'grupe-ii', title: 'DSS specialistas – II grupė', description: 'Ekonominių veiklos rūšių II grupės klausimai.', questions: grupeIIQuestions },
-  { id: 'grupe-iii', title: 'DSS specialistas – III grupė', description: 'Ekonominių veiklos rūšių III grupės klausimai.', questions: grupeIIIQuestions },
+  {
+    id: 'dss-specialistas',
+    title: 'DSS specialistas – visos ekonominių veiklos rūšių grupės',
+    description: 'Klausimai I, II ir III ekonominių veiklos rūšių grupėms.',
+    questions: [...grupeIQuestions, ...grupeIIQuestions, ...grupeIIIQuestions],
+  },
 ];
 
 function shuffle(items) {
@@ -133,7 +136,7 @@ export default function VdiTests() {
             <div className="grid gap-4 md:grid-cols-2">
               {CATEGORIES.map((item) => (
                 <button key={item.id} type="button" onClick={() => setCategoryId(item.id)} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
-                  <span className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-sm font-black text-emerald-800">{item.id === 'darbdavys' ? 'D' : item.id.slice(-1).toUpperCase()}</span>
+                  <span className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-sm font-black text-emerald-800">{item.id === 'darbdavys' ? 'D' : 'DSS'}</span>
                   <h3 className="font-bold text-slate-950">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
                   <span className="mt-4 block text-sm font-bold text-emerald-800">{item.questions.length} klausimų banke →</span>
