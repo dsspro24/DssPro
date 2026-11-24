@@ -29,6 +29,8 @@ const BlogPage = lazy(() => import('./Blog.jsx'));
 const TermsOfService = lazy(() => import('./TermsOfService.jsx'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy.jsx'));
 const VdiTests = lazy(() => import('./VdiTests.jsx'));
+const AboutPage = lazy(() => import('./AboutPage.jsx'));
+const ContactPage = lazy(() => import('./ContactPage.jsx'));
 
 export default function App() {
   let page;
@@ -38,6 +40,10 @@ export default function App() {
     page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliama privatumo politika…</p></main>}><PrivacyPolicy /></Suspense>;
   } else if (/^\/vdi-testai\/?$/.test(window.location.pathname)) {
     page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliami VDI testai…</p></main>}><VdiTests /></Suspense>;
+  } else if (/^\/apie-mus\/?$/.test(window.location.pathname)) {
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliama informacija apie DSS Pro…</p></main>}><AboutPage /></Suspense>;
+  } else if (/^\/kontaktai\/?$/.test(window.location.pathname)) {
+    page = <Suspense fallback={<main className="grid min-h-screen place-items-center px-4"><p className="text-sm text-slate-600">Įkeliami kontaktai…</p></main>}><ContactPage /></Suspense>;
   } else if (window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/)) {
     const blogRoute = window.location.pathname.match(/^\/tinklarastis(?:\/([^/]+))?\/?$/);
     const slug = blogRoute[1]
@@ -673,6 +679,8 @@ function DemoApp({ cloudMode = false }) {
 
         <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
           <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+            <a href="/apie-mus" className="font-semibold text-emerald-800 hover:text-emerald-950">Apie mus</a>
+            <a href="/kontaktai" className="font-semibold text-emerald-800 hover:text-emerald-950">Kontaktai</a>
             <a href="/tinklarastis" className="font-semibold text-emerald-800 hover:text-emerald-950">Tinklaraštis</a>
             <a href="/vdi-testai" className="font-semibold text-emerald-800 hover:text-emerald-950">VDI testai</a>
             <a href="/naudojimo-salygos" className="font-semibold text-emerald-800 hover:text-emerald-950">Naudojimo sąlygos</a>

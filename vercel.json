@@ -4,7 +4,9 @@
     { "source": "/tinklarastis/:slug/", "destination": "/tinklarastis/:slug", "permanent": true },
     { "source": "/naudojimo-salygos/", "destination": "/naudojimo-salygos", "permanent": true },
     { "source": "/privatumo-politika/", "destination": "/privatumo-politika", "permanent": true },
-    { "source": "/vdi-testai/", "destination": "/vdi-testai", "permanent": true }
+    { "source": "/vdi-testai/", "destination": "/vdi-testai", "permanent": true },
+    { "source": "/apie-mus/", "destination": "/apie-mus", "permanent": true },
+    { "source": "/kontaktai/", "destination": "/kontaktai", "permanent": true }
   ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
@@ -12,6 +14,8 @@
     { "source": "/tinklarastis/:slug", "destination": "/api/blog?slug=:slug" },
     { "source": "/naudojimo-salygos", "destination": "/index.html" },
     { "source": "/privatumo-politika", "destination": "/index.html" },
-    { "source": "/vdi-testai", "destination": "/index.html" }
+    { "source": "/vdi-testai", "destination": "/index.html" },
+    { "source": "/apie-mus", "destination": "/index.html" },
+    { "source": "/kontaktai", "destination": "/index.html" }
   ]
 }

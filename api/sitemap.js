@@ -86,6 +86,8 @@ export default async function handler(request, response) {
       sitemapUrl(`${siteUrl}/privatumo-politika`),
       sitemapUrl(`${siteUrl}/naudojimo-salygos`),
       sitemapUrl(`${siteUrl}/vdi-testai`),
+      sitemapUrl(`${siteUrl}/apie-mus`),
+      sitemapUrl(`${siteUrl}/kontaktai`),
       sitemapUrl(`${siteUrl}/tinklarastis`, validDate(posts[0]?.updated_at)),
       ...posts
         .filter((post) => typeof post.slug === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(post.slug))

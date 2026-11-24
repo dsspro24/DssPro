@@ -286,6 +286,8 @@ export default function VdiTests() {
       <footer className="border-t border-slate-200 bg-slate-50 px-5 py-6 text-center text-xs text-slate-500">
         <nav aria-label="Poraštės nuorodos" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
           <a href="/" className="font-semibold text-emerald-800">DSS Pro</a>
+          <a href="/apie-mus" className="font-semibold text-emerald-800">Apie mus</a>
+          <a href="/kontaktai" className="font-semibold text-emerald-800">Kontaktai</a>
           <a href="/tinklarastis" className="font-semibold text-emerald-800">Tinklaraštis</a>
           <a href="/naudojimo-salygos" className="font-semibold text-emerald-800">Naudojimo sąlygos</a>
           <a href="/privatumo-politika" className="font-semibold text-emerald-800">Privatumo politika</a>
