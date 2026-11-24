@@ -654,7 +654,7 @@ function DemoApp({ cloudMode = false }) {
             <div className="mt-8 divide-y divide-slate-200 border-y border-slate-200">
               <details className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Kas apmoka DSS Pro planą?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Mokamą planą pasirenka ir apmoka įmonės vadovas. DSS specialistai ir darbuotojai prie įmonės prisijungia nemokamai.</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Mokamą planą pasirenka ir apmoka įmonės vadovas. DSS specialistai ir darbuotojai prie įmonės prisijungiami nemokamai.</p>
               </details>
               <details className="group py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">Ar galiu išbandyti sistemą prieš registruodamasis?<ChevronRight size={18} className="shrink-0 text-emerald-800 transition group-open:rotate-90" /></summary>
