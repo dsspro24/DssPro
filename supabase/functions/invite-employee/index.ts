@@ -11,6 +11,29 @@ const response = (status: number, body: Record<string, unknown>) => new Response
   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
 });
 
+const sendEmployeeSetupEmail = async (
+  adminClient: ReturnType<typeof createClient>,
+  employeeUser: { email_confirmed_at?: string; user_metadata?: Record<string, unknown> },
+  email: string,
+  redirectTo: string,
+) => {
+  if (employeeUser.user_metadata?.employee_needs_password !== true) return false;
+
+  if (!employeeUser.email_confirmed_at) {
+    const { error } = await adminClient.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: redirectTo },
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  const { error } = await adminClient.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+  return true;
+};
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return response(405, { error: 'Method not allowed' });
@@ -37,6 +60,8 @@ Deno.serve(async (request) => {
   }
 
   const organizationId = String(body.organizationId ?? '');
+  const resendEmployeeId = String(body.resendEmployeeId ?? '');
+  const isResend = Boolean(resendEmployeeId);
   const employee = body.employee as Record<string, unknown> | undefined;
   const email = String(employee?.email ?? '').trim().toLowerCase();
   const employeeId = String(employee?.id ?? '');
@@ -48,8 +73,10 @@ Deno.serve(async (request) => {
     return response(400, { error: 'Invalid invitation redirect URL' });
   }
 
-  if (!organizationId || !employee || !/^emp-[a-z0-9-]{10,80}$/i.test(employeeId)
-    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  if (!organizationId
+    || (isResend && !/^emp-[a-z0-9-]{10,80}$/i.test(resendEmployeeId))
+    || (!isResend && (!employee || !/^emp-[a-z0-9-]{10,80}$/i.test(employeeId)
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))
     || redirectUrl.origin !== origin) {
     return response(400, { error: 'Employee invitation data is invalid' });
   }
@@ -89,6 +116,35 @@ Deno.serve(async (request) => {
 
   const organization = workspace.data.organizations?.find((item: Record<string, unknown>) => item.id === organizationId);
   if (!organization) return response(404, { error: 'Organization workspace was not found' });
+
+  if (isResend) {
+    const invitedEmployee = (Array.isArray(workspace.data.employees) ? workspace.data.employees : [])
+      .find((item: Record<string, unknown>) => item.id === resendEmployeeId && item.orgId === organizationId);
+    if (!invitedEmployee || invitedEmployee.status !== 'Pakviestas') {
+      return response(404, { error: 'Pending employee invitation was not found' });
+    }
+
+    const invitedEmail = String(invitedEmployee.email ?? '').trim().toLowerCase();
+    const { data: employeeUserId, error: employeeLookupError } = await adminClient.rpc(
+      'find_employee_account_by_email',
+      { input_email: invitedEmail },
+    );
+    if (employeeLookupError) return response(500, { error: `Could not check for an existing employee account: ${employeeLookupError.message}` });
+    if (!employeeUserId) return response(404, { error: 'Employee account was not found' });
+
+    const { data: employeeUserResult, error: employeeUserError } = await adminClient.auth.admin.getUserById(employeeUserId);
+    if (employeeUserError || !employeeUserResult.user) {
+      return response(500, { error: `Could not load employee account: ${employeeUserError?.message ?? 'Account was not found'}` });
+    }
+
+    try {
+      const emailSent = await sendEmployeeSetupEmail(adminClient, employeeUserResult.user, invitedEmail, redirectUrl.toString());
+      return response(200, { employeeId: resendEmployeeId, email: invitedEmail, emailSent });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return response(400, { error: `Could not resend employee setup email: ${message}` });
+    }
+  }
 
   const resourceIds = Array.isArray(employee.resourceIds) ? employee.resourceIds.map(String) : [];
   const allowedResourceIds = new Set(Array.isArray(organization.resources) ? organization.resources.map(String) : []);
@@ -190,6 +246,7 @@ Deno.serve(async (request) => {
 
   let employeeUserId = existingEmployeeUserId;
   let invitedNewAccount = false;
+  let setupEmailSent = false;
   if (!employeeUserId) {
     const { data: invitation, error: invitationError } = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: {
@@ -206,6 +263,20 @@ Deno.serve(async (request) => {
     }
     employeeUserId = invitation.user.id;
     invitedNewAccount = true;
+    setupEmailSent = true;
+  } else {
+    const { data: employeeUserResult, error: employeeUserError } = await adminClient.auth.admin.getUserById(employeeUserId);
+    if (employeeUserError || !employeeUserResult.user) {
+      await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+      return response(500, { error: `Could not load employee account: ${employeeUserError?.message ?? 'Account was not found'}` });
+    }
+    try {
+      setupEmailSent = await sendEmployeeSetupEmail(adminClient, employeeUserResult.user, email, redirectUrl.toString());
+    } catch (error) {
+      await adminClient.from('organization_data').update({ data: workspace.data }).eq('organization_id', organizationId);
+      const message = error instanceof Error ? error.message : String(error);
+      return response(400, { error: `Could not resend employee setup email: ${message}` });
+    }
   }
 
   const { error: accessError } = await adminClient.from('employee_organization_access').upsert({
@@ -262,5 +333,5 @@ Deno.serve(async (request) => {
     return response(500, { error: `Could not link employee record: ${employeeLinkError.message}` });
   }
 
-  return response(200, { employeeId, email, existingAccount: !invitedNewAccount });
+  return response(200, { employeeId, email, existingAccount: !invitedNewAccount, invitationEmailSent: setupEmailSent });
 });
