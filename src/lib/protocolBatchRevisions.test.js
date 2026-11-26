@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updateProtocolBatchRevision } from './protocolBatchRevisions.js';
+import { applyProtocolBatchSnapshot, updateProtocolBatchRevision } from './protocolBatchRevisions.js';
 
 const employee = (id, name, testResults = []) => ({
   id,
@@ -74,4 +74,15 @@ test('updating an unsigned protocol changes its snapshot without creating anothe
   assert.equal(result.batches.length, 1);
   assert.equal(result.batch.id, batch.id);
   assert.deepEqual(result.batch.employeeSnapshots[0].testResults, [resultSnapshot]);
+});
+
+test('applying a protocol snapshot retains later test attempts for the report', () => {
+  const earlierAttempt = { resourceId: 'test-1', passed: false, score: 60, completedAt: '2026-10-01T10:00:00Z' };
+  const passedAttempt = { resourceId: 'test-1', passed: true, score: 90, completedAt: '2026-10-02T10:00:00Z' };
+  const employeeRecord = employee('employee-1', 'Jonas', [earlierAttempt, passedAttempt]);
+  const snapshot = { ...employeeRecord, testResults: [earlierAttempt] };
+
+  const result = applyProtocolBatchSnapshot(employeeRecord, snapshot);
+
+  assert.deepEqual(result.testResults, [earlierAttempt, passedAttempt]);
 });

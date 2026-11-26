@@ -8,7 +8,7 @@ import {
 } from './lib/subscriptionAccess.js';
 import dssProLogo from './assets/dss-pro-logo.webp';
 import { supabase } from './lib/supabase.js';
-import { updateProtocolBatchRevision } from './lib/protocolBatchRevisions.js';
+import { applyProtocolBatchSnapshot, updateProtocolBatchRevision } from './lib/protocolBatchRevisions.js';
 import { isProtocolCommissionSigningAvailable } from './lib/protocolCommissionSigning.js';
 import {
   getOrganizationPresetResourceIds,
@@ -7068,12 +7068,12 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
       : (data.archivedEmployees ?? [])
         .filter((record) => record.orgId === currentOrg?.id)
         .map((record) => record.employee);
-    const applyProtocolBatchSnapshot = (person, employeeId) => {
-      const snapshot = protocolBatch?.employeeSnapshots?.find((item) => item.id === employeeId);
-      return person && snapshot ? { ...person, ...snapshot } : person;
-    };
+    const employeeWithProtocolSnapshot = (person, employeeId) => applyProtocolBatchSnapshot(
+      person,
+      protocolBatch?.employeeSnapshots?.find((item) => item.id === employeeId),
+    );
     const activeEmployees = templateOnly || archivedRecord ? [] : protocolBatch
-      ? protocolBatch.employeeIds.map((employeeId) => applyProtocolBatchSnapshot(
+      ? protocolBatch.employeeIds.map((employeeId) => employeeWithProtocolSnapshot(
         data.employees.find((item) => item.id === employeeId),
         employeeId,
       )).filter(Boolean)
@@ -7083,7 +7083,7 @@ export default function LocalWorkspace({ userRole, onRoleChange, onExit, initial
     const archivedEmployees = archivedRecord
       ? [archivedRecord.employee]
       : templateOnly || userRole === 'darbuotojas' ? [] : protocolBatch
-      ? protocolBatch.employeeIds.map((employeeId) => applyProtocolBatchSnapshot(
+      ? protocolBatch.employeeIds.map((employeeId) => employeeWithProtocolSnapshot(
         data.archivedEmployees?.find((item) => item.employee.id === employeeId)?.employee
           ?? previewArchivedEmployees.find((employee) => employee.id === employeeId),
         employeeId,

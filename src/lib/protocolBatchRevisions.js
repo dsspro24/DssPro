@@ -13,6 +13,15 @@ const sameEmployeeSnapshot = (left, right) => left.name === right.name
   && JSON.stringify(left.sequenceNumbersByResource ?? {}) === JSON.stringify(right.sequenceNumbersByResource ?? {})
   && JSON.stringify(left.testResults ?? []) === JSON.stringify(right.testResults ?? []);
 
+export const applyProtocolBatchSnapshot = (employee, snapshot) => {
+  if (!employee || !snapshot) return employee;
+  const testResultsByAttempt = new Map(
+    [...(employee.testResults ?? []), ...(snapshot.testResults ?? [])]
+      .map((result) => [`${result.resourceId}:${result.completedAt ?? ''}`, result]),
+  );
+  return { ...employee, ...snapshot, testResults: [...testResultsByAttempt.values()] };
+};
+
 export const updateProtocolBatchRevision = ({
   batches,
   batch,
