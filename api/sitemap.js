@@ -84,7 +84,6 @@ export default async function handler(request, response) {
     const urls = [
       sitemapUrl(`${siteUrl}/`),
       sitemapUrl(`${siteUrl}/privatumo-politika`),
-      sitemapUrl(`${siteUrl}/naudojimo-salygos`),
       sitemapUrl(`${siteUrl}/vdi-testai`),
       sitemapUrl(`${siteUrl}/apie-mus`),
       sitemapUrl(`${siteUrl}/kontaktai`),

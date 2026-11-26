@@ -6,6 +6,9 @@ Pagrindiniai puslapiai:
 - https://www.dsspro.lt/
 - https://www.dsspro.lt/vdi-testai
 - https://www.dsspro.lt/tinklarastis
+- https://www.dsspro.lt/apie-mus
+- https://www.dsspro.lt/kontaktai
+- https://www.dsspro.lt/privatumo-politika
 
 VDI testai:
 - Savarankiškas mokymas pagal viešai skelbiamus VDI pavyzdinius klausimus.

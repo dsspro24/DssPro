@@ -12,10 +12,10 @@
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/tinklarastis", "destination": "/api/blog" },
     { "source": "/tinklarastis/:slug", "destination": "/api/blog?slug=:slug" },
-    { "source": "/naudojimo-salygos", "destination": "/index.html" },
-    { "source": "/privatumo-politika", "destination": "/index.html" },
-    { "source": "/vdi-testai", "destination": "/index.html" },
-    { "source": "/apie-mus", "destination": "/index.html" },
-    { "source": "/kontaktai", "destination": "/index.html" }
+    { "source": "/naudojimo-salygos", "destination": "/api/public-page?path=/naudojimo-salygos" },
+    { "source": "/privatumo-politika", "destination": "/api/public-page?path=/privatumo-politika" },
+    { "source": "/vdi-testai", "destination": "/api/public-page?path=/vdi-testai" },
+    { "source": "/apie-mus", "destination": "/api/public-page?path=/apie-mus" },
+    { "source": "/kontaktai", "destination": "/api/public-page?path=/kontaktai" }
   ]
 }
