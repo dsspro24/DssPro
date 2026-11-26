@@ -74,7 +74,7 @@ Deno.serve(async (request) => {
   }
 
   if (!organizationId
-    || (isResend && !/^emp-[a-z0-9-]{10,80}$/i.test(resendEmployeeId))
+    || (isResend && resendEmployeeId.length > 128)
     || (!isResend && (!employee || !/^emp-[a-z0-9-]{10,80}$/i.test(employeeId)
       || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))
     || redirectUrl.origin !== origin) {
