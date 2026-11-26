@@ -3,6 +3,7 @@ import { ArrowLeft, Globe, Mail, MessageSquareText } from 'lucide-react';
 
 const EMAIL = 'dsspro@inbox.lt';
 const LINKEDIN_URL = 'https://www.linkedin.com/company/dsspro';
+const FACEBOOK_URL = 'https://www.facebook.com/dsspro.lt';
 
 function setContactMetadata() {
   const title = 'Kontaktai | DSS Pro';
@@ -84,6 +85,12 @@ export default function ContactPage() {
             <h2 className="mt-5 text-xl font-bold text-slate-950">LinkedIn</h2>
             <p className="mt-2 leading-7 text-slate-600">Sekite DSS Pro naujienas ir įmonės puslapį LinkedIn.</p>
             <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-emerald-800 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">Atidaryti puslapį</a>
+          </article>
+          <article className="rounded-2xl border border-slate-200 p-6 sm:p-8">
+            <span className="grid size-12 place-items-center rounded-xl bg-emerald-50 text-emerald-800"><Globe size={22} /></span>
+            <h2 className="mt-5 text-xl font-bold text-slate-950">Facebook</h2>
+            <p className="mt-2 leading-7 text-slate-600">Sekite DSS Pro naujienas mūsų Facebook puslapyje.</p>
+            <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-emerald-800 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">Atidaryti puslapį</a>
           </article>
         </section>
       </main>
